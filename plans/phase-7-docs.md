@@ -13,4 +13,9 @@ Mark every phase as done in `plans/README.md`.
 
 ## Done
 
-_Fill in when the phase lands._
+- `CLAUDE.md` rewritten to cover:
+  - the backend switch and the mock's seeded accounts;
+  - sessions, query keys and invalidation;
+  - route guards and screens chosen by role;
+  - cross-platform rules and the domain/time-string conventions.
+- Final regression: all five Playwright suites passed (45 steps: auth, user dashboard and booking, store dashboard, menu and events, settings and profile), with no console errors.
