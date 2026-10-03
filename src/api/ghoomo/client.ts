@@ -1,8 +1,24 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
-import { toLocationCode } from '@/api/ghoomo/mappers';
-import type { GhoomoLocationClaims, GhoomoUserClaims } from '@/api/ghoomo/types';
+import {
+  API_DEFAULTS,
+  appointmentToBooking,
+  calendarId,
+  localToIso,
+  locationToStore,
+  slotKey,
+  slotsFromCalendar,
+  toLocationCode,
+} from '@/api/ghoomo/mappers';
+import type {
+  GhoomoAppointment,
+  GhoomoCalendar,
+  GhoomoLocation,
+  GhoomoLocationClaims,
+  GhoomoUserClaims,
+} from '@/api/ghoomo/types';
 import { decodeJwt } from '@/lib/jwt';
-import type { Session } from '@/types/domain';
+import { parseDateKey } from '@/lib/date';
+import type { Booking, Session, Store, UserProfile } from '@/types/domain';
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT';
@@ -48,9 +64,41 @@ const notYet = (name: string) => async (): Promise<never> => {
 };
 
 type TokenResponse = { message: string; token: string };
+type EventsResponse = { success: boolean; data: GhoomoAppointment[] };
 
 export function createGhoomoApi(baseUrl: string): Api {
   const request = createRequest(baseUrl);
+
+  /** Claims of the signed-in account; endpoints that need them are only reachable signed in. */
+  function claims<T extends GhoomoUserClaims | GhoomoLocationClaims>(): T {
+    const token = getAuthToken();
+    if (!token) throw new ApiError('Please log in again.', 401);
+    return decodeJwt<T>(token);
+  }
+
+  // The API has no user-profile endpoints yet: keep edits for this session, keyed by account.
+  const userProfiles = new Map<string, UserProfile>();
+
+  /** Active SHOP locations with their settings. GET /location is public, so guests can browse. */
+  async function listShops(): Promise<Store[]> {
+    const res = await request<{ locationList: GhoomoLocation[] }>('/location', { emptyOn: [404] });
+    return (res?.locationList ?? [])
+      .filter((row) => row.loc_type === 'SHOP' && row.active !== 0)
+      .map((row) => locationToStore(row));
+  }
+
+  async function findShop(storeId: string): Promise<Store> {
+    const store = (await listShops()).find((s) => s.id === storeId);
+    if (!store) throw new ApiError('Store not found.', 404);
+    return store;
+  }
+
+  /** A month's SHOP calendar; `null` when nothing has been booked that month (404). */
+  async function getCalendar(storeId: string, year: number, month: number) {
+    const id = encodeURIComponent(calendarId(year, month, storeId));
+    const res = await request<{ calendarDetails: GhoomoCalendar }>(`/calendar/${id}`, { emptyOn: [404] });
+    return res?.calendarDetails.day_details ?? null;
+  }
 
   return {
     async signup(input) {
@@ -107,17 +155,98 @@ export function createGhoomoApi(baseUrl: string): Api {
       };
     },
 
-    listStores: notYet('listStores'),
-    getStore: notYet('getStore'),
-    getStoreSlots: notYet('getStoreSlots'),
+    listStores: listShops,
+    getStore: findShop,
+
+    async getStoreSlots(storeId, date) {
+      const { year, month } = parseDateKey(date);
+      const [store, dayDetails] = await Promise.all([
+        findShop(storeId),
+        getCalendar(storeId, year, month),
+      ]);
+      return slotsFromCalendar(dayDetails, date, store);
+    },
+
     getStoreMonthSummary: notYet('getStoreMonthSummary'),
     getStoreBookings: notYet('getStoreBookings'),
-    createBooking: notYet('createBooking'),
+    async createBooking(input): Promise<Booking> {
+      const store = await findShop(input.storeId);
+      const { userId } = claims<GhoomoUserClaims>();
+      const createdAt = new Date().toISOString();
+      const res = await request<{ appointmentId: string }>('/appointment', {
+        method: 'POST',
+        body: {
+          loc_id: store.id,
+          loc_name: store.name,
+          apntmnt_time: localToIso(input.slotStart),
+          apntmnt_period: store.limitUnit === 'day' ? 'DAY' : 'HOUR',
+          cret_on: createdAt,
+          cret_by: input.name,
+          bokng_name: input.name,
+          bokng_mobile: input.mobile,
+          bokng_cnt: input.people,
+          bokng_desc: input.description,
+        },
+      });
+      const appointmentId = res!.appointmentId;
+
+      // Second call adds the head-count to the availability calendar. If it fails the booking
+      // still exists (Api.md §6), so don't fail the whole flow.
+      const { year, month, day } = parseDateKey(input.slotStart.slice(0, 10));
+      try {
+        await request('/calendar', {
+          method: 'POST',
+          body: {
+            plan_id: appointmentId,
+            count_of_ppl: input.people,
+            type: 'SHOP',
+            details: [
+              {
+                calendar_id: calendarId(year, month, store.id),
+                days: [day],
+                time: slotKey(input.slotStart.slice(11, 16)),
+              },
+            ],
+          },
+        });
+      } catch (error) {
+        console.warn('Booking saved but the availability calendar was not updated', error);
+      }
+
+      return {
+        ...input,
+        id: appointmentId,
+        storeName: store.name,
+        userId,
+        // New appointments always start PENDING on the server, even with auto-approve on.
+        status: 'pending',
+        createdAt,
+      };
+    },
+
     setBookingStatus: notYet('setBookingStatus'),
-    getMyBookings: notYet('getMyBookings'),
+    async getMyBookings() {
+      const ranges = ['coming-events', 'inprogress-events', 'completed-events'];
+      const lists = await Promise.all(
+        ranges.map((range) => request<EventsResponse>(`/events/${range}`)),
+      );
+      const rows = lists.flatMap((res) => res?.data ?? []);
+      const unique = new Map(rows.map((row) => [row.apntmnt_id, appointmentToBooking(row)]));
+      return [...unique.values()];
+    },
+
     updateStoreSettings: notYet('updateStoreSettings'),
     updateStoreProfile: notYet('updateStoreProfile'),
-    getUserProfile: notYet('getUserProfile'),
-    updateUserProfile: notYet('updateUserProfile'),
+    async getUserProfile() {
+      const { userId, userName } = claims<GhoomoUserClaims>();
+      return (
+        userProfiles.get(userId) ?? { name: userName?.split('@')[0] ?? '', mobile: API_DEFAULTS.userMobile }
+      );
+    },
+
+    async updateUserProfile(profile) {
+      userProfiles.set(claims<GhoomoUserClaims>().userId, profile);
+      return profile;
+    },
   };
 }

@@ -1,9 +1,12 @@
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
+// react-native-web can leave a fading modal stuck on screen if navigation happens mid-fade.
+const MODAL_ANIMATION = Platform.OS === 'web' ? 'none' : 'fade';
 
 type ConfirmModalProps = {
   visible: boolean;
@@ -30,7 +33,7 @@ export function ConfirmModal({
   const theme = useTheme();
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal visible={visible} transparent animationType={MODAL_ANIMATION} onRequestClose={onCancel}>
       <Pressable
         style={[styles.backdrop, { backgroundColor: theme.overlay }]}
         onPress={onCancel}

@@ -29,6 +29,8 @@ import type {
 export const API_DEFAULTS = {
   maxPerBooking: 5,
   state: '',
+  /** No user-profile endpoints: name comes from the email, mobile starts empty. */
+  userMobile: '',
   /** Server defaults applied when a location has never opened its settings (Api.md §5.4). */
   settings: { maxLimit: 100, unit: 'DAY', autoApprove: true, openAt: '09:00', closeAt: '21:00' },
 } as const;
