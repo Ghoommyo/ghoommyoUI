@@ -44,8 +44,11 @@ export interface StoreProfile {
   state: string;
   country: string;
   bio: string;
-  lat: number;
-  lng: number;
+  /** Not stored by the Ghoomo API yet, so absent in API mode (no map pin). */
+  lat?: number;
+  lng?: number;
+  /** Navigation link set by the store (Ghoomo `loc_nav`). */
+  mapUrl?: string;
 }
 
 export interface Store extends StoreSettings {

@@ -20,4 +20,5 @@ Create the `api_integration` branch and add an env flag that chooses between the
 
 ## Done
 
-_Fill in when the phase lands._
+- `EXPO_PUBLIC_API_URL` falls back to the default when it's empty, not only when it's missing.
+- An uncommitted `ios.bundleIdentifier` change in `app.json`, probably from a local `expo run:ios`, was left out of the branch's commits on purpose.

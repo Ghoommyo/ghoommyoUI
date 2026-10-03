@@ -32,4 +32,25 @@ Build the typed Ghoomo client and the pure mapping layer. Add a stub server so t
 
 ## Done
 
-_Fill in when the phase lands._
+- The client's `request()` handles four cases:
+  - **Token:** sent exactly as received, with `Bearer ` added only if it's missing.
+  - **Network failure:** becomes `ApiError(status 0)` with a "could not reach the server" message.
+  - **"Nothing there" statuses:** each call lists them in `emptyOn` (e.g. the calendar's 404), and they resolve to `null`.
+  - **Error bodies:** read from either the `error` or the `message` key.
+- Until phases 3–6 fill them in, the methods throw `ApiError(501)`.
+- `StoreProfile.lat`/`lng` are now optional, and there's a new `mapUrl` field (Ghoomo `loc_nav`).
+  - `MapFallback` prefers `mapUrl`, then coordinates, then an address search.
+  - `StoreMap` shows no native pin when there are no coordinates.
+- The stub (`npm run stub:api`) has:
+  - an HS256 JWT signed with HMAC, so a tampered token gets a 401;
+  - lazy profile and settings rows, and PUTs that return 404 before the first GET;
+  - empty strings ignored on profile PUT;
+  - PLACE rows, and a shop (`city_salon`) whose settings are `null`;
+  - seeded Raju Tailor appointments, with calendar rows to match.
+- Checked with `curl` and a Node mapper script, which covered:
+  - local↔ISO round trips;
+  - unpadded `"9:0"` keys, and half-hour keys counted in the right hourly slot;
+  - the `day` unit;
+  - null settings → server defaults;
+  - string numbers;
+  - JWT UTF-8 decoding.

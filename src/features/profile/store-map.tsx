@@ -12,12 +12,13 @@ const NativeMap = lazy(() => import('@/features/profile/native-map'));
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export function StoreMap({ name, profile }: { name: string; profile: StoreProfile }) {
-  if (isExpoGo) return <MapFallback profile={profile} />;
+  // No pin without coordinates (the Ghoomo API doesn't store them yet).
+  if (isExpoGo || profile.lat == null || profile.lng == null) return <MapFallback profile={profile} />;
 
   return (
     <View style={styles.container}>
       <Suspense fallback={<ActivityIndicator />}>
-        <NativeMap name={name} profile={profile} />
+        <NativeMap name={name} latitude={profile.lat} longitude={profile.lng} />
       </Suspense>
       <MapFallback profile={profile} />
     </View>

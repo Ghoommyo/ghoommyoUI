@@ -11,7 +11,11 @@ export function MapFallback({ profile }: { profile: StoreProfile }) {
   const address = [profile.address, profile.city, profile.state, profile.pin, profile.country]
     .filter(Boolean)
     .join(', ');
-  const url = `https://www.google.com/maps/search/?api=1&query=${profile.lat},${profile.lng}` as const;
+  // Prefer the store's own navigation link, then its coordinates, then an address search.
+  const query =
+    profile.lat != null && profile.lng != null ? `${profile.lat},${profile.lng}` : address;
+  const url = (profile.mapUrl ||
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`) as `https://${string}`;
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
@@ -19,9 +23,11 @@ export function MapFallback({ profile }: { profile: StoreProfile }) {
       <ThemedText type="small" themeColor="textSecondary">
         {address || 'No address yet'}
       </ThemedText>
-      <ExternalLink href={url}>
-        <ThemedText type="linkPrimary">Open in Maps ↗</ThemedText>
-      </ExternalLink>
+      {profile.mapUrl || query ? (
+        <ExternalLink href={url}>
+          <ThemedText type="linkPrimary">Open in Maps ↗</ThemedText>
+        </ExternalLink>
+      ) : null}
     </ThemedView>
   );
 }
