@@ -3,8 +3,12 @@ import {
   API_DEFAULTS,
   appointmentToBooking,
   calendarId,
+  daySummaryFromCalendar,
+  fromStatus,
   localToIso,
   locationToStore,
+  profileToStore,
+  settingsToStore,
   slotKey,
   slotsFromCalendar,
   toLocationCode,
@@ -14,6 +18,8 @@ import type {
   GhoomoCalendar,
   GhoomoLocation,
   GhoomoLocationClaims,
+  GhoomoProfile,
+  GhoomoSettings,
   GhoomoUserClaims,
 } from '@/api/ghoomo/types';
 import { decodeJwt } from '@/lib/jwt';
@@ -87,7 +93,36 @@ export function createGhoomoApi(baseUrl: string): Api {
       .map((row) => locationToStore(row));
   }
 
+  /** The signed-in owner's location code, or undefined when not signed in as a store. */
+  function ownLocCode(): string | undefined {
+    const token = getAuthToken();
+    if (!token) return undefined;
+    const c = decodeJwt<Partial<GhoomoLocationClaims>>(token);
+    return c.locCode ? c.locCode : undefined;
+  }
+
+  /** Owner view of their store. The settings/profile GETs also create those rows on first use. */
+  async function getOwnStore(locCode: string): Promise<Store> {
+    const base = `/location/${encodeURIComponent(locCode)}`;
+    const [location, settings, profile] = await Promise.all([
+      request<{ locationList: GhoomoLocation[] }>(base),
+      request<{ locationList: GhoomoSettings[] }>(`${base}/settings`),
+      request<{ locationList: GhoomoProfile[] }>(`${base}/profile`),
+    ]);
+    const row = location?.locationList[0];
+    if (!row) throw new ApiError('Store not found.', 404);
+    return {
+      id: row.user_id,
+      name: row.loc_name,
+      ...settingsToStore(settings?.locationList[0] ?? {}),
+      profile: profileToStore(profile?.locationList[0]),
+    };
+  }
+
   async function findShop(storeId: string): Promise<Store> {
+    const locCode = ownLocCode();
+    if (locCode && claims<GhoomoLocationClaims>().userId === storeId) return getOwnStore(locCode);
+
     const store = (await listShops()).find((s) => s.id === storeId);
     if (!store) throw new ApiError('Store not found.', 404);
     return store;
@@ -167,8 +202,21 @@ export function createGhoomoApi(baseUrl: string): Api {
       return slotsFromCalendar(dayDetails, date, store);
     },
 
-    getStoreMonthSummary: notYet('getStoreMonthSummary'),
-    getStoreBookings: notYet('getStoreBookings'),
+    async getStoreMonthSummary(storeId, year, month) {
+      return daySummaryFromCalendar(await getCalendar(storeId, year, month), year, month);
+    },
+
+    // The token scopes this to the owner's location; status tabs filter on the client.
+    async getStoreBookings(_storeId, dates) {
+      const res = await request<{ all_appointments: GhoomoAppointment[] }>(
+        '/events/all-appointment',
+        { method: 'POST', body: { selected_dates: dates } },
+      );
+      return (res?.all_appointments ?? [])
+        .map(appointmentToBooking)
+        .sort((a, b) => a.slotStart.localeCompare(b.slotStart));
+    },
+
     async createBooking(input): Promise<Booking> {
       const store = await findShop(input.storeId);
       const { userId } = claims<GhoomoUserClaims>();
@@ -224,7 +272,14 @@ export function createGhoomoApi(baseUrl: string): Api {
       };
     },
 
-    setBookingStatus: notYet('setBookingStatus'),
+    async setBookingStatus(bookingId, status) {
+      const res = await request<{ appointment: GhoomoAppointment }>('/appointment', {
+        method: 'PUT',
+        body: { apntmnt_id: bookingId, status: fromStatus(status) },
+      });
+      return appointmentToBooking(res!.appointment);
+    },
+
     async getMyBookings() {
       const ranges = ['coming-events', 'inprogress-events', 'completed-events'];
       const lists = await Promise.all(
