@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Switch, View } from 'react-native';
 
 import { errorMessage } from '@/api';
+import { USE_REAL_API } from '@/api/config';
 import { ThemedText } from '@/components/themed-text';
 import { Banner, type BannerMessage } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,9 @@ import { useUpdateStoreSettings } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { timeOptions, toMinutes } from '@/lib/date';
 import type { LimitUnit, Store, StoreSettings } from '@/types/domain';
+
+// Fields the Ghoomo API can't store yet are shown read-only in API mode (see API_DEFAULTS).
+const NOT_SAVED_HINT = "Can't be changed yet — the server doesn't support it.";
 
 const LIMIT_UNITS: SelectOption<LimitUnit>[] = [
   { label: 'Day', value: 'day' },
@@ -87,6 +91,8 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         value={draft.name}
         onChangeText={(v) => set('name', v)}
         error={errors.name}
+        editable={!USE_REAL_API}
+        hint={USE_REAL_API ? NOT_SAVED_HINT : undefined}
       />
       <View style={styles.row}>
         <View style={styles.flex}>
@@ -112,6 +118,8 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         onChangeText={(v) => set('maxPerBooking', v)}
         error={errors.maxPerBooking}
         keyboardType="number-pad"
+        editable={!USE_REAL_API}
+        hint={USE_REAL_API ? NOT_SAVED_HINT : undefined}
       />
       <View style={styles.row}>
         <Select

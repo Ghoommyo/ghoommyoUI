@@ -7,7 +7,9 @@ import {
   fromStatus,
   localToIso,
   locationToStore,
+  profileToRequest,
   profileToStore,
+  settingsToRequest,
   settingsToStore,
   slotKey,
   slotsFromCalendar,
@@ -65,10 +67,6 @@ export function createRequest(baseUrl: string): GhoomoRequest {
   };
 }
 
-const notYet = (name: string) => async (): Promise<never> => {
-  throw new ApiError(`${name} is not wired to the Ghoomo API yet.`, 501);
-};
-
 type TokenResponse = { message: string; token: string };
 type EventsResponse = { success: boolean; data: GhoomoAppointment[] };
 
@@ -99,6 +97,12 @@ export function createGhoomoApi(baseUrl: string): Api {
     if (!token) return undefined;
     const c = decodeJwt<Partial<GhoomoLocationClaims>>(token);
     return c.locCode ? c.locCode : undefined;
+  }
+
+  function requireOwnLocCode(): string {
+    const locCode = ownLocCode();
+    if (!locCode) throw new ApiError('Log in as a store to change its details.', 403);
+    return locCode;
   }
 
   /** Owner view of their store. The settings/profile GETs also create those rows on first use. */
@@ -290,8 +294,22 @@ export function createGhoomoApi(baseUrl: string): Api {
       return [...unique.values()];
     },
 
-    updateStoreSettings: notYet('updateStoreSettings'),
-    updateStoreProfile: notYet('updateStoreProfile'),
+    // Name and max-per-booking aren't stored by the API yet (see API_DEFAULTS); the rest is saved.
+    async updateStoreSettings(_storeId, settings) {
+      const locCode = requireOwnLocCode();
+      const path = `/location/${encodeURIComponent(locCode)}/settings`;
+      await request(path); // creates the row if it doesn't exist; PUT 404s otherwise
+      await request(path, { method: 'PUT', body: settingsToRequest(settings) });
+      return getOwnStore(locCode);
+    },
+
+    async updateStoreProfile(_storeId, profile) {
+      const locCode = requireOwnLocCode();
+      const path = `/location/${encodeURIComponent(locCode)}/profile`;
+      await request(path);
+      await request(path, { method: 'PUT', body: profileToRequest(profile) });
+      return getOwnStore(locCode);
+    },
     async getUserProfile() {
       const { userId, userName } = claims<GhoomoUserClaims>();
       return (
