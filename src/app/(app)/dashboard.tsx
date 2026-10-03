@@ -1,12 +1,9 @@
-import { ThemedText } from '@/components/themed-text';
-import { AppHeader } from '@/components/app-header';
-import { Screen } from '@/components/ui/screen';
+import { useSession } from '@/auth/session';
+import { StoreDashboard } from '@/features/store-dashboard/store-dashboard';
+import { UserDashboard } from '@/features/user-dashboard/user-dashboard';
 
+/** Stores manage their bookings; users and guests browse and book. */
 export default function DashboardScreen() {
-  return (
-    <Screen>
-      <AppHeader title="Dashboard" />
-      <ThemedText themeColor="textSecondary">Coming in phase 3.</ThemedText>
-    </Screen>
-  );
+  const { session } = useSession();
+  return session?.role === 'store' ? <StoreDashboard /> : <UserDashboard />;
 }

@@ -86,7 +86,10 @@ export default function SignupScreen() {
         placeholder="User or store"
         value={role}
         options={ROLE_OPTIONS}
-        onChange={setRole}
+        onChange={(value) => {
+          setRole(value);
+          setErrors((e) => ({ ...e, role: undefined }));
+        }}
         error={errors.role}
       />
       <Button label="Sign up" onPress={submit} loading={signup.isPending} fullWidth />

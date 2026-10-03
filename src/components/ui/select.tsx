@@ -66,7 +66,9 @@ export function Select<T extends string | number>({
           style={[styles.fieldText, { color: selected ? fieldText : theme.textSecondary }]}>
           {selected?.label ?? placeholder}
         </ThemedText>
-        <ThemedText style={{ color: fieldText }}>▾</ThemedText>
+        <ThemedText aria-hidden style={{ color: fieldText }}>
+          ▾
+        </ThemedText>
       </Pressable>
       {error ? (
         <ThemedText type="small" style={{ color: theme.danger }}>
@@ -103,7 +105,11 @@ export function Select<T extends string | number>({
                       (isSelected || pressed) && { backgroundColor: theme.backgroundSelected },
                     ]}>
                     <ThemedText type={isSelected ? 'smallBold' : 'small'}>{item.label}</ThemedText>
-                    {isSelected ? <ThemedText style={{ color: theme.primary }}>✓</ThemedText> : null}
+                    {isSelected ? (
+                      <ThemedText aria-hidden style={{ color: theme.primary }}>
+                        ✓
+                      </ThemedText>
+                    ) : null}
                   </Pressable>
                 );
               }}
