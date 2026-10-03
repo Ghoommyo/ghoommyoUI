@@ -72,3 +72,12 @@ export function formatSlotStart(start: SlotStart): string {
   const { month, day } = parseDateKey(start.slice(0, 10));
   return `${MONTHS[month].slice(0, 3)} ${day}, ${formatTime(start.slice(11, 16))}`;
 }
+
+/** `HH:mm` options every `step` minutes within [from, to] (minutes since midnight; 1440 = `24:00`). */
+export function timeOptions(from: number, to: number, step = 30) {
+  const options: { label: string; value: string }[] = [];
+  for (let m = from; m <= to; m += step) {
+    options.push({ label: m === 1440 ? '12:00 AM (midnight)' : formatTime(fromMinutes(m)), value: fromMinutes(m) });
+  }
+  return options;
+}

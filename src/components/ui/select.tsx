@@ -5,6 +5,8 @@ import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+const OPTION_HEIGHT = 52;
+
 export interface SelectOption<T extends string | number> {
   label: string;
   value: T;
@@ -90,6 +92,13 @@ export function Select<T extends string | number>({
             <FlatList
               data={options}
               keyExtractor={(o) => String(o.value)}
+              // Open long lists (times, days) with the current value in view.
+              initialScrollIndex={Math.max(0, options.findIndex((o) => o.value === value) - 2)}
+              getItemLayout={(_, index) => ({
+                length: OPTION_HEIGHT,
+                offset: OPTION_HEIGHT * index,
+                index,
+              })}
               renderItem={({ item }) => {
                 const isSelected = item.value === value;
                 return (
@@ -160,10 +169,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   option: {
+    height: OPTION_HEIGHT,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
   },
 });
