@@ -1,0 +1,35 @@
+# API phase 2: Ghoomo client foundation and stub server
+
+## Goal
+
+Build the typed Ghoomo client and the pure mapping layer. Add a stub server so the API flows can be tested without the real backend.
+
+## Changes
+
+- `src/api/ghoomo/types.ts`: request and response types for each route in Api.md.
+- `src/api/ghoomo/mappers.ts`: pure functions that translate between the API and the app:
+  - location row → `Store`, with documented defaults when settings are `null`;
+  - appointment → `Booking`;
+  - `DAY` / `HOUR` / `HALF_HOUR` ↔ `day` / `hour` / `halfHour`;
+  - `PENDING` / `ACCEPTED` / `REJECTED` ↔ `pending` / `accepted` / `rejected`;
+  - local `YYYY-MM-DDTHH:mm` ↔ ISO UTC;
+  - `calendarId(year, month, locId)` → `october2026_<id>_SHOP`;
+  - `slotKey('09:00')` → `'9:0'`;
+  - calendar `day_details` → slot counts and per-day totals;
+  - `API_DEFAULTS` for the fields the API can't store yet.
+- `src/api/ghoomo/client.ts`: `createGhoomoApi(baseUrl)` with a `request()` helper that:
+  - sends the token exactly as received, already prefixed with `Bearer `;
+  - reads errors from either the `error` or the `message` key;
+  - lets the caller treat specific statuses, such as the calendar's 404, as empty.
+- `src/lib/jwt.ts`: `decodeJwt()` decodes the claims, handling base64url and the `Bearer ` prefix.
+- `scripts/ghoomo-stub.mjs` and `npm run stub:api`: an in-memory Node server with no dependencies. It mimics the documented routes, status codes and response shapes, and logs each request.
+- The placeholder `src/api/http.ts` is removed.
+
+## Acceptance
+
+- A Node script checks the mappers: time round-trips, slot keys, unit and status mapping, and string numbers.
+- `curl` against the stub returns the shapes documented in Api.md.
+
+## Done
+
+_Fill in when the phase lands._
