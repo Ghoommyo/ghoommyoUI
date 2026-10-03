@@ -32,4 +32,9 @@ Signup and login for both account types (user and store). The JWT is stored and 
 
 ## Done
 
-_Fill in when the phase lands._
+- Shared layout and validation live in `src/features/auth/auth-form.tsx`. Passwords must be at least 8 characters.
+- After signup, the app goes to `/login?registered=1`, which shows the "Account created" banner.
+- Logging in with the wrong account type gives a clear error: "This account is registered as a user."
+- Fixed a `Select` bug: `flexBasis: 0` collapsed its height in column layouts. Row layouts now pass `style` instead.
+- `Select` infers its value type from `options` only (via `NoInfer`), so `useState<Role>` setters type-check.
+- Verified in Chrome via Playwright at a 390×844 viewport: validation, wrong password, wrong role, user login, session kept across reloads, signing up a store, then logging in as it. No console errors.

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -13,13 +13,14 @@ export interface SelectOption<T extends string | number> {
 type SelectProps<T extends string | number> = {
   label?: string;
   placeholder?: string;
-  value: T | undefined;
+  value: NoInfer<T> | undefined;
   options: SelectOption<T>[];
-  onChange(value: T): void;
+  onChange(value: NoInfer<T>): void;
   error?: string;
   /** Light field for use on white cards, as in the dashboard reference. */
   onCard?: boolean;
   disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
 };
 
 /** Cross-platform dropdown: a field that opens a modal list (native pickers have no web support). */
@@ -32,6 +33,7 @@ export function Select<T extends string | number>({
   error,
   onCard = false,
   disabled = false,
+  style,
 }: SelectProps<T>) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
@@ -39,7 +41,7 @@ export function Select<T extends string | number>({
   const fieldText = onCard ? theme.cardText : theme.text;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       {label ? (
         <ThemedText type="smallBold" style={onCard && { color: theme.cardText }}>
           {label}
@@ -116,8 +118,6 @@ export function Select<T extends string | number>({
 const styles = StyleSheet.create({
   container: {
     gap: Spacing.one,
-    flexGrow: 1,
-    flexBasis: 0,
   },
   field: {
     flexDirection: 'row',
