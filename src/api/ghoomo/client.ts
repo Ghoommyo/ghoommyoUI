@@ -13,7 +13,6 @@ import {
   settingsToStore,
   slotKey,
   slotsFromCalendar,
-  toLocationCode,
 } from '@/api/ghoomo/mappers';
 import type {
   GhoomoAppointment,
@@ -25,6 +24,7 @@ import type {
   GhoomoUserClaims,
 } from '@/api/ghoomo/types';
 import { decodeJwt } from '@/lib/jwt';
+import { normalizeStoreName, storeKey } from '@/lib/store-name';
 import { parseDateKey } from '@/lib/date';
 import type { Booking, Session, Store, UserProfile } from '@/types/domain';
 
@@ -82,6 +82,10 @@ export function createGhoomoApi(baseUrl: string): Api {
 
   // The API has no user-profile endpoints yet: keep edits for this session, keyed by account.
   const userProfiles = new Map<string, UserProfile>();
+  // Nor a username on signup: remember it by email for this app session (lost on reload).
+  const usernames = new Map<string, string>();
+  const displayName = (email: string) =>
+    usernames.get(email.toLowerCase()) ?? email.split('@')[0] ?? '';
 
   /** Active SHOP locations with their settings. GET /location is public, so guests can browse. */
   async function listShops(): Promise<Store[]> {
@@ -142,23 +146,26 @@ export function createGhoomoApi(baseUrl: string): Api {
   return {
     async signup(input) {
       if (input.role === 'user') {
+        // `username` isn't accepted by POST /signup yet; kept locally until it is.
         await request('/signup', {
           method: 'POST',
           body: { user_name: input.email, password: input.password, confirmPassword: input.password },
         });
+        usernames.set(input.email.trim().toLowerCase(), input.username.trim());
         return {};
       }
+      const name = normalizeStoreName(input.locationName);
       await request('/location/signup', {
         method: 'POST',
         body: {
-          location_name: input.locationName,
+          location_name: name,
           location_type: 'SHOP',
           email: input.email,
           password: input.password,
           confirmPassword: input.password,
         },
       });
-      return { loginCode: toLocationCode(input.locationName) };
+      return { loginCode: storeKey(name) };
     },
 
     async login(credentials): Promise<Session> {
@@ -173,12 +180,19 @@ export function createGhoomoApi(baseUrl: string): Api {
           role: 'user',
           accountId: claims.userId,
           email: claims.userName,
-          name: claims.userName.split('@')[0],
+          name: displayName(claims.userName),
         };
+      }
+      // POST /location/signin only takes the location code for now; email login needs the API fix.
+      if (credentials.login.includes('@')) {
+        throw new ApiError(
+          "Logging in with email isn't supported by the server yet. Use your store name.",
+          400,
+        );
       }
       const res = await request<TokenResponse>('/location/signin', {
         method: 'POST',
-        body: { location_code: credentials.locationCode, password: credentials.password },
+        body: { location_code: storeKey(credentials.login), password: credentials.password },
       });
       const claims = decodeJwt<GhoomoLocationClaims>(res!.token);
       if (claims.locType !== 'SHOP') {
@@ -188,7 +202,7 @@ export function createGhoomoApi(baseUrl: string): Api {
         token: res!.token,
         role: 'store',
         accountId: claims.userId,
-        email: claims.locCode,
+        email: claims.locCode, // the location token carries no email
         name: claims.locName,
         locCode: claims.locCode,
       };
@@ -313,7 +327,10 @@ export function createGhoomoApi(baseUrl: string): Api {
     async getUserProfile() {
       const { userId, userName } = claims<GhoomoUserClaims>();
       return (
-        userProfiles.get(userId) ?? { name: userName?.split('@')[0] ?? '', mobile: API_DEFAULTS.userMobile }
+        userProfiles.get(userId) ?? {
+          name: userName ? displayName(userName) : '',
+          mobile: API_DEFAULTS.userMobile,
+        }
       );
     },
 

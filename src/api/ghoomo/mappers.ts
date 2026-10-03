@@ -29,7 +29,10 @@ import type {
 export const API_DEFAULTS = {
   maxPerBooking: 5,
   state: '',
-  /** No user-profile endpoints: name comes from the email, mobile starts empty. */
+  /**
+   * No user-profile endpoints: the name is the username given at signup in this app session
+   * (POST /signup can't store it yet), else the email prefix; mobile starts empty.
+   */
   userMobile: '',
   /** Server defaults applied when a location has never opened its settings (Api.md §5.4). */
   settings: { maxLimit: 100, unit: 'DAY', autoApprove: true, openAt: '09:00', closeAt: '21:00' },
@@ -37,10 +40,6 @@ export const API_DEFAULTS = {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** The login code the server derives from a location name: `Raju Tailor` → `raju_tailor`. */
-export function toLocationCode(locationName: string): string {
-  return locationName.trim().toLowerCase().replace(/ /g, '_');
-}
 
 export function toLimitUnit(unit: string | null | undefined): LimitUnit {
   switch (unit?.toUpperCase()) {

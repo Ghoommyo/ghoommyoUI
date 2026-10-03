@@ -23,13 +23,15 @@ export interface Session {
   locCode?: string;
 }
 
-/** Users sign in with their email; stores with the location code issued at signup. */
+/** Users sign in with their email; stores with their email or store name. */
 export type Credentials =
   | { role: 'user'; email: string; password: string }
-  | { role: 'store'; locationCode: string; password: string };
+  | { role: 'store'; /** Email, or store name in any case/spacing. */ login: string; password: string };
 
 export type SignupInput =
-  | { role: 'user'; email: string; password: string }
+  /** `username` is a display name and may be shared by several users. */
+  | { role: 'user'; username: string; email: string; password: string }
+  /** `locationName` is unique per store once normalized (see `storeKey`). */
   | { role: 'store'; locationName: string; email: string; password: string };
 
 export interface SignupResult {

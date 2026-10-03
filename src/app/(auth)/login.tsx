@@ -13,10 +13,10 @@ import type { Credentials, Role } from '@/types/domain';
 
 export default function LoginScreen() {
   const { signIn } = useSession();
-  // Set by signup: show a confirmation and, for stores, prefill the issued login code.
-  const params = useLocalSearchParams<{ registered?: string; role?: Role; code?: string }>();
+  // Set by signup: show a confirmation and, for stores, prefill the store name.
+  const params = useLocalSearchParams<{ registered?: string; role?: Role; store?: string }>();
   const [role, setRole] = useState<Role>(params.role === 'store' ? 'store' : 'user');
-  const [identifier, setIdentifier] = useState(params.code ?? '');
+  const [identifier, setIdentifier] = useState(params.store ?? '');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});
   const isStore = role === 'store';
@@ -34,7 +34,7 @@ export default function LoginScreen() {
       identifier: isStore
         ? identifier.trim()
           ? undefined
-          : 'Location code is required.'
+          : 'Enter your email or store name.'
         : validateEmail(identifier),
       password: password ? undefined : 'Password is required.',
     };
@@ -42,14 +42,15 @@ export default function LoginScreen() {
     if (next.identifier || next.password) return;
     login.mutate(
       isStore
-        ? { role: 'store', locationCode: identifier.trim(), password }
+        ? { role: 'store', login: identifier.trim(), password }
         : { role: 'user', email: identifier.trim(), password },
     );
   };
 
-  const registeredText = params.code
-    ? `Account created. Your login code is "${params.code}".`
-    : 'Account created. Please log in.';
+  const registeredText =
+    params.role === 'store'
+      ? 'Account created. Log in with your email or store name.'
+      : 'Account created. Please log in.';
 
   return (
     <AuthFormLayout
@@ -71,7 +72,7 @@ export default function LoginScreen() {
         value={role}
         options={ROLE_OPTIONS}
         onChange={(value) => {
-          // Email and location code are different identifiers; don't carry one into the other.
+          // Users log in by email only; don't carry a store name over (or vice versa).
           if (value !== role) setIdentifier('');
           setRole(value);
           setErrors({});
@@ -80,11 +81,11 @@ export default function LoginScreen() {
       />
       {isStore ? (
         <TextField
-          label="Location code"
+          label="Email or store name"
           value={identifier}
           onChangeText={setIdentifier}
           error={errors.identifier}
-          placeholder="e.g. raju_tailor"
+          placeholder="you@example.com or Raju Tailor"
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="username"

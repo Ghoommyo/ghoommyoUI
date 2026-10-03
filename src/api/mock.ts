@@ -1,15 +1,15 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
-import { toLocationCode } from '@/api/ghoomo/mappers';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
 import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
+import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type { Booking, Role, Store, UserProfile } from '@/types/domain';
 
 /**
  * In-memory backend used until a real API exists. Data resets on reload;
  * the seeded accounts below always exist.
  *
- *   user@ghoomyo.app / password123  (user, logs in by email)
- *   raju_tailor      / password123  (store "Raju Tailor", logs in by location code)
+ *   user@ghoomyo.app  / password123  (user, logs in by email)
+ *   store@ghoomyo.app / password123  (store "Raju Tailor"; also logs in as "Raju Tailor" or "raju_tailor")
  */
 
 interface Account {
@@ -17,7 +17,7 @@ interface Account {
   email: string;
   password: string;
   role: Role;
-  /** Stores only: login code derived from the store name, as the Ghoomo server does. */
+  /** Stores only: the unique key derived from the store name (`storeKey`). */
   locCode?: string;
   profile: UserProfile;
 }
@@ -162,23 +162,30 @@ export const mockApi: Api = {
     await delay();
     const email = input.email.trim().toLowerCase();
     if (input.role === 'user') {
+      // Users log in by email, so it must be unique; usernames may repeat.
       if (accounts.some((a) => a.role === 'user' && a.email === email)) {
-        throw new ApiError('User name already exists', 409);
+        throw new ApiError('Email already registered', 409);
       }
       accounts.push({
         id: newId('u'),
         email,
         password: input.password,
         role: 'user',
-        profile: { name: email.split('@')[0], mobile: '' },
+        profile: { name: input.username.trim(), mobile: '' },
       });
       return {};
     }
 
-    const name = input.locationName.trim();
-    const locCode = toLocationCode(name);
+    const nameError = validateStoreName(input.locationName);
+    if (nameError) throw new ApiError(nameError, 400);
+    const name = normalizeStoreName(input.locationName);
+    const locCode = storeKey(name);
     if (accounts.some((a) => a.locCode === locCode)) {
-      throw new ApiError('Location already exists', 409);
+      throw new ApiError('Store name already taken', 409);
+    }
+    // Stores can log in by email, so it must be unique among stores.
+    if (accounts.some((a) => a.role === 'store' && a.email === email)) {
+      throw new ApiError('Email already registered', 409);
     }
     const id = newId('s');
     accounts.push({ id, email, password: input.password, role: 'store', locCode, profile: { name, mobile: '' } });
@@ -207,10 +214,17 @@ export const mockApi: Api = {
 
   async login(credentials) {
     await delay();
-    const account =
-      credentials.role === 'user'
-        ? accounts.find((a) => a.role === 'user' && a.email === credentials.email.trim().toLowerCase())
-        : accounts.find((a) => a.locCode === credentials.locationCode.trim().toLowerCase());
+    let account: Account | undefined;
+    if (credentials.role === 'user') {
+      const email = credentials.email.trim().toLowerCase();
+      account = accounts.find((a) => a.role === 'user' && a.email === email);
+    } else {
+      // Stores log in with their email or their store name (any case/spacing, or the key itself).
+      const login = credentials.login.trim().toLowerCase();
+      account = login.includes('@')
+        ? accounts.find((a) => a.role === 'store' && a.email === login)
+        : accounts.find((a) => a.locCode === storeKey(login));
+    }
     if (!account) throw new ApiError('User not found', 404);
     if (account.password !== credentials.password) throw new ApiError('Invalid credentials', 401);
     const store = account.role === 'store' ? stores.find((s) => s.id === account.id) : undefined;
@@ -218,7 +232,7 @@ export const mockApi: Api = {
       token: `mock.${account.id}`,
       role: account.role,
       accountId: account.id,
-      email: account.locCode ?? account.email,
+      email: account.email,
       name: store?.name ?? account.profile.name,
       locCode: account.locCode,
     };

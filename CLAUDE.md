@@ -33,7 +33,7 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
 
 - Screens call the `Api` interface (`src/api/client.ts`) through `api` from `@/api`. Which backend that is depends on a flag in `src/api/config.ts`, set in `.env.local` (see `.env.example`). Restart `expo start` after changing it; `--clear` is safest.
 - **Flag off (default):** `api` is the in-memory dummy backend (`src/api/mock.ts`), which resets on every reload.
-  - Seeded logins (password `password123`): user `user@ghoomyo.app`, store code `raju_tailor`.
+  - Seeded logins (password `password123`): user `user@ghoomyo.app`; store `store@ghoomyo.app`, which also accepts the store name `Raju Tailor` or `raju_tailor`.
   - Seeded bookings are dated relative to today.
 - **`EXPO_PUBLIC_USE_REAL_API=true`:** `api` is the Ghoomo client (`src/api/ghoomo/`), pointed at `EXPO_PUBLIC_API_URL` (default `http://localhost:3000/apis`). `Api.md` is the API reference.
   - `types.ts` holds the wire types.
@@ -46,12 +46,16 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
 - **A new endpoint** needs adding in three places: the `Api` interface, `mock.ts` and `ghoomo/client.ts`. Also add it to `scripts/ghoomo-stub.mjs` to test it.
 - **How the Ghoomo API shapes the app:**
   - Only SHOP locations are supported; PLACE locations are filtered out.
-  - Stores log in with a location code, which is the store name lowercased with spaces turned into `_`.
+  - Account identity rules are in `plans/auth-identity.md`, and the store-name rules are in `src/lib/store-name.ts`:
+    - store names are unique, letters/digits/spaces only, and saved as `storeKey` (lowercased, spaces turned into `_`);
+    - users have a username, which can be shared;
+    - stores log in with their email or their store name.
+  - The dummy backend enforces all of this. The Ghoomo API doesn't yet: its client sends the store key as `location_code`, rejects store email login with a "not supported yet" message, and keeps usernames in memory for the session.
   - A booking takes two calls: `POST /appointment`, then `POST /calendar`.
   - Slot and day counts come from the calendar, which doesn't drop when a booking is rejected.
   - Owner routes are addressed by `session.locCode`.
   - Settings and profile rows are created by their GET, so updates GET before they PUT.
-- **API gaps:** the API has nowhere to store store name edits, max per booking, state, map coordinates, or the user's name and mobile. They use `API_DEFAULTS` or session-only values, and are read-only in the UI when the flag is on. Wire each one through when the API supports it.
+- **API gaps:** the API has nowhere to store store name edits, max per booking, state, map coordinates, or the user's name and mobile. Usernames at signup and store login by email aren't supported either. They use `API_DEFAULTS` or session-only values, and are read-only in the UI when the flag is on. Wire each one through when the API supports it.
 
 ### Session and auth
 

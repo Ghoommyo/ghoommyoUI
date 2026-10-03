@@ -3,8 +3,6 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 
 import { api, errorMessage } from '@/api';
-import { toLocationCode } from '@/api/ghoomo/mappers';
-import { ThemedText } from '@/components/themed-text';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
@@ -14,11 +12,14 @@ import {
   MIN_PASSWORD_LENGTH,
   ROLE_OPTIONS,
   validateEmail,
+  validateUsername,
 } from '@/features/auth/auth-form';
+import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type { Role, SignupInput } from '@/types/domain';
 
 type FieldErrors = {
   role?: string;
+  username?: string;
   locationName?: string;
   email?: string;
   password?: string;
@@ -27,6 +28,7 @@ type FieldErrors = {
 
 export default function SignupScreen() {
   const [role, setRole] = useState<Role>();
+  const [username, setUsername] = useState('');
   const [locationName, setLocationName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,7 +44,7 @@ export default function SignupScreen() {
         params: {
           registered: '1',
           role: input.role,
-          ...(result.loginCode ? { code: result.loginCode } : {}),
+          ...(input.role === 'store' ? { store: input.locationName } : {}),
         },
       }),
   });
@@ -50,7 +52,8 @@ export default function SignupScreen() {
   const submit = () => {
     const next: FieldErrors = {
       role: role ? undefined : 'Choose an account type.',
-      locationName: isStore && !locationName.trim() ? 'Store name is required.' : undefined,
+      username: role === 'user' ? validateUsername(username) : undefined,
+      locationName: isStore ? validateStoreName(locationName) : undefined,
       email: validateEmail(email),
       password:
         password.length < MIN_PASSWORD_LENGTH
@@ -62,8 +65,8 @@ export default function SignupScreen() {
     if (!role || Object.values(next).some(Boolean)) return;
     signup.mutate(
       role === 'store'
-        ? { role: 'store', locationName: locationName.trim(), email: email.trim(), password }
-        : { role: 'user', email: email.trim(), password },
+        ? { role: 'store', locationName: normalizeStoreName(locationName), email: email.trim(), password }
+        : { role: 'user', username: username.trim(), email: email.trim(), password },
     );
   };
 
@@ -88,20 +91,34 @@ export default function SignupScreen() {
         error={errors.role}
       />
       {isStore ? (
-        <>
-          <TextField
-            label="Store name"
-            value={locationName}
-            onChangeText={setLocationName}
-            error={errors.locationName}
-            autoComplete="organization"
-          />
-          {locationName.trim() ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              You will log in with the code &quot;{toLocationCode(locationName)}&quot;.
-            </ThemedText>
-          ) : null}
-        </>
+        <TextField
+          label="Store name"
+          value={locationName}
+          onChangeText={(value) => {
+            setLocationName(value);
+            setErrors((e) => ({ ...e, locationName: undefined }));
+          }}
+          onBlur={() =>
+            locationName && setErrors((e) => ({ ...e, locationName: validateStoreName(locationName) }))
+          }
+          error={errors.locationName}
+          hint={
+            locationName.trim()
+              ? `Must be unique. Saved as "${storeKey(locationName)}".`
+              : 'Letters, numbers and spaces only. Must be unique.'
+          }
+          autoComplete="organization"
+        />
+      ) : role === 'user' ? (
+        <TextField
+          label="Username"
+          value={username}
+          onChangeText={setUsername}
+          error={errors.username}
+          hint="Shown on your bookings. Doesn't need to be unique."
+          autoComplete="username"
+          textContentType="username"
+        />
       ) : null}
       <TextField
         label="Email"
