@@ -6,6 +6,8 @@ import type {
   DaySummary,
   NewBooking,
   Session,
+  SignupInput,
+  SignupResult,
   Slot,
   Store,
   StoreProfile,
@@ -25,7 +27,7 @@ export class ApiError extends Error {
 
 /** Everything the app needs from the backend. Implemented by the mock and the HTTP client. */
 export interface Api {
-  signup(credentials: Credentials): Promise<void>;
+  signup(input: SignupInput): Promise<SignupResult>;
   login(credentials: Credentials): Promise<Session>;
 
   listStores(): Promise<Store[]>;

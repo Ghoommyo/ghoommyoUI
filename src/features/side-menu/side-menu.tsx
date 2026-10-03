@@ -25,8 +25,8 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
 
   const displayName =
     session?.role === 'store'
-      ? (store.data?.name ?? session.email)
-      : (profile.data?.name || session?.email || 'Guest');
+      ? (store.data?.name ?? session.name ?? session.email)
+      : (profile.data?.name || session?.name || session?.email || 'Guest');
 
   const items: Item[] = session
     ? [
@@ -58,7 +58,11 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
               {displayName}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              {session ? (session.role === 'store' ? 'Store account' : session.email) : 'Not signed in'}
+              {session
+                ? session.role === 'store'
+                  ? `Store · ${session.locCode ?? session.email}`
+                  : session.email
+                : 'Not signed in'}
             </ThemedText>
           </View>
         </View>

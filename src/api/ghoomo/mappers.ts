@@ -35,6 +35,11 @@ export const API_DEFAULTS = {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
+/** The login code the server derives from a location name: `Raju Tailor` → `raju_tailor`. */
+export function toLocationCode(locationName: string): string {
+  return locationName.trim().toLowerCase().replace(/ /g, '_');
+}
+
 export function toLimitUnit(unit: string | null | undefined): LimitUnit {
   switch (unit?.toUpperCase()) {
     case 'HOUR':

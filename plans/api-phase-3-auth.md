@@ -24,4 +24,19 @@ Make signup and login work in both modes, using the Ghoomo auth model.
 
 ## Done
 
-_Fill in when the phase lands._
+- **Login and signup forms:** Type moves to the top of both, because it decides which fields appear.
+  - Switching Type on login clears the identifier and the previous error, so an email isn't carried into "Location code".
+  - Store signup shows the code you'll log in with while you type the name.
+  - After signup, the login screen opens with the right Type and the code already filled in.
+- **Mock:** error messages now match the server's ("User not found", "Invalid credentials", "User name already exists", "Location already exists"). The Raju Tailor account logs in as `raju_tailor`.
+- **Ghoomo login:** the `Session` comes from the JWT claims, and stores get `locCode` and `name`. A PLACE owner who signs in is turned away with a message, since only shops are supported for now.
+- **Side menu:** shows `Store · <code>` for stores, and uses `session.name` when the profile isn't loaded yet.
+- **Verified:** one Playwright script run in both modes (`e2e-auth-modes.mjs`) passed all 6 steps each time, with no console errors:
+  - wrong password;
+  - an unknown store code;
+  - store login by code;
+  - customer signup, then login;
+  - duplicate signup;
+  - store signup, the code shown and prefilled, then login.
+
+  The stub's log confirmed the request sequence: CORS preflight, then the documented status codes.

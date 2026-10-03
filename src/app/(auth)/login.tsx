@@ -9,18 +9,20 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
 import { AuthFormLayout, ROLE_OPTIONS, validateEmail } from '@/features/auth/auth-form';
-import type { Role } from '@/types/domain';
+import type { Credentials, Role } from '@/types/domain';
 
 export default function LoginScreen() {
   const { signIn } = useSession();
-  const { registered } = useLocalSearchParams<{ registered?: string }>();
-  const [email, setEmail] = useState('');
+  // Set by signup: show a confirmation and, for stores, prefill the issued login code.
+  const params = useLocalSearchParams<{ registered?: string; role?: Role; code?: string }>();
+  const [role, setRole] = useState<Role>(params.role === 'store' ? 'store' : 'user');
+  const [identifier, setIdentifier] = useState(params.code ?? '');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<Role>('user');
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});
+  const isStore = role === 'store';
 
   const login = useMutation({
-    mutationFn: () => api.login({ email, password, role }),
+    mutationFn: (credentials: Credentials) => api.login(credentials),
     onSuccess: async (session) => {
       await signIn(session);
       router.replace('/dashboard');
@@ -29,12 +31,25 @@ export default function LoginScreen() {
 
   const submit = () => {
     const next = {
-      email: validateEmail(email),
+      identifier: isStore
+        ? identifier.trim()
+          ? undefined
+          : 'Location code is required.'
+        : validateEmail(identifier),
       password: password ? undefined : 'Password is required.',
     };
     setErrors(next);
-    if (!next.email && !next.password) login.mutate();
+    if (next.identifier || next.password) return;
+    login.mutate(
+      isStore
+        ? { role: 'store', locationCode: identifier.trim(), password }
+        : { role: 'user', email: identifier.trim(), password },
+    );
   };
+
+  const registeredText = params.code
+    ? `Account created. Your login code is "${params.code}".`
+    : 'Account created. Please log in.';
 
   return (
     <AuthFormLayout
@@ -46,21 +61,47 @@ export default function LoginScreen() {
         message={
           login.isError
             ? { type: 'error', text: errorMessage(login.error) }
-            : registered
-              ? { type: 'success', text: 'Account created. Please log in.' }
+            : params.registered
+              ? { type: 'success', text: registeredText }
               : null
         }
       />
-      <TextField
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        error={errors.email}
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-        textContentType="emailAddress"
+      <Select
+        label="Type"
+        value={role}
+        options={ROLE_OPTIONS}
+        onChange={(value) => {
+          // Email and location code are different identifiers; don't carry one into the other.
+          if (value !== role) setIdentifier('');
+          setRole(value);
+          setErrors({});
+          login.reset();
+        }}
       />
+      {isStore ? (
+        <TextField
+          label="Location code"
+          value={identifier}
+          onChangeText={setIdentifier}
+          error={errors.identifier}
+          placeholder="e.g. raju_tailor"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="username"
+          textContentType="username"
+        />
+      ) : (
+        <TextField
+          label="Email"
+          value={identifier}
+          onChangeText={setIdentifier}
+          error={errors.identifier}
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          textContentType="emailAddress"
+        />
+      )}
       <TextField
         label="Password"
         value={password}
@@ -71,7 +112,6 @@ export default function LoginScreen() {
         textContentType="password"
         onSubmitEditing={submit}
       />
-      <Select label="Type" value={role} options={ROLE_OPTIONS} onChange={setRole} />
       <Button label="Login" onPress={submit} loading={login.isPending} fullWidth />
     </AuthFormLayout>
   );
