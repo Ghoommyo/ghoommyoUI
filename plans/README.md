@@ -43,7 +43,7 @@ Where the screenshots and the spec disagree, the spec wins. The menu opens from 
 
 ## Phases
 
-- [ ] [Phase 1: Foundation](phase-1-foundation.md)
+- [x] [Phase 1: Foundation](phase-1-foundation.md)
 - [ ] [Phase 2: Auth](phase-2-auth.md)
 - [ ] [Phase 3: User dashboard and booking](phase-3-user-dashboard.md)
 - [ ] [Phase 4: Store dashboard](phase-4-store-dashboard.md)

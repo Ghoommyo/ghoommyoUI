@@ -1,98 +1,80 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Redirect, router } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { useSession } from '@/auth/session';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Brand } from '@/components/ui/brand';
+import { Button } from '@/components/ui/button';
+import { Screen } from '@/components/ui/screen';
+import { Spacing } from '@/constants/theme';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+const FEATURES = [
+  {
+    title: 'Book appointments',
+    body: 'Pick a store, choose a time slot and reserve your visit in a few taps.',
+  },
+  {
+    title: 'Skip the crowd',
+    body: 'See how many people are visiting each hour before you go.',
+  },
+  {
+    title: 'Stores near you',
+    body: 'Find nearby stores, then order or schedule with them directly.',
+  },
+];
 
-export default function HomeScreen() {
+/** First-launch intro explaining the app; skipped once dismissed. */
+export default function IntroScreen() {
+  const { hasSeenIntro, markIntroSeen } = useSession();
+
+  if (hasSeenIntro) return <Redirect href="/dashboard" />;
+
+  const start = async () => {
+    await markIntroSeen();
+    router.replace('/dashboard');
+  };
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+    <Screen>
+      <View style={styles.hero}>
+        <Brand size={48} />
+        <ThemedText type="default" themeColor="textSecondary" style={styles.tagline}>
+          Scheduling and booking for the places you visit.
+        </ThemedText>
+      </View>
+
+      {FEATURES.map((feature) => (
+        <ThemedView key={feature.title} type="backgroundElement" style={styles.card}>
+          <ThemedText type="smallBold" style={styles.cardTitle}>
+            {feature.title}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {feature.body}
           </ThemedText>
         </ThemedView>
+      ))}
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      <Button label="Get started" onPress={start} fullWidth />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
+  hero: {
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    gap: Spacing.two,
+    paddingVertical: Spacing.six,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
+  tagline: {
     textAlign: 'center',
   },
-  code: {
-    textTransform: 'uppercase',
+  card: {
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+    gap: Spacing.one,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  cardTitle: {
+    fontSize: 16,
   },
 });

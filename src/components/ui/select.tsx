@@ -1,0 +1,163 @@
+import { useState } from 'react';
+import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
+
+import { ThemedText } from '@/components/themed-text';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+
+export interface SelectOption<T extends string | number> {
+  label: string;
+  value: T;
+}
+
+type SelectProps<T extends string | number> = {
+  label?: string;
+  placeholder?: string;
+  value: T | undefined;
+  options: SelectOption<T>[];
+  onChange(value: T): void;
+  error?: string;
+  /** Light field for use on white cards, as in the dashboard reference. */
+  onCard?: boolean;
+  disabled?: boolean;
+};
+
+/** Cross-platform dropdown: a field that opens a modal list (native pickers have no web support). */
+export function Select<T extends string | number>({
+  label,
+  placeholder = 'Select…',
+  value,
+  options,
+  onChange,
+  error,
+  onCard = false,
+  disabled = false,
+}: SelectProps<T>) {
+  const theme = useTheme();
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+  const fieldText = onCard ? theme.cardText : theme.text;
+
+  return (
+    <View style={styles.container}>
+      {label ? (
+        <ThemedText type="smallBold" style={onCard && { color: theme.cardText }}>
+          {label}
+        </ThemedText>
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label ?? placeholder}
+        accessibilityHint="Opens a list of options"
+        disabled={disabled}
+        onPress={() => setOpen(true)}
+        style={[
+          styles.field,
+          {
+            backgroundColor: onCard ? theme.card : theme.backgroundElement,
+            borderColor: error ? theme.danger : onCard ? '#C9CDD4' : theme.border,
+          },
+          disabled && styles.disabled,
+        ]}>
+        <ThemedText
+          numberOfLines={1}
+          style={[styles.fieldText, { color: selected ? fieldText : theme.textSecondary }]}>
+          {selected?.label ?? placeholder}
+        </ThemedText>
+        <ThemedText style={{ color: fieldText }}>▾</ThemedText>
+      </Pressable>
+      {error ? (
+        <ThemedText type="small" style={{ color: theme.danger }}>
+          {error}
+        </ThemedText>
+      ) : null}
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable
+          style={[styles.backdrop, { backgroundColor: theme.overlay }]}
+          onPress={() => setOpen(false)}
+          accessibilityLabel="Close list">
+          <View style={[styles.sheet, { backgroundColor: theme.backgroundElement }]}>
+            {label ? (
+              <ThemedText type="smallBold" style={styles.sheetTitle}>
+                {label}
+              </ThemedText>
+            ) : null}
+            <FlatList
+              data={options}
+              keyExtractor={(o) => String(o.value)}
+              renderItem={({ item }) => {
+                const isSelected = item.value === value;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    onPress={() => {
+                      onChange(item.value);
+                      setOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.option,
+                      (isSelected || pressed) && { backgroundColor: theme.backgroundSelected },
+                    ]}>
+                    <ThemedText type={isSelected ? 'smallBold' : 'small'}>{item.label}</ThemedText>
+                    {isSelected ? <ThemedText style={{ color: theme.primary }}>✓</ThemedText> : null}
+                  </Pressable>
+                );
+              }}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    gap: Spacing.one,
+    flexGrow: 1,
+    flexBasis: 0,
+  },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    minHeight: 44,
+  },
+  fieldText: {
+    flexShrink: 1,
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  backdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: Spacing.four,
+  },
+  sheet: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: MaxContentWidth / 2,
+    maxHeight: '70%',
+    borderRadius: Spacing.three,
+    paddingVertical: Spacing.two,
+    overflow: 'hidden',
+  },
+  sheetTitle: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  option: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+  },
+});

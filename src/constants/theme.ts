@@ -7,20 +7,46 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+const shared = {
+  primary: '#3B6FF5',
+  onPrimary: '#FFFFFF',
+  success: '#5CB85C',
+  danger: '#E5533D',
+  warning: '#F5A623',
+  accent: '#E8891A',
+  purple: '#5B3FE0',
+  eventCard: '#4A9FF5',
+  card: '#FFFFFF',
+  cardText: '#15181E',
+  cardTextSecondary: '#5F6470',
+  slot: '#F1FAF2',
+  slotBorder: '#D5ECD8',
+  slotFull: '#FFF1D2',
+  slotFullBorder: '#F5C76A',
+  slotOver: '#FDE1DD',
+  slotOverBorder: '#EE9184',
+  overlay: 'rgba(0, 0, 0, 0.5)',
+} as const;
+
+// Dark palette follows the reference screenshots in plans/references/.
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    ...shared,
+    text: '#111318',
+    background: '#F4F5F7',
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: '#E4E7EC',
+    textSecondary: '#5F6470',
+    border: '#D9DCE1',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    ...shared,
+    text: '#FFFFFF',
+    background: '#1F232B',
+    backgroundElement: '#2A2F38',
+    backgroundSelected: '#363C47',
+    textSecondary: '#A9AEB8',
+    border: '#3A404B',
   },
 } as const;
 

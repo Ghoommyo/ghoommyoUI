@@ -41,4 +41,9 @@ Replace the starter template with the app's skeleton: theme, UI kit, domain type
 
 ## Done
 
-_Fill in when the phase lands._
+- Starter screens, components and images removed. `eslint.config.js` was added the first time `expo lint` ran (it also added `eslint` and `eslint-config-expo` as dev dependencies).
+- `src/hooks/use-color-scheme.web.ts` now uses `useSyncExternalStore` for hydration. The old `setState`-in-effect failed the React Compiler lint rule.
+- If any query gets a 401, the user is signed out. This is done with a QueryCache subscription in `src/app/_layout.tsx`.
+- `buildSlotStarts` creates slots that start before `closeAt`. The mock's Raju Tailor store is open 09:00–22:00, giving 13 hourly slots (9 AM–9 PM) like the reference screenshot.
+- The wordmark reads "GHOOMYO", the app's name; the old app's screenshot says "GHOOMO".
+- Verified: `tsc` and lint pass; a Node script exercised the slot/date helpers; the web bundle builds and the intro screen renders in headless Chrome.
