@@ -25,4 +25,17 @@
 
 ## Done
 
-_Fill in when the phase lands._
+- `UserEventsTabs` (`src/features/events/user-events-tabs.tsx`) is shared by the Events screen and the bottom of the user dashboard. Rows show the store's name.
+- `SideMenu` is the Drawer's `drawerContent`:
+  - The header shows the avatar plus a display name: the profile name for users, the store name for stores, "Guest" when signed out.
+  - The current route is highlighted.
+  - It navigates with `router.navigate` after closing the drawer.
+- Logout cancel only closes the dialog: the drawer stays open on the same screen, as the spec asks. Confirm closes the drawer, signs out and goes to `/login`.
+- Signed-out deep links to protected drawer routes (e.g. `/events`) fall back to `/dashboard` through `Drawer.Protected`.
+- Verified in Chrome via Playwright, no console errors:
+  - the guest menu leads to login;
+  - the dashboard's event tabs show Coming, In-Progress and Completed correctly;
+  - the user menu items and avatar are right, and the menu leads to Events;
+  - cancelling logout keeps the session, confirming goes to login;
+  - a signed-out `/events` redirects to the dashboard;
+  - the store menu has no Events item.

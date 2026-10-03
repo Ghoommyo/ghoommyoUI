@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { Spacing } from '@/constants/theme';
+import { UserEventsTabs } from '@/features/events/user-events-tabs';
 import { SlotGrid } from '@/features/user-dashboard/slot-grid';
 import { useStores, useStoreSlots } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
@@ -195,6 +196,8 @@ export function UserDashboard() {
         <Button label="Reset" variant="danger" onPress={reset} />
         <Button label={session ? 'Book' : 'Login to book'} variant="success" onPress={book} />
       </View>
+
+      {session?.role === 'user' ? <UserEventsTabs /> : null}
     </Screen>
   );
 }
