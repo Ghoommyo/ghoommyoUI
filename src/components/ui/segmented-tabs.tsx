@@ -11,8 +11,8 @@ export interface Tab<K extends string> {
 
 type SegmentedTabsProps<K extends string> = {
   tabs: Tab<K>[];
-  value: K;
-  onChange(key: K): void;
+  value: NoInfer<K>;
+  onChange(key: NoInfer<K>): void;
 };
 
 /** Underlined tab bar from the dashboard references; scrolls sideways on narrow screens. */
