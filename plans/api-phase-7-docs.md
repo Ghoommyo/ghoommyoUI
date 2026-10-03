@@ -17,4 +17,14 @@
 
 ## Done
 
-_Fill in when the phase lands._
+- `CLAUDE.md` updated:
+  - the backend flag and seeded logins for each backend;
+  - how to use the stub;
+  - where the Ghoomo mapping layer lives and how the API shapes the app;
+  - the API gaps.
+- **Final regression:**
+  - **Flag off:** five suites, all 43 steps pass. The old store logins in the suites now use the location code.
+  - **Flag on,** with a fresh stub before each suite: four suites, all 23 steps pass.
+  - No console errors in either run.
+  - `expo export` still builds the iOS and Android bundles.
+- The branch is pushed. It hasn't been merged into `main`.

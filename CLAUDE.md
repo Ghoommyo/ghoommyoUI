@@ -21,25 +21,41 @@ npm start                 # expo start (also: npm run ios | android | web)
 npx expo lint             # lint (React Compiler rules are enforced)
 npx tsc --noEmit          # typecheck
 npx expo install <pkg>    # add dependencies
+npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Backend)
 ```
 
-- **Tests:** there's no test runner yet. Changes have been checked by driving the web build in Chrome with Playwright (see each phase's **Done** notes).
+- **Tests:** there's no test runner yet. Changes have been checked by driving the web build in Chrome with Playwright, with the flag off and on (see each phase's **Done** notes).
 - **Generated file:** `expo-env.d.ts` is created by `expo start`. Without it, `tsc` reports a missing type for `@/global.css`.
 
 ## Architecture
 
 ### Backend
 
-- No backend exists yet. Screens call the `Api` interface (`src/api/client.ts`) through `api` from `@/api`.
-- Without `EXPO_PUBLIC_API_URL`, `api` is the in-memory mock (`src/api/mock.ts`), which resets on every reload.
-  - Seeded accounts: `user@ghoomyo.app` (user) and `store@ghoomyo.app` (store "Raju Tailor"), both with password `password123`.
+- Screens call the `Api` interface (`src/api/client.ts`) through `api` from `@/api`. Which backend that is depends on a flag in `src/api/config.ts`, set in `.env.local` (see `.env.example`). Restart `expo start` after changing it; `--clear` is safest.
+- **Flag off (default):** `api` is the in-memory dummy backend (`src/api/mock.ts`), which resets on every reload.
+  - Seeded logins (password `password123`): user `user@ghoomyo.app`, store code `raju_tailor`.
   - Seeded bookings are dated relative to today.
-- With `EXPO_PUBLIC_API_URL` set, `api` is `src/api/http.ts`. Its REST paths are a proposed contract that should be aligned with the real server.
-- A new endpoint needs adding in three places: the `Api` interface, the mock and the HTTP client.
+- **`EXPO_PUBLIC_USE_REAL_API=true`:** `api` is the Ghoomo client (`src/api/ghoomo/`), pointed at `EXPO_PUBLIC_API_URL` (default `http://localhost:3000/apis`). `Api.md` is the API reference.
+  - `types.ts` holds the wire types.
+  - `mappers.ts` holds the pure conversions:
+    - units, statuses, and local time ↔ UTC ISO;
+    - calendar ids (`october2026_<locId>_SHOP`) and unpadded `"H:M"` slot keys;
+    - `API_DEFAULTS`.
+  - `client.ts` implements `Api`.
+- **Without the real backend,** `npm run stub:api` serves the documented routes in memory and logs each request. Seeded logins (password `Secret@123`): user `asha@example.com`, stores `raju_tailor` and `city_salon` (City Salon has no settings yet). There's also a PLACE location, `taj_mahal`.
+- **A new endpoint** needs adding in three places: the `Api` interface, `mock.ts` and `ghoomo/client.ts`. Also add it to `scripts/ghoomo-stub.mjs` to test it.
+- **How the Ghoomo API shapes the app:**
+  - Only SHOP locations are supported; PLACE locations are filtered out.
+  - Stores log in with a location code, which is the store name lowercased with spaces turned into `_`.
+  - A booking takes two calls: `POST /appointment`, then `POST /calendar`.
+  - Slot and day counts come from the calendar, which doesn't drop when a booking is rejected.
+  - Owner routes are addressed by `session.locCode`.
+  - Settings and profile rows are created by their GET, so updates GET before they PUT.
+- **API gaps:** the API has nowhere to store store name edits, max per booking, state, map coordinates, or the user's name and mobile. They use `API_DEFAULTS` or session-only values, and are read-only in the UI when the flag is on. Wire each one through when the API supports it.
 
 ### Session and auth
 
-- `src/auth/session.tsx` (`useSession`) stores the `Session` (JWT, role, `accountId`). `src/auth/storage.ts` uses SecureStore; `storage.web.ts` uses localStorage.
+- `src/auth/session.tsx` (`useSession`) stores the `Session` (JWT, role, `accountId`, and for stores `locCode`). Ghoomo sessions are built from the JWT claims (`src/lib/jwt.ts`); the token is sent exactly as received, already prefixed with `Bearer `. `src/auth/storage.ts` uses SecureStore; `storage.web.ts` uses localStorage.
 - `setAuthToken` gives the API layer the token.
 - **For store accounts, `accountId` is also the store id.**
 - If any query fails with a 401, the user is signed out (see `src/app/_layout.tsx`).
@@ -74,7 +90,7 @@ npx expo install <pkg>    # add dependencies
 - The pure helpers are in `src/lib/slots.ts` and `src/lib/date.ts`.
 - **Dates and slot times are local-time strings**, `YYYY-MM-DD` and `YYYY-MM-DDTHH:mm`, never `Date`/ISO with a timezone. That way string comparisons order them correctly.
 - Slots run from `openAt` until `closeAt`, stepped by the store's `limitUnit` (`day`, `hour` or `halfHour`).
-- Rejected bookings don't count toward visitor totals.
+- In the dummy backend, rejected bookings don't count toward visitor totals. The Ghoomo calendar can't decrement, so with the real API they still count.
 - `slotState` marks a slot `full` when its count reaches the max and `over` when it exceeds it.
 
 ### Theming
