@@ -76,3 +76,9 @@ Decisions:
 These are the account rules for signup and login: unique store names with no special characters, usernames for users, and store login by email or store name. The dummy backend handles all of them now; the Ghoomo API changes are pending.
 
 - [x] [Signup and login identity rules](auth-identity.md)
+
+## Next.js web port
+
+A self-contained spec for rebuilding the web screens in the separate Next.js project, against that project's own API client. Copy it there along with `references/`.
+
+- [Next.js web-port spec](nextjs-web-port.md)
