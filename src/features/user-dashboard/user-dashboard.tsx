@@ -13,12 +13,14 @@ import { Select, type SelectOption } from '@/components/ui/select';
 import { RatingBadge } from '@/components/ui/stars';
 import { Spacing } from '@/constants/theme';
 import { UserEventsTabs } from '@/features/events/user-events-tabs';
+import { ServicesModal } from '@/features/services/services-modal';
 import { SlotGrid } from '@/features/user-dashboard/slot-grid';
 import { useStores, useStoreSlots } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDayLong, formatSlotStart, makeDateKey, MONTHS, toDateKey } from '@/lib/date';
+import { countServices, encodeServices } from '@/lib/services';
 import { daysInMonth, LIMIT_UNIT_LABEL } from '@/lib/slots';
-import type { SlotStart } from '@/types/domain';
+import type { ServicePicks, SlotStart } from '@/types/domain';
 
 /** The next 12 months, starting with the current one; values are `year-month` (0-based month). */
 function monthOptions(today: Date): SelectOption<string>[] {
@@ -47,6 +49,16 @@ export function UserDashboard() {
   const [day, setDay] = useState(today.getDate());
   const [selectedSlot, setSelectedSlot] = useState<SlotStart | null>(null);
   const [message, setMessage] = useState<BannerMessage | null>(null);
+  const [picks, setPicks] = useState<ServicePicks>({});
+  const [servicesOpen, setServicesOpen] = useState(false);
+  const serviceCount = countServices(picks);
+
+  // A finished booking comes back with a new `booked` param: start the next one without its services.
+  const [seenBooked, setSeenBooked] = useState(booked);
+  if (booked !== seenBooked) {
+    setSeenBooked(booked);
+    if (booked) setPicks({});
+  }
 
   const [year, month] = monthKey.split('-').map(Number);
   const dateKey = makeDateKey(year, month, day);
@@ -76,6 +88,7 @@ export function UserDashboard() {
     setDay(today.getDate());
     setSelectedSlot(null);
     setMessage(null);
+    setPicks({});
     router.setParams({ booked: undefined, status: undefined });
   };
 
@@ -94,7 +107,14 @@ export function UserDashboard() {
     }
     setMessage(null);
     router.setParams({ booked: undefined, status: undefined });
-    router.push({ pathname: '/booking', params: { storeId, slotStart: selectedSlot } });
+    router.push({
+      pathname: '/booking',
+      params: {
+        storeId,
+        slotStart: selectedSlot,
+        ...(serviceCount ? { services: encodeServices(picks) } : {}),
+      },
+    });
   };
 
   return (
@@ -117,6 +137,8 @@ export function UserDashboard() {
           }))}
           fieldAccessory={store ? <RatingBadge rating={store.rating} color={theme.cardTextSecondary} /> : null}
           onChange={(id) => {
+            // Services belong to a store, so a new store starts with none.
+            if (id !== storeId) setPicks({});
             setStoreId(id);
             setSelectedSlot(null);
             setMessage(null);
@@ -124,12 +146,19 @@ export function UserDashboard() {
           onCard
           style={styles.flex}
         />
-        {store ? (
-          <ThemedText type="default" themeColor="textSecondary" style={styles.flex}>
-            Max Count : {store.maxPerSlot} per {LIMIT_UNIT_LABEL[store.limitUnit]}
-          </ThemedText>
-        ) : null}
+        <Button
+          label={serviceCount ? `Services (${serviceCount})` : 'Services'}
+          variant="secondary"
+          disabled={!store}
+          accessibilityHint={store ? undefined : 'Select a store first'}
+          onPress={() => setServicesOpen(true)}
+        />
       </View>
+      {store ? (
+        <ThemedText type="default" themeColor="textSecondary">
+          Max Count : {store.maxPerSlot} per {LIMIT_UNIT_LABEL[store.limitUnit]}
+        </ThemedText>
+      ) : null}
       {stores.isError ? (
         <Banner message={{ type: 'error', text: errorMessage(stores.error) }} />
       ) : null}
@@ -205,8 +234,22 @@ export function UserDashboard() {
 
       <View style={styles.actions}>
         <Button label="Reset" variant="danger" onPress={reset} />
-        <Button label={session ? 'Book' : 'Login to book'} variant="success" onPress={book} />
+        <Button label={session ? 'Submit request' : 'Login to book'} variant="success" onPress={book} />
       </View>
+
+      {servicesOpen && store ? (
+        <ServicesModal
+          storeId={store.id}
+          storeName={store.name}
+          initial={picks}
+          onClose={() => setServicesOpen(false)}
+          onSave={(next) => {
+            setPicks(next);
+            setServicesOpen(false);
+            setMessage(null);
+          }}
+        />
+      ) : null}
 
       {session?.role === 'user' ? <UserEventsTabs /> : null}
     </Screen>
