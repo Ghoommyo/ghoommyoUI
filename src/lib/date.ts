@@ -81,3 +81,15 @@ export function timeOptions(from: number, to: number, step = 30) {
   }
   return options;
 }
+
+/** ISO timestamp → `just now`, `5 min ago`, `3 h ago`, `2 d ago`, or `Oct 3`. */
+export function formatTimeAgo(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso);
+  const minutes = Math.floor((now.getTime() - then.getTime()) / 60_000);
+  if (Number.isNaN(minutes)) return '';
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} h ago`;
+  if (minutes < 7 * 24 * 60) return `${Math.floor(minutes / (24 * 60))} d ago`;
+  return `${MONTHS[then.getMonth()].slice(0, 3)} ${then.getDate()}`;
+}
