@@ -3,6 +3,7 @@ import type {
   GhoomoDayDetails,
   GhoomoLocation,
   GhoomoProfile,
+  GhoomoService,
   GhoomoSettings,
   GhoomoSlotCount,
   GhoomoStatus,
@@ -15,10 +16,12 @@ import type {
   DateKey,
   DaySummary,
   LimitUnit,
+  ServiceInput,
   Slot,
   SlotStart,
   Store,
   StoreProfile,
+  StoreService,
   StoreSettings,
 } from '@/types/domain';
 
@@ -35,7 +38,7 @@ export const API_DEFAULTS = {
    */
   userMobile: '',
   /** Server defaults applied when a location has never opened its settings (Api.md §5.4). */
-  settings: { maxLimit: 100, unit: 'DAY', autoApprove: true, openAt: '09:00', closeAt: '21:00' },
+  settings: { maxLimit: 100, unit: 'DAY', autoApprove: true, openAt: '09:00', closeAt: '21:00', maxServiceQty: 1 },
 } as const;
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -135,7 +138,7 @@ export function daySummaryFromCalendar(
   }));
 }
 
-type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store'>;
+type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty'>;
 /** Settings columns, which are null on browse rows for locations that never opened settings. */
 type SettingsInput = { [K in keyof SettingsFields]?: SettingsFields[K] | null };
 
@@ -149,6 +152,7 @@ export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'>
     openAt: row.open_at || d.openAt,
     closeAt: row.close_at || d.closeAt,
     isDarkStore: row.is_dark_store === 1,
+    maxServiceQty: Number(row.max_svc_qty) || d.maxServiceQty,
   };
 }
 
@@ -159,6 +163,7 @@ export function settingsToRequest(settings: StoreSettings) {
     isAutoApprove: settings.autoApprove ? 1 : 0,
     openAt: settings.openAt,
     closeAt: settings.closeAt,
+    maxServiceQty: settings.maxServiceQty,
   };
 }
 
@@ -224,5 +229,34 @@ export function appointmentToBooking(row: GhoomoAppointment): Booking {
     status: toStatus(row.status),
     createdAt: row.cret_on ?? '',
     rating: row.rtng_stars ? { stars: Number(row.rtng_stars), review: row.rtng_review ?? '' } : null,
+    services: (row.services ?? []).map((s) => ({
+      serviceId: s.svc_id,
+      name: s.name,
+      price: Number(s.price) || 0,
+      qty: Number(s.qty) || 1,
+    })),
+  };
+}
+
+export function serviceToStore(row: GhoomoService): StoreService {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? '',
+    price: Number(row.price) || 0,
+    imageUrl: row.imageUrl ?? '',
+    maxQtyOverride: row.maxQty ?? null,
+    maxQty: Number(row.effectiveMaxQty) || 1,
+  };
+}
+
+/** POST/PUT body for a service; PUT replaces every field. */
+export function serviceToRequest(input: ServiceInput) {
+  return {
+    name: input.name,
+    description: input.description,
+    price: input.price,
+    imageUrl: input.imageUrl,
+    maxQty: input.maxQty,
   };
 }

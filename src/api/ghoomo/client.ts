@@ -9,6 +9,8 @@ import {
   locationToStore,
   profileToRequest,
   profileToStore,
+  serviceToRequest,
+  serviceToStore,
   settingsToRequest,
   settingsToStore,
   slotKey,
@@ -23,6 +25,7 @@ import type {
   GhoomoProfile,
   GhoomoReminderSettings,
   GhoomoReviewsResponse,
+  GhoomoService,
   GhoomoSettings,
   GhoomoUserClaims,
 } from '@/api/ghoomo/types';
@@ -240,6 +243,37 @@ export function createGhoomoApi(baseUrl: string): Api {
         .sort((a, b) => a.slotStart.localeCompare(b.slotStart));
     },
 
+    async getStoreServices(storeId) {
+      const res = await request<{ services: GhoomoService[] }>(`/services/${encodeURIComponent(storeId)}`);
+      return (res?.services ?? []).map(serviceToStore);
+    },
+
+    // Owner routes are addressed by the token's location code; the store id isn't needed.
+    async createService(_storeId, input) {
+      const locCode = requireOwnLocCode();
+      const res = await request<{ service: GhoomoService }>(
+        `/location/${encodeURIComponent(locCode)}/services`,
+        { method: 'POST', body: serviceToRequest(input) },
+      );
+      return serviceToStore(res!.service);
+    },
+
+    async updateService(_storeId, serviceId, input) {
+      const locCode = requireOwnLocCode();
+      const res = await request<{ service: GhoomoService }>(
+        `/location/${encodeURIComponent(locCode)}/services/${encodeURIComponent(serviceId)}`,
+        { method: 'PUT', body: serviceToRequest(input) },
+      );
+      return serviceToStore(res!.service);
+    },
+
+    async deleteService(_storeId, serviceId) {
+      const locCode = requireOwnLocCode();
+      await request(`/location/${encodeURIComponent(locCode)}/services/${encodeURIComponent(serviceId)}`, {
+        method: 'DELETE',
+      });
+    },
+
     async createBooking(input): Promise<Booking> {
       const store = await findShop(input.storeId);
       const { userId } = claims<GhoomoUserClaims>();
@@ -257,6 +291,9 @@ export function createGhoomoApi(baseUrl: string): Api {
           bokng_mobile: input.mobile,
           bokng_cnt: input.people,
           bokng_desc: input.description,
+          ...(input.services.length
+            ? { services: input.services.map((svc) => ({ svc_id: svc.serviceId, qty: svc.qty })) }
+            : {}),
         },
       });
       const appointmentId = res!.appointmentId;

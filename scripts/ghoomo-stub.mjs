@@ -12,8 +12,8 @@
  *   shop      city_salon    (settings never opened → null settings on browse rows)
  *   place     taj_mahal     (PLACE; the app should hide it)
  *
- * Also serves notifications, booking edits, ratings/reviews and reminder settings
- * (Api.md §5.6–5.6b) so those flows can be tried without the real backend.
+ * Also serves services (Api.md §5.4a), notifications, booking edits, ratings/reviews and
+ * reminder settings (§5.6–5.6b) so those flows can be tried without the real backend.
  *
  * Data resets on restart. Every request is logged with its body.
  */
@@ -52,6 +52,7 @@ const calendars = new Map(); // clndr_id → { clndr_id, day_details, type, ... 
 const notifications = []; // { ntfy_id, rcpt_id, apntmnt_id, kind, text, cret_on, read_on }
 const ratings = []; // { rtng_id, apntmnt_id, loc_id, user_id, name, stars, review, cret_on }
 const reminderSettings = []; // append-only audit trail: { acct_id, enabled, hoursBefore, platform, cret_on }
+const services = []; // { svc_id, loc_id, svc_name, svc_desc, svc_price, svc_img_url, max_qty, active, created_on }
 function notify(rcptId, apptId, kind, text) {
   notifications.push({ ntfy_id: randomUUID(), rcpt_id: rcptId, apntmnt_id: apptId, kind, text, cret_on: now(), read_on: null });
 }
@@ -71,7 +72,7 @@ function ensureSettings(loc) {
   if (!settings.has(loc.user_id)) {
     settings.set(loc.user_id, {
       stng_id: randomUUID(), loc_id: loc.user_id, max_limit: '100', unit: 'DAY', is_auto_approval: 1,
-      open_at: '09:00', close_at: '21:00', created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
+      open_at: '09:00', close_at: '21:00', max_svc_qty: 1, created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
     });
   }
   return settings.get(loc.user_id);
@@ -97,6 +98,7 @@ function addAppointment(body, userId) {
     start_time: start.toISOString(), end_time: new Date(start.getTime() + (PERIOD_MS[body.apntmnt_period] ?? 0)).toISOString(),
     cret_on: body.cret_on ?? now(), cret_by: body.cret_by ?? null, updt_on: now(), updt_by: body.cret_by ?? null,
     status: 'PENDING', status_updt_by: null, status_updt_on: null, updt_reason: null,
+    services: body.services ?? null,
   };
   appointments.push(row);
   return row;
@@ -127,7 +129,14 @@ function addToCalendar({ plan_id, count_of_ppl, type, details }) {
 // Seed: two shops, one place, and appointments around today (local time, like the app books).
 {
   const raju = addLocation('Raju Tailor', 'SHOP', 'raju@example.com');
-  Object.assign(ensureSettings(raju), { max_limit: '3', unit: 'HOUR', is_auto_approval: 0, open_at: '09:00', close_at: '22:00' });
+  Object.assign(ensureSettings(raju), { max_limit: '3', unit: 'HOUR', is_auto_approval: 0, open_at: '09:00', close_at: '22:00', max_svc_qty: 2 });
+  for (const [name, desc, price, maxQty] of [
+    ['Blouse stitching', 'Lined blouse, fitted to your measurements', 450, null],
+    ['Kurta alteration', 'Take in, let out or shorten', 150, null],
+    ['Hemming', 'Trousers, skirts or sarees', 80, 1],
+  ]) {
+    services.push({ svc_id: randomUUID(), loc_id: raju.user_id, svc_name: name, svc_desc: desc, svc_price: price, svc_img_url: '', max_qty: maxQty, active: 1, created_on: now() });
+  }
   Object.assign(ensureProfile(raju), {
     loc_info: 'Custom tailoring and alterations since 1998.', loc_address: '12 MG Road', loc_city: 'Indore',
     loc_country: 'India', loc_pin_code: '452001', loc_nav: 'https://maps.google.com/?q=22.7196,75.8577',
@@ -170,6 +179,7 @@ const browseRow = (loc) => {
   const avg = rated.length ? (rated.reduce((sum, r) => sum + r.stars, 0) / rated.length).toFixed(1) : null;
   return {
     ...row, max_limit: s?.max_limit ?? null, unit: s?.unit ?? null, is_auto_approval: s?.is_auto_approval ?? null, open_at: s?.open_at ?? null, close_at: s?.close_at ?? null,
+    max_svc_qty: s?.max_svc_qty ?? null,
     rating_avg: avg, rating_count: rated.length ? String(rated.length) : null,
   };
 };
@@ -178,6 +188,22 @@ const localDay = (iso) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 const today = () => localDay(new Date().toISOString());
+/** Service row → the API's service object, with the limit that applies. */
+const serviceJson = (svc) => ({
+  id: svc.svc_id, name: svc.svc_name, description: svc.svc_desc ?? '', price: svc.svc_price, imageUrl: svc.svc_img_url ?? '',
+  maxQty: svc.max_qty, effectiveMaxQty: svc.max_qty ?? settings.get(svc.loc_id)?.max_svc_qty ?? 1,
+});
+const activeServices = (locId) => services.filter((svc) => svc.loc_id === locId && svc.active);
+function serviceFields(body) {
+  if (typeof body?.name !== 'string' || !body.name.trim()) return [null, 'name is required'];
+  const price = Number(body.price);
+  if (body.price === undefined || body.price === null || body.price === '' || !Number.isFinite(price) || price < 0) return [null, 'price must be a number of at least 0'];
+  const maxQty = body.maxQty ?? null;
+  if (maxQty !== null && (!Number.isInteger(maxQty) || maxQty < 1)) return [null, 'maxQty must be empty or a whole number of at least 1'];
+  const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl.trim() : '';
+  if (imageUrl && !/^https?:\/\//.test(imageUrl)) return [null, 'imageUrl must start with http:// or https://'];
+  return [{ svc_name: body.name.trim(), svc_desc: typeof body.description === 'string' ? body.description.trim() : '', svc_price: Math.round(price * 100) / 100, svc_img_url: imageUrl, max_qty: maxQty }, null];
+}
 const isLocToken = (c) => c && 'locCode' in c;
 
 // ---------- routing ----------
@@ -263,8 +289,45 @@ route('PUT', /^\/location\/([^/]+)\/settings$/, 'any', ({ claims, params, body }
   if (body?.isAutoApprove !== undefined) row.is_auto_approval = Number(body.isAutoApprove);
   if (body?.openAt !== undefined) row.open_at = body.openAt;
   if (body?.closeAt !== undefined) row.close_at = body.closeAt;
+  if (body?.maxServiceQty !== undefined) {
+    if (!Number.isInteger(body.maxServiceQty) || body.maxServiceQty < 1) return [400, { error: 'maxServiceQty must be a whole number of at least 1' }];
+    row.max_svc_qty = body.maxServiceQty;
+  }
   Object.assign(row, { updated_on: now(), updated_by: loc.loc_name });
   return [200, { settings: row }];
+});
+
+route('GET', /^\/services\/([^/]+)$/, 'none', ({ params }) => [200, { services: activeServices(params[0]).map(serviceJson) }]);
+route('GET', /^\/location\/([^/]+)\/services$/, 'any', ({ claims, params }) => {
+  const [loc, err] = ownLocation(claims, params[0]);
+  return err ?? [200, { services: activeServices(loc.user_id).map(serviceJson) }];
+});
+route('POST', /^\/location\/([^/]+)\/services$/, 'any', ({ claims, params, body }) => {
+  const [loc, err] = ownLocation(claims, params[0]);
+  if (err) return err;
+  const [fields, error] = serviceFields(body);
+  if (error) return [400, { error }];
+  const svc = { svc_id: randomUUID(), loc_id: loc.user_id, ...fields, active: 1, created_on: now() };
+  services.push(svc);
+  return [201, { service: serviceJson(svc) }];
+});
+route('PUT', /^\/location\/([^/]+)\/services\/([^/]+)$/, 'any', ({ claims, params, body }) => {
+  const [loc, err] = ownLocation(claims, params[0]);
+  if (err) return err;
+  const svc = activeServices(loc.user_id).find((s) => s.svc_id === params[1]);
+  if (!svc) return [404, { error: 'Service not found' }];
+  const [fields, error] = serviceFields(body);
+  if (error) return [400, { error }];
+  Object.assign(svc, fields);
+  return [200, { service: serviceJson(svc) }];
+});
+route('DELETE', /^\/location\/([^/]+)\/services\/([^/]+)$/, 'any', ({ claims, params }) => {
+  const [loc, err] = ownLocation(claims, params[0]);
+  if (err) return err;
+  const svc = activeServices(loc.user_id).find((s) => s.svc_id === params[1]);
+  if (!svc) return [404, { error: 'Service not found' }];
+  svc.active = 0;
+  return [200, { message: 'Service deleted' }];
 });
 
 route('GET', /^\/calendar\/([^/]+)$/, 'none', ({ params }) => {
@@ -283,7 +346,23 @@ route('POST', /^\/appointment$/, 'any', ({ claims, body }) => {
   if (!body?.loc_id || !body.loc_name || !body.apntmnt_time || !body.apntmnt_period) return [400, { error: 'Missing required fields' }];
   if (typeof body.bokng_desc !== 'string' || !body.bokng_desc.trim()) return [400, { error: 'bokng_desc is required' }];
   if (Number.isNaN(new Date(body.apntmnt_time).getTime())) return [400, { error: 'Invalid apntmnt_time' }];
-  const appt = addAppointment(body, claims.userId);
+  // Booked services: each one this location's, listed once, within its limit; saved as a snapshot.
+  let booked = null;
+  if (body.services != null) {
+    if (!Array.isArray(body.services)) return [400, { error: 'services must be an array' }];
+    const offered = activeServices(body.loc_id).map(serviceJson);
+    const seen = new Set();
+    booked = [];
+    for (const { svc_id, qty } of body.services) {
+      const svc = offered.find((s) => s.id === svc_id);
+      if (!svc || seen.has(svc_id)) return [400, { error: "services contains a service this location doesn't offer" }];
+      seen.add(svc_id);
+      if (!Number.isInteger(qty) || qty < 1 || qty > svc.effectiveMaxQty) return [400, { error: `qty for ${svc.name} must be between 1 and ${svc.effectiveMaxQty}` }];
+      booked.push({ svc_id, name: svc.name, price: svc.price, qty });
+    }
+    if (!booked.length) booked = null;
+  }
+  const appt = addAppointment({ ...body, services: booked }, claims.userId);
   // Auto-approving locations (the default for new settings) accept on creation.
   const auto = Number(settings.get(body.loc_id)?.is_auto_approval ?? 1) === 1;
   if (auto) Object.assign(appt, { status: 'ACCEPTED', status_updt_by: 'SYSTEM', status_updt_on: now() });
