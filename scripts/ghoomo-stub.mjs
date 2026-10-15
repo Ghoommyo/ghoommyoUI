@@ -12,6 +12,9 @@
  *   shop      city_salon    (settings never opened → null settings on browse rows)
  *   place     taj_mahal     (PLACE; the app should hide it)
  *
+ * Also serves notifications, booking edits, ratings/reviews and reminder settings
+ * (Api.md §5.6–5.6b) so those flows can be tried without the real backend.
+ *
  * Data resets on restart. Every request is logged with its body.
  */
 import { createHmac, randomUUID } from 'node:crypto';
@@ -46,6 +49,13 @@ const settings = new Map(); // loc_id → settings row
 const profiles = new Map(); // loc_id → profile row
 const appointments = [];
 const calendars = new Map(); // clndr_id → { clndr_id, day_details, type, ... }
+const notifications = []; // { ntfy_id, rcpt_id, apntmnt_id, kind, text, cret_on, read_on }
+const ratings = []; // { rtng_id, apntmnt_id, loc_id, user_id, name, stars, review, cret_on }
+const reminderSettings = []; // append-only audit trail: { acct_id, enabled, hoursBefore, platform, cret_on }
+function notify(rcptId, apptId, kind, text) {
+  notifications.push({ ntfy_id: randomUUID(), rcpt_id: rcptId, apntmnt_id: apptId, kind, text, cret_on: now(), read_on: null });
+}
+const starText = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
 
 function addLocation(name, type, email) {
   const code = name.toLowerCase().replace(/ /g, '_');
@@ -156,7 +166,12 @@ function addToCalendar({ plan_id, count_of_ppl, type, details }) {
 const browseRow = (loc) => {
   const { password: _pw, email: _email, ...row } = loc;
   const s = settings.get(loc.user_id);
-  return { ...row, max_limit: s?.max_limit ?? null, unit: s?.unit ?? null, is_auto_approval: s?.is_auto_approval ?? null, open_at: s?.open_at ?? null, close_at: s?.close_at ?? null };
+  const rated = ratings.filter((r) => r.loc_id === loc.user_id);
+  const avg = rated.length ? (rated.reduce((sum, r) => sum + r.stars, 0) / rated.length).toFixed(1) : null;
+  return {
+    ...row, max_limit: s?.max_limit ?? null, unit: s?.unit ?? null, is_auto_approval: s?.is_auto_approval ?? null, open_at: s?.open_at ?? null, close_at: s?.close_at ?? null,
+    rating_avg: avg, rating_count: rated.length ? String(rated.length) : null,
+  };
 };
 const localDay = (iso) => {
   const d = new Date(iso);
@@ -266,8 +281,14 @@ route('POST', /^\/calendar$/, 'any', ({ body }) => {
 
 route('POST', /^\/appointment$/, 'any', ({ claims, body }) => {
   if (!body?.loc_id || !body.loc_name || !body.apntmnt_time || !body.apntmnt_period) return [400, { error: 'Missing required fields' }];
+  if (typeof body.bokng_desc !== 'string' || !body.bokng_desc.trim()) return [400, { error: 'bokng_desc is required' }];
   if (Number.isNaN(new Date(body.apntmnt_time).getTime())) return [400, { error: 'Invalid apntmnt_time' }];
-  return [201, { message: 'Appointment added successfully', appointmentId: addAppointment(body, claims.userId).apntmnt_id }];
+  const appt = addAppointment(body, claims.userId);
+  // Auto-approving locations (the default for new settings) accept on creation.
+  const auto = Number(settings.get(body.loc_id)?.is_auto_approval ?? 1) === 1;
+  if (auto) Object.assign(appt, { status: 'ACCEPTED', status_updt_by: 'SYSTEM', status_updt_on: now() });
+  notify(body.loc_id, appt.apntmnt_id, auto ? 'AUTO_ACCEPTED' : 'NEW_REQUEST', `${body.bokng_name || 'A customer'} requested a booking${auto ? ' — auto-approved' : ''}`);
+  return [201, { message: 'Appointment added successfully', appointmentId: appt.apntmnt_id, status: appt.status }];
 });
 route('PUT', /^\/appointment$/, 'any', ({ claims, body }) => {
   if (!isLocToken(claims)) return [403, { error: 'Forbidden: location login required' }];
@@ -276,7 +297,72 @@ route('PUT', /^\/appointment$/, 'any', ({ claims, body }) => {
   const appt = appointments.find((a) => a.apntmnt_id === body.apntmnt_id && a.loc_id === claims.userId);
   if (!appt) return [404, { error: 'Appointment not found' }];
   Object.assign(appt, { status: body.status, updt_reason: body.updt_reason ?? null, status_updt_by: claims.locName, status_updt_on: now() });
+  if (body.status !== 'PENDING') notify(appt.user_id, appt.apntmnt_id, body.status, `${claims.locName} ${body.status.toLowerCase()} your booking`);
   return [200, { message: 'Appointment status updated successfully', appointment: appt }];
+});
+route('PUT', /^\/appointment\/([^/]+)$/, 'any', ({ claims, params, body }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const appt = appointments.find((a) => a.apntmnt_id === params[0] && a.user_id === claims.userId);
+  if (!appt) return [404, { error: 'Appointment not found' }];
+  if (!['PENDING', 'ACCEPTED'].includes(appt.status)) return [409, { error: 'Only pending or accepted bookings can be changed' }];
+  const message = typeof body?.message === 'string' ? body.message.trim() : '';
+  const current = Number(appt.bokng_cnt) || 1;
+  const people = body?.people == null ? current : Number(body.people);
+  const mobile = typeof body?.mobile === 'string' ? body.mobile.trim() : appt.mobile_number;
+  if (!Number.isInteger(people) || people < 1 || people > 5) return [400, { error: 'people must be a whole number from 1 to 5' }];
+  if (!/^\+?\d{10,15}$/.test(String(mobile).replace(/[\s-]/g, ''))) return [400, { error: 'mobile must be a valid phone number' }];
+  const parts = [message && 'sent a message', people !== current && `changed the booking to ${people} ${people === 1 ? 'person' : 'people'}`, mobile !== appt.mobile_number && 'updated their mobile number'].filter(Boolean);
+  if (!parts.length) return [400, { error: 'Nothing to change' }];
+  if (message) appt.bokng_desc = `${appt.bokng_desc}\n=====\n${message}`;
+  Object.assign(appt, { bokng_cnt: String(people), mobile_number: mobile, updt_on: now() });
+  notify(appt.loc_id, appt.apntmnt_id, 'UPDATED', `${appt.user_name || 'A customer'} ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}`);
+  return [200, { appointment: appt }];
+});
+route('PUT', /^\/appointment\/([^/]+)\/rating$/, 'any', ({ claims, params, body }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const appt = appointments.find((a) => a.apntmnt_id === params[0] && a.user_id === claims.userId);
+  if (!appt) return [404, { error: 'Appointment not found' }];
+  if (appt.status !== 'ACCEPTED') return [409, { error: 'Only accepted bookings can be rated' }];
+  const stars = Number(body?.stars);
+  if (!Number.isInteger(stars) || stars < 1 || stars > 5) return [400, { error: 'stars must be a whole number from 1 to 5' }];
+  const review = typeof body?.review === 'string' ? body.review.trim() : '';
+  const existing = ratings.find((r) => r.apntmnt_id === appt.apntmnt_id);
+  const name = appt.user_name || 'Customer';
+  if (existing) Object.assign(existing, { stars, review });
+  else ratings.push({ rtng_id: randomUUID(), apntmnt_id: appt.apntmnt_id, loc_id: appt.loc_id, user_id: claims.userId, name, stars, review, cret_on: now() });
+  const excerpt = review.length > 80 ? `${review.slice(0, 80).trimEnd()}…` : review;
+  notify(appt.loc_id, appt.apntmnt_id, 'RATED', `${name} ${existing ? 'updated their rating to' : 'rated your store'} ${starText(stars)}${excerpt ? `: "${excerpt}"` : ''}`);
+  return [200, { rating: { stars, review, createdAt: (existing ?? ratings.at(-1)).cret_on, updatedAt: now() } }];
+});
+route('GET', /^\/reviews\/([^/]+)$/, 'none', ({ params, query }) => {
+  const own = ratings.filter((r) => r.loc_id === params[0]).sort((a, b) => b.cret_on.localeCompare(a.cret_on));
+  const limit = Math.min(50, Number(query.get('limit')) || 10);
+  const start = Number(query.get('cursor')) || 0; // the stub's cursor is just an offset
+  const page = own.slice(start, start + limit).map((r) => ({ id: r.rtng_id, name: r.name, stars: r.stars, review: r.review, createdAt: r.cret_on }));
+  const body = { reviews: page, nextCursor: start + limit < own.length ? String(start + limit) : null };
+  if (!query.get('cursor')) body.summary = { average: own.length ? Math.round((own.reduce((s, r) => s + r.stars, 0) / own.length) * 10) / 10 : null, count: own.length };
+  return [200, body];
+});
+route('GET', /^\/notifications$/, 'any', ({ claims }) => {
+  const mine = notifications.filter((n) => n.rcpt_id === claims.userId).sort((a, b) => b.cret_on.localeCompare(a.cret_on)).slice(0, 50);
+  return [200, { notifications: mine.map(({ rcpt_id: _r, ...n }) => ({ ...n, appointment: appointments.find((a) => a.apntmnt_id === n.apntmnt_id) ?? null })) }];
+});
+route('POST', /^\/notifications\/read$/, 'any', ({ claims, body }) => {
+  if (!Array.isArray(body?.ids) || !body.ids.length) return [400, { error: 'ids must be a non-empty array of notification ids' }];
+  let updated = 0;
+  for (const n of notifications) if (n.rcpt_id === claims.userId && body.ids.includes(n.ntfy_id) && !n.read_on) { n.read_on = now(); updated++; }
+  return [200, { updated }];
+});
+route('GET', /^\/reminder-settings$/, 'any', ({ claims }) => {
+  const latest = reminderSettings.filter((r) => r.acct_id === claims.userId).at(-1);
+  return [200, { settings: latest ? { enabled: latest.enabled, hoursBefore: latest.hoursBefore, platform: latest.platform, updatedAt: latest.cret_on } : { enabled: false, hoursBefore: 1, platform: null, updatedAt: null } }];
+});
+route('PUT', /^\/reminder-settings$/, 'any', ({ claims, body }) => {
+  if (typeof body?.enabled !== 'boolean') return [400, { error: 'enabled must be true or false' }];
+  if (!Number.isInteger(body.hoursBefore) || body.hoursBefore < 1 || body.hoursBefore > 72) return [400, { error: 'hoursBefore must be a whole number from 1 to 72' }];
+  const row = { acct_id: claims.userId, enabled: body.enabled, hoursBefore: body.hoursBefore, platform: body.platform ?? null, cret_on: now() };
+  reminderSettings.push(row);
+  return [200, { settings: { enabled: row.enabled, hoursBefore: row.hoursBefore, platform: row.platform, updatedAt: row.cret_on } }];
 });
 
 const LISTS = { pending: ['PENDING', 'open_appointments'], accepted: ['ACCEPTED', 'accepted_appointments'], rejected: ['REJECTED', 'rejected_appointments'], all: [null, 'all_appointments'] };
@@ -301,7 +387,7 @@ route('GET', /^\/events\/(coming-events|inprogress-events|completed-events)$/, '
 });
 
 // ---------- server ----------
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS' };
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS' };
 
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -329,7 +415,7 @@ createServer(async (req, res) => {
     if (!match) continue;
     const claims = verifyJwt(req.headers.authorization);
     if (r.auth === 'any' && !claims) return send(...UNAUTH);
-    const [status, json] = r.handler({ body, claims, params: match.slice(1) });
+    const [status, json] = r.handler({ body, claims, params: match.slice(1), query: url.searchParams });
     return send(status, json);
   }
   send(404, { error: 'Not found' });

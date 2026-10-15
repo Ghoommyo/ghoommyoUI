@@ -50,6 +50,8 @@ export interface StoreSettings {
   openAt: string;
   /** `HH:mm` */
   closeAt: string;
+  /** No dine-in: bookings are orders, so the head count can't change. Read-only in the app. */
+  isDarkStore?: boolean;
 }
 
 export interface StoreProfile {
@@ -66,9 +68,16 @@ export interface StoreProfile {
   mapUrl?: string;
 }
 
+/** Average stars (1 decimal; null when unrated) and how many ratings. */
+export interface RatingSummary {
+  average: number | null;
+  count: number;
+}
+
 export interface Store extends StoreSettings {
   id: string;
   profile: StoreProfile;
+  rating: RatingSummary;
 }
 
 export interface UserProfile {
@@ -88,6 +97,59 @@ export interface Booking {
   description: string;
   status: BookingStatus;
   createdAt: string;
+  /** The customer's own rating; only on the customer's bookings. */
+  rating: BookingRating | null;
+}
+
+export interface BookingRating {
+  /** 1–5 */
+  stars: number;
+  review: string;
+}
+
+/** What a customer can change on their own pending/accepted booking. */
+export interface BookingChanges {
+  /** Appended to the description below a `=====` line. */
+  message?: string;
+  people?: number;
+  mobile?: string;
+}
+
+/** A public review of a store. `name` is never an email. */
+export interface Review {
+  id: string;
+  name: string;
+  stars: number;
+  review: string;
+  createdAt: string;
+}
+
+export interface ReviewsPage {
+  reviews: Review[];
+  /** Pass to the next `getReviews` call; null on the last page. */
+  nextCursor: string | null;
+  /** Only on the first page. */
+  summary?: RatingSummary;
+}
+
+export type NotificationKind = 'NEW_REQUEST' | 'AUTO_ACCEPTED' | 'ACCEPTED' | 'REJECTED' | 'UPDATED' | 'RATED';
+
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  text: string;
+  /** ISO timestamp. */
+  createdAt: string;
+  read: boolean;
+  /** The booking it's about; null if it no longer exists. */
+  booking: Booking | null;
+}
+
+/** Booking reminders (iOS/Android). Applies to all accepted bookings. */
+export interface ReminderSettings {
+  enabled: boolean;
+  /** 1–72 */
+  hoursBefore: number;
 }
 
 export interface NewBooking {

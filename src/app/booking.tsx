@@ -17,7 +17,7 @@ import { formatSlotStart } from '@/lib/date';
 
 const MOBILE_PATTERN = /^\+?\d{10,15}$/;
 
-type FieldErrors = { name?: string; mobile?: string; people?: string };
+type FieldErrors = { name?: string; mobile?: string; people?: string; description?: string };
 
 export default function BookingScreen() {
   const { storeId, slotStart } = useLocalSearchParams<{ storeId: string; slotStart: string }>();
@@ -89,6 +89,8 @@ function BookingForm({
       name: name.trim() ? undefined : 'Name is required.',
       mobile: MOBILE_PATTERN.test(cleanMobile) ? undefined : 'Enter a valid mobile number.',
       people: people ? undefined : 'Choose how many people are coming.',
+      // The server rejects bookings without a description.
+      description: description.trim() ? undefined : 'Description is required.',
     };
     setErrors(next);
     if (!people || Object.values(next).some(Boolean)) return;
@@ -154,8 +156,13 @@ function BookingForm({
       <TextField
         label="Description"
         value={description}
-        onChangeText={setDescription}
+        onChangeText={(value) => {
+          setDescription(value);
+          setErrors((e) => ({ ...e, description: undefined }));
+        }}
         placeholder="Anything the store should know"
+        hint="Tell the store what you need."
+        error={errors.description}
         multiline
       />
 

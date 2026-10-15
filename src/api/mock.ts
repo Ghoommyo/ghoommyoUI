@@ -2,7 +2,16 @@ import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
 import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
-import type { Booking, Role, Store, UserProfile } from '@/types/domain';
+import type {
+  AppNotification,
+  Booking,
+  NotificationKind,
+  ReminderSettings,
+  Review,
+  Role,
+  Store,
+  UserProfile,
+} from '@/types/domain';
 
 /**
  * In-memory backend used until a real API exists. Data resets on reload;
@@ -46,7 +55,10 @@ const accounts: Account[] = [
   },
 ];
 
-const stores: Store[] = [
+/** Stores as kept in memory; `rating` is computed from `reviews` when they're read. */
+type StoreRecord = Omit<Store, 'rating'>;
+
+const stores: StoreRecord[] = [
   {
     id: 's1',
     name: 'Raju Tailor',
@@ -132,10 +144,65 @@ function seedBookings(): Booking[] {
     description,
     status,
     createdAt: new Date().toISOString(),
+    rating: null,
   }));
 }
 
 const bookings: Booking[] = seedBookings();
+
+interface StoredReview extends Review {
+  storeId: string;
+  bookingId: string;
+  userId: string;
+}
+
+/** Seeded reviews for Raju Tailor, so the reviews screen has more than one page. */
+function seedReviews(): StoredReview[] {
+  const names = ['Neha', 'Karan', 'Meera', 'Rohit', 'Priya', 'Arjun', 'Sana', 'Vikram', 'Isha', 'Dev', 'Anya', 'Kabir'];
+  return names.map((name, i) => ({
+    id: `r${i + 1}`,
+    storeId: 's1',
+    bookingId: `seed-booking-${i + 1}`,
+    userId: `guest-r${i}`,
+    name,
+    stars: [5, 4, 5, 3, 4, 5, 2, 4, 5, 4, 3, 5][i],
+    review: i % 3 === 2 ? '' : ['Neat stitching and on time.', 'Friendly and quick.', 'Good fit after one trial.'][i % 3],
+    createdAt: new Date(Date.now() - (i + 1) * 36e5).toISOString(),
+  }));
+}
+
+const reviews: StoredReview[] = seedReviews();
+
+interface StoredNotification extends Omit<AppNotification, 'booking'> {
+  recipientId: string;
+  bookingId: string;
+}
+
+const notifications: StoredNotification[] = [];
+
+/** Reminder settings per account id (the real backend keeps an audit trail; the mock keeps the latest). */
+const reminderSettings = new Map<string, ReminderSettings>();
+
+function notify(recipientId: string, bookingId: string, kind: NotificationKind, text: string) {
+  notifications.push({
+    id: newId('n'),
+    recipientId,
+    bookingId,
+    kind,
+    text,
+    createdAt: new Date().toISOString(),
+    read: false,
+  });
+}
+
+function withRating(store: StoreRecord): Store {
+  const own = reviews.filter((r) => r.storeId === store.id);
+  const average = own.length ? Math.round((own.reduce((sum, r) => sum + r.stars, 0) / own.length) * 10) / 10 : null;
+  return { ...store, rating: { average, count: own.length } };
+}
+
+const MOBILE_PATTERN = /^\+?\d{10,15}$/;
+const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n);
 
 function currentAccount(): Account {
   const token = getAuthToken();
@@ -144,7 +211,7 @@ function currentAccount(): Account {
   return account;
 }
 
-function findStore(storeId: string): Store {
+function findStore(storeId: string): StoreRecord {
   const store = stores.find((s) => s.id === storeId);
   if (!store) throw new ApiError('Store not found.', 404);
   return store;
@@ -240,12 +307,12 @@ export const mockApi: Api = {
 
   async listStores() {
     await delay();
-    return clone(stores);
+    return clone(stores.map(withRating));
   },
 
   async getStore(storeId) {
     await delay();
-    return clone(findStore(storeId));
+    return clone(withRating(findStore(storeId)));
   },
 
   async getStoreSlots(storeId, date) {
@@ -304,8 +371,15 @@ export const mockApi: Api = {
       userId: account.id,
       status: store.autoApprove ? 'accepted' : 'pending',
       createdAt: new Date().toISOString(),
+      rating: null,
     };
     bookings.push(booking);
+    notify(
+      store.id,
+      booking.id,
+      store.autoApprove ? 'AUTO_ACCEPTED' : 'NEW_REQUEST',
+      `${booking.name || 'A customer'} requested a booking${store.autoApprove ? ' — auto-approved' : ''}`,
+    );
     return clone(booking);
   },
 
@@ -315,6 +389,9 @@ export const mockApi: Api = {
     if (!booking) throw new ApiError('Booking not found.', 404);
     requireStoreOwner(booking.storeId);
     booking.status = status;
+    if (status !== 'pending') {
+      notify(booking.userId, booking.id, status === 'accepted' ? 'ACCEPTED' : 'REJECTED', `${booking.storeName} ${status} your booking`);
+    }
     return clone(booking);
   },
 
@@ -324,13 +401,146 @@ export const mockApi: Api = {
     return clone(bookings.filter((b) => b.userId === account.id));
   },
 
+  async updateBooking(bookingId, changes) {
+    await delay();
+    const account = currentAccount();
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (!booking || booking.userId !== account.id) throw new ApiError('Appointment not found', 404);
+    if (booking.status === 'rejected') throw new ApiError('Only pending or accepted bookings can be changed', 409);
+    const store = findStore(booking.storeId);
+    const message = changes.message?.trim() ?? '';
+    const people = changes.people ?? booking.people;
+    const mobile = changes.mobile?.trim() ?? booking.mobile;
+    if (!Number.isInteger(people) || people < 1 || people > store.maxPerBooking) {
+      throw new ApiError(`people must be a whole number from 1 to ${store.maxPerBooking}`, 400);
+    }
+    if (!MOBILE_PATTERN.test(mobile.replace(/[\s-]/g, ''))) throw new ApiError('mobile must be a valid phone number', 400);
+    const peopleChanged = people !== booking.people;
+    const mobileChanged = mobile !== booking.mobile;
+    if (!message && !peopleChanged && !mobileChanged) throw new ApiError('Nothing to change', 400);
+    if (peopleChanged && store.isDarkStore) {
+      throw new ApiError("This store takes orders; the number of people can't change", 400);
+    }
+    if (message) booking.description = `${booking.description}\n=====\n${message}`;
+    booking.people = people;
+    booking.mobile = mobile;
+    const parts = [
+      message && 'sent a message',
+      peopleChanged && `changed the booking to ${people} ${people === 1 ? 'person' : 'people'}`,
+      mobileChanged && 'updated their mobile number',
+    ].filter((part): part is string => Boolean(part));
+    const said = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
+    notify(booking.storeId, booking.id, 'UPDATED', `${booking.name || 'A customer'} ${said}`);
+    return clone(booking);
+  },
+
+  async rateBooking(bookingId, rating) {
+    await delay();
+    const account = currentAccount();
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (!booking || booking.userId !== account.id) throw new ApiError('Appointment not found', 404);
+    if (booking.status !== 'accepted') throw new ApiError('Only accepted bookings can be rated', 409);
+    if (!Number.isInteger(rating.stars) || rating.stars < 1 || rating.stars > 5) {
+      throw new ApiError('stars must be a whole number from 1 to 5', 400);
+    }
+    const review = rating.review.trim();
+    const existing = reviews.find((r) => r.bookingId === bookingId);
+    const name = account.profile.name.trim() || booking.name.trim() || 'Customer';
+    if (existing) Object.assign(existing, { stars: rating.stars, review });
+    else {
+      reviews.push({
+        id: newId('r'),
+        storeId: booking.storeId,
+        bookingId,
+        userId: account.id,
+        name,
+        stars: rating.stars,
+        review,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    booking.rating = { stars: rating.stars, review };
+    const excerpt = review.length > 80 ? `${review.slice(0, 80).trimEnd()}…` : review;
+    notify(
+      booking.storeId,
+      booking.id,
+      'RATED',
+      `${name} ${existing ? 'updated their rating to' : 'rated your store'} ${stars(rating.stars)}${excerpt ? `: "${excerpt}"` : ''}`,
+    );
+    return clone(booking.rating);
+  },
+
+  async getReviews(storeId, cursor) {
+    await delay();
+    const own = reviews
+      .filter((r) => r.storeId === storeId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+    const start = cursor ? Number(cursor) || 0 : 0;
+    const page = own.slice(start, start + 10).map(({ id, name, stars: s, review, createdAt }) => ({
+      id,
+      name,
+      stars: s,
+      review,
+      createdAt,
+    }));
+    const next = start + 10 < own.length ? String(start + 10) : null;
+    return { reviews: page, nextCursor: next, ...(cursor ? {} : { summary: withRating(findStore(storeId)).rating }) };
+  },
+
+  async getNotifications() {
+    await delay();
+    const account = currentAccount();
+    return notifications
+      .filter((n) => n.recipientId === account.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 50)
+      .map(({ recipientId: _recipient, bookingId, ...n }) => ({
+        ...n,
+        booking: clone(bookings.find((b) => b.id === bookingId) ?? null),
+      }));
+  },
+
+  async markNotificationsRead(ids) {
+    await delay();
+    const account = currentAccount();
+    for (const n of notifications) if (n.recipientId === account.id && ids.includes(n.id)) n.read = true;
+  },
+
+  async getReminderBookings() {
+    await delay();
+    const account = currentAccount();
+    const today = todayKey();
+    return clone(
+      bookings.filter(
+        (b) =>
+          b.status === 'accepted' &&
+          b.slotStart.slice(0, 10) >= today &&
+          (account.role === 'store' ? b.storeId === account.id : b.userId === account.id),
+      ),
+    );
+  },
+
+  async getReminderSettings() {
+    await delay();
+    return clone(reminderSettings.get(currentAccount().id) ?? { enabled: false, hoursBefore: 1 });
+  },
+
+  async saveReminderSettings(settings) {
+    await delay();
+    if (!Number.isInteger(settings.hoursBefore) || settings.hoursBefore < 1 || settings.hoursBefore > 72) {
+      throw new ApiError('hoursBefore must be a whole number from 1 to 72', 400);
+    }
+    reminderSettings.set(currentAccount().id, { ...settings });
+    return clone(settings);
+  },
+
   async updateStoreSettings(storeId, settings) {
     await delay();
     requireStoreOwner(storeId);
     const store = findStore(storeId);
     Object.assign(store, settings);
     for (const b of bookings) if (b.storeId === storeId) b.storeName = store.name;
-    return clone(store);
+    return clone(withRating(store));
   },
 
   async updateStoreProfile(storeId, profile) {
@@ -338,7 +548,7 @@ export const mockApi: Api = {
     requireStoreOwner(storeId);
     const store = findStore(storeId);
     store.profile = { ...profile };
-    return clone(store);
+    return clone(withRating(store));
   },
 
   async getUserProfile() {
