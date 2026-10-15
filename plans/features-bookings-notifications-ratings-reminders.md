@@ -1,6 +1,6 @@
 # Bookings, notifications, ratings and reminders (prompts 4–6)
 
-Branch `booking_features` (from `api_integration`). Status: in progress.
+Branch `booking_features` (from `api_integration`). Status: done (2026-10-15). iOS is not yet verified (see below).
 
 The Ghoomo backend already supports everything here except reminder settings: notifications, booking edits, ratings, paged reviews, required descriptions and auto-approve status. See `Api.md` in the backend repo (`docs/API.md`), sections 5.6–5.6a. The web app (Next.js, branch `improved_screens`) already ships the same features, so its behaviour is the reference.
 
@@ -47,5 +47,33 @@ The Ghoomo backend already supports everything here except reminder settings: no
 
 Every phase: `npx expo lint` and `npx tsc --noEmit` pass, then a commit. Flows are checked on the web build with Playwright against the real backend (`EXPO_PUBLIC_USE_REAL_API=true`); reminders are checked on the `Pixel_9a` emulator.
 
-## Done notes
-(filled in as phases land)
+## Done notes (2026-10-15)
+- **Backend:**
+  - reminder settings were added to the Next.js repo (`improved_screens`): migration `006_reminder_settings.sql` and `GET/PUT /apis/reminder-settings` (append-only audit trail)
+  - everything else was already there
+  - the stub (`scripts/ghoomo-stub.mjs`) and the mock implement all the new endpoints
+- **Web checks** (Playwright against the real backend, `EXPO_PUBLIC_USE_REAL_API=true`):
+  - details and edit (with `=====`), today's store bookings, Refresh
+  - notifications: no fetch until the bell, one per open and per Refresh; the store accepts from the panel, and the user sees "accepted"
+  - rating, and the store picker's ratings opening reviews (10, then 28 after scrolling with 2 more requests, then the end message)
+  - the store's Reviews menu item; reminders hidden on web
+- **Bugs found and fixed while testing:**
+  - a whole-card pressable made `<button>` inside `<button>` on web; the action buttons are now siblings
+  - the Expo dev server started with `CI=1` doesn't watch files (restart it, or start it without `CI=1`)
+- **Android** (development build on the `Pixel_9a` emulator, Android 15):
+  - **Setting:** saved on the device and on the server (`platform: android`); the POST_NOTIFICATIONS prompt appears on save
+  - **Scheduling:** an exact `RTC_WAKEUP` alarm (`exactAllowReason=permission`), fired on time
+  - **Delivery:** importance 5 on the `booking-reminders` channel with sound `raw/reminder`; text "Your visit to Claude Web Shop is at … (in 1 hour)."
+  - **Buttons:** **Snooze** (5-minute exact re-alarm, current one dismissed) and **Close** work with the app running **and with its process killed**
+  - **Restart:** reminders are rescheduled on app start after a force-stop
+- **Killed-app actions needed three fixes:**
+  1. an `expo-task-manager` notification task (`registerTaskAsync`)
+  2. defining it in a custom entry `index.ts` (`package.json` `main`), because headless runs never load the root layout
+  3. reading the task payload's `content.dataString` (a JSON string), since `content.data` is absent there
+- **Testing notes:**
+  - the emulator clock ran ~30 s behind the Mac's
+  - exact alarms on Android 14+ need "Alarms & reminders" allowed: granted with `appops` in testing; users can toggle it, and without it Android fires inexactly
+- **Limits:**
+  - an alarm-style notification, not a full-screen looping alarm
+  - iOS is written, but untested here (no Xcode): test killed-app Snooze/Close on iOS especially, since the background task is Android-only. On iOS a cold-start tap is handled by `getLastNotificationResponseAsync`
+  - at most 50 reminders are scheduled at a time

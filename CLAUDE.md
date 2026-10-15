@@ -55,6 +55,10 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
   - Slot and day counts come from the calendar, which doesn't drop when a booking is rejected.
   - Owner routes are addressed by `session.locCode`.
   - Settings and profile rows are created by their GET, so updates GET before they PUT.
+- **Bookings, notifications, ratings, reminders** (branch `booking_features`, plan `plans/features-bookings-notifications-ratings-reminders.md`):
+  - **Endpoints:** `PUT /appointment/{id}` (customer edit: message appended below `=====`, people, mobile), `PUT /appointment/{id}/rating`, `GET /reviews/{locId}` (10 per page, `nextCursor`), `GET /notifications` + `POST /notifications/read`, and `GET/PUT /reminder-settings` (append-only server audit copy).
+  - **Server-driven behaviour:** new bookings take their status from the server (auto-approve), and the server rejects bookings without a description.
+  - **Real backend:** the Next.js `ghoomo` repo (`improved_screens`) serves all of these. Its `docs/API.md` §5.6–5.6b is the reference, and it runs locally on :3000 (`npm run dev` there).
 - **API gaps:** the API has nowhere to store store name edits, max per booking, state, map coordinates, or the user's name and mobile. Usernames at signup and store login by email aren't supported either. They use `API_DEFAULTS` or session-only values, and are read-only in the UI when the flag is on. Wire each one through when the API supports it.
 
 ### Session and auth
@@ -82,8 +86,20 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
   - `settings` and `profile` branch the same way.
 - Feature components live in `src/features/<area>/`. Shared UI (`Select`, `ConfirmModal`, `SegmentedTabs`, `Banner`, `Screen`, etc.) is in `src/components/ui/`.
 
+### Booking reminders (iOS/Android only)
+
+- `src/features/reminders/`: `reminders.ts` (native) / `reminders.web.ts` (no-op), `ReminderSync` (mounted in the root layout) and the Settings section.
+- **What they are:** `expo-notifications` local notifications at a `DATE` trigger, `hoursBefore` before each **accepted** booking (at most 50 scheduled).
+  - **Android:** an alarm-usage channel with the bundled `assets/sounds/reminder.wav`, exact alarms via `SCHEDULE_EXACT_ALARM` in `app.json`.
+  - **Both:** **Snooze (5 min)** / **Close** actions.
+- **Where the setting lives:** SecureStore per account (what scheduling uses), seeded from the server on a new device. Every save also goes to `PUT /reminder-settings` for auditing (best-effort).
+- **Builds:** the custom sound and exact alarms need a **development build** (`npx expo run:android`), not Expo Go. In the Android emulator the backend is `http://10.0.2.2:3000/apis`.
+- **iOS:** not verified here (no Xcode). Use Xcode or an EAS development build.
+
 ### Cross-platform rules
 
+- Modals: use `Sheet` (`src/components/ui/sheet.tsx`: bottom sheet on phones, dialog when wide, `panel` variant from the right) for anything larger than a confirmation.
+- Never nest pressables that both have the `button` role: on web they become `<button>` inside `<button>`. Put action buttons beside the tappable area (see `EventCard`, and `Select` option accessories).
 - Use the `Select` modal, not native pickers, and `ConfirmModal`, not `Alert.alert`, which does nothing on web.
 - `.web.ts(x)` siblings override the native versions: `storage`, `use-color-scheme`, `store-map`.
 - `expo-maps` only runs in dev builds. `store-map.tsx` lazy-loads it and falls back to an address card in Expo Go and on web.

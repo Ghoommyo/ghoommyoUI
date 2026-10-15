@@ -93,3 +93,10 @@ export function formatTimeAgo(iso: string, now: Date = new Date()): string {
   if (minutes < 7 * 24 * 60) return `${Math.floor(minutes / (24 * 60))} d ago`;
   return `${MONTHS[then.getMonth()].slice(0, 3)} ${then.getDate()}`;
 }
+
+/** `YYYY-MM-DDTHH:mm` (local) → `Date`. */
+export function slotStartToDate(start: SlotStart): Date {
+  const [year, month, day] = start.slice(0, 10).split('-').map(Number);
+  const [hours, minutes] = start.slice(11, 16).split(':').map(Number);
+  return new Date(year, month - 1, day, hours, minutes);
+}

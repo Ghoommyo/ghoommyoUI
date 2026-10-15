@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet } from 'react-native';
 
 import { errorMessage } from '@/api';
 import { useSession } from '@/auth/session';
@@ -9,6 +9,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Banner } from '@/components/ui/banner';
 import { Screen } from '@/components/ui/screen';
 import { Spacing } from '@/constants/theme';
+import { ReminderSettingsSection } from '@/features/reminders/reminder-settings-form';
 import { StoreSettingsForm } from '@/features/settings/store-settings-form';
 import { useStore } from '@/hooks/queries';
 
@@ -18,6 +19,8 @@ export default function SettingsScreen() {
   return (
     <Screen>
       <AppHeader title="Settings" />
+      {/* Reminders are a phone feature; not offered on web. */}
+      {Platform.OS !== 'web' && session ? <ReminderSettingsSection /> : null}
       {session?.role === 'store' ? <StoreSettings storeId={session.accountId} /> : <UserSettings />}
     </Screen>
   );
