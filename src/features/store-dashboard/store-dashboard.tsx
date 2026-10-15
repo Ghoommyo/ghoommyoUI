@@ -13,7 +13,7 @@ import { MonthCalendar } from '@/features/store-dashboard/month-calendar';
 import { StoreBookings } from '@/features/store-dashboard/store-bookings';
 import { useStore, useStoreMonthSummary } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { todayKey } from '@/lib/date';
+import { formatDayLong, todayKey } from '@/lib/date';
 import { dayCapacity } from '@/lib/slots';
 import type { DateKey } from '@/types/domain';
 
@@ -25,6 +25,8 @@ export function StoreDashboard() {
   const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selected, setSelected] = useState<Set<DateKey>>(new Set());
   const [searchDates, setSearchDates] = useState<DateKey[] | null>(null);
+  // Until the store searches, the bookings list shows today.
+  const [todayDates] = useState(() => [todayKey()]);
   const [message, setMessage] = useState<BannerMessage | null>(null);
 
   const store = useStore(storeId);
@@ -112,7 +114,12 @@ export function StoreDashboard() {
         <Button label="Search" variant="success" onPress={search} />
       </View>
 
-      <StoreBookings storeId={storeId} dates={searchDates} />
+      <StoreBookings
+        storeId={storeId}
+        dates={searchDates ?? todayDates}
+        caption={searchDates ? `Bookings for ${searchDates.map(formatDayLong).join(', ')}` : "Today's bookings"}
+        isDarkStore={store.data?.isDarkStore}
+      />
     </Screen>
   );
 }

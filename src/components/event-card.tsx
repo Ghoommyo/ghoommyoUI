@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -32,30 +32,51 @@ type EventCardProps = {
   title: string;
   /** Right-hand column; defaults to the status chip. */
   actions?: ReactNode;
+  /** Small line under the title, e.g. the customer's mobile on the store's cards. */
+  subtitle?: string;
+  /** Hide the head count (dark-store bookings are orders). */
+  showPeople?: boolean;
+  /** Makes the whole card open the booking. Buttons inside keep their own presses. */
+  onPress?(): void;
 };
 
 /** Blue booking row from the dashboard references. */
-export function EventCard({ booking, title, actions }: EventCardProps) {
+export function EventCard({ booking, title, actions, subtitle, showPeople = true, onPress }: EventCardProps) {
   const theme = useTheme();
 
+  // The tappable part and the action buttons are siblings, so buttons never nest (invalid on web).
   return (
     <View style={[styles.card, { backgroundColor: theme.eventCard }]}>
-      <View style={styles.who}>
-        <ThemedText type="small" style={styles.light}>
-          {formatSlotStart(booking.slotStart)}
-        </ThemedText>
-        <ThemedText type="smallBold" style={[styles.light, styles.title]}>
-          {title}
-        </ThemedText>
-      </View>
-      <View style={[styles.details, { borderLeftColor: 'rgba(255,255,255,0.5)' }]}>
-        <ThemedText style={styles.light} numberOfLines={3}>
-          {booking.description || 'No description'}
-        </ThemedText>
-        <ThemedText type="small" style={styles.light}>
-          {booking.people} {booking.people === 1 ? 'person' : 'people'}
-        </ThemedText>
-      </View>
+      <Pressable
+        disabled={!onPress}
+        onPress={onPress}
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessibilityLabel={onPress ? `${title}, ${formatSlotStart(booking.slotStart)}. Open details` : undefined}
+        style={({ pressed }) => [styles.main, pressed && styles.pressed]}>
+        <View style={styles.who}>
+          <ThemedText type="small" style={styles.light}>
+            {formatSlotStart(booking.slotStart)}
+          </ThemedText>
+          <ThemedText type="smallBold" style={[styles.light, styles.title]}>
+            {title}
+          </ThemedText>
+          {subtitle ? (
+            <ThemedText type="small" style={styles.light}>
+              {subtitle}
+            </ThemedText>
+          ) : null}
+        </View>
+        <View style={[styles.details, { borderLeftColor: 'rgba(255,255,255,0.5)' }]}>
+          <ThemedText style={styles.light} numberOfLines={6}>
+            {booking.description || 'No description'}
+          </ThemedText>
+          {showPeople ? (
+            <ThemedText type="small" style={styles.light}>
+              {booking.people} {booking.people === 1 ? 'person' : 'people'}
+            </ThemedText>
+          ) : null}
+        </View>
+      </Pressable>
       <View style={styles.actions}>{actions ?? <StatusChip status={booking.status} />}</View>
     </View>
   );
@@ -69,6 +90,14 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     borderRadius: Spacing.three,
     padding: Spacing.three,
+  },
+  main: {
+    flex: 1,
+    minWidth: 232,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.three,
   },
   who: {
     minWidth: 96,
@@ -91,6 +120,9 @@ const styles = StyleSheet.create({
   },
   light: {
     color: '#FFFFFF',
+  },
+  pressed: {
+    opacity: 0.85,
   },
   chip: {
     alignItems: 'center',
