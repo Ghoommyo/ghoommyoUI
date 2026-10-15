@@ -34,6 +34,9 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
         ...(session.role === 'user'
           ? [{ label: 'Events', href: '/events' as const, route: 'events' }]
           : []),
+        ...(session.role === 'store'
+          ? [{ label: 'Reviews', href: '/reviews' as const, route: 'reviews' }]
+          : []),
         { label: 'Profile', href: '/profile', route: 'profile' },
         { label: 'Settings', href: '/settings', route: 'settings' },
       ]

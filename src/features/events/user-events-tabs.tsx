@@ -10,8 +10,9 @@ import { SegmentedTabs, type Tab } from '@/components/ui/segmented-tabs';
 import { Spacing } from '@/constants/theme';
 import { BookingDetailsModal } from '@/features/bookings/booking-details-modal';
 import { EditBookingModal } from '@/features/bookings/edit-booking-modal';
+import { RateBookingModal } from '@/features/bookings/rate-booking-modal';
 import { useMyBookings, useStores } from '@/hooks/queries';
-import { canEditBooking } from '@/lib/bookings';
+import { canEditBooking, canRateBooking } from '@/lib/bookings';
 import { todayKey } from '@/lib/date';
 import { bucketEvents } from '@/lib/slots';
 import type { Booking } from '@/types/domain';
@@ -36,6 +37,7 @@ export function UserEventsTabs() {
   const [today] = useState(todayKey);
   const [open, setOpen] = useState<Booking | null>(null);
   const [editing, setEditing] = useState<Booking | null>(null);
+  const [rating, setRating] = useState<Booking | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const bookings = useMyBookings();
   const stores = useStores();
@@ -46,6 +48,12 @@ export function UserEventsTabs() {
     setOpen(null);
     setSaved(null);
     setEditing(booking);
+  };
+
+  const startRate = (booking: Booking) => {
+    setOpen(null);
+    setSaved(null);
+    setRating(booking);
   };
 
   return (
@@ -99,6 +107,7 @@ export function UserEventsTabs() {
           isDarkStore={storeOf(open)?.isDarkStore}
           onClose={() => setOpen(null)}
           onEdit={canEditBooking(open, today) ? startEdit : undefined}
+          onRate={canRateBooking(open) ? startRate : undefined}
         />
       ) : null}
       {editing ? (
@@ -110,6 +119,16 @@ export function UserEventsTabs() {
           onSaved={() => {
             setEditing(null);
             setSaved('Changes saved. The store has been notified.');
+          }}
+        />
+      ) : null}
+      {rating ? (
+        <RateBookingModal
+          booking={rating}
+          onClose={() => setRating(null)}
+          onSaved={() => {
+            setRating(null);
+            setSaved('Thanks! Your rating was saved.');
           }}
         />
       ) : null}
