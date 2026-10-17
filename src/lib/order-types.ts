@@ -60,6 +60,10 @@ export const showsPeople = (
 export const countNoun = (isDarkStore: boolean | undefined, n: number) =>
   isDarkStore ? (n === 1 ? 'order' : 'orders') : n === 1 ? 'visitor' : 'visitors';
 
+/** The store's type of service (e.g. "Plumber") to show customers: service stores with one set, else null. */
+export const serviceTypeLabel = (store: Pick<StoreSettings, 'catalogType' | 'serviceType'> | undefined) =>
+  store?.catalogType === 'service' && store.serviceType ? store.serviceType : null;
+
 /** How a store's items are called: Products (default) or Services. */
 export function catalogWords(catalogType: CatalogType | undefined) {
   const service = catalogType === 'service';

@@ -16,7 +16,7 @@ import { useCreateBooking, useMyProfile, useStore, useStoreServices } from '@/ho
 import { useTheme } from '@/hooks/use-theme';
 import { ServicesModal } from '@/features/services/services-modal';
 import { formatSlotStart } from '@/lib/date';
-import { catalogWords, defaultOrderType, orderTypeOptions } from '@/lib/order-types';
+import { catalogWords, defaultOrderType, orderTypeOptions, serviceTypeLabel } from '@/lib/order-types';
 import {
   countServices,
   formatPrice,
@@ -200,6 +200,11 @@ function BookingForm({
               <ThemedText type="smallBold" accessibilityRole="header">
                 {words.Items}
               </ThemedText>
+              {serviceTypeLabel(store) ? (
+                <ThemedText type="smallBold" style={{ color: theme.primary }}>
+                  {serviceTypeLabel(store)}
+                </ThemedText>
+              ) : null}
               <ThemedText type="small" themeColor="textSecondary">
                 You can select {words.items} by clicking here
               </ThemedText>
@@ -306,6 +311,7 @@ function BookingForm({
           storeId={store.id}
           storeName={store.name}
           catalogType={store.catalogType}
+          serviceType={serviceTypeLabel(store)}
           initial={picks}
           onClose={() => setServicesOpen(false)}
           onSave={saveServices}

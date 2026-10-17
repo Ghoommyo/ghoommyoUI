@@ -18,7 +18,7 @@ import { SlotGrid } from '@/features/user-dashboard/slot-grid';
 import { useStores, useStoreSlots } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDayLong, formatSlotStart, makeDateKey, MONTHS, toDateKey } from '@/lib/date';
-import { catalogWords } from '@/lib/order-types';
+import { catalogWords, serviceTypeLabel } from '@/lib/order-types';
 import { countServices, encodeServices } from '@/lib/services';
 import { daysInMonth, LIMIT_UNIT_LABEL } from '@/lib/slots';
 import type { ServicePicks, SlotStart } from '@/types/domain';
@@ -129,7 +129,8 @@ export function UserDashboard() {
           placeholder={stores.isLoading ? 'Loading stores…' : 'Select a store'}
           value={storeId}
           options={(stores.data ?? []).map((s) => ({
-            label: s.name,
+            // Service stores show their type of service, e.g. "Raju Tailor · Plumber".
+            label: serviceTypeLabel(s) ? `${s.name} · ${serviceTypeLabel(s)}` : s.name,
             value: s.id,
             // The rating opens the store's reviews; the name still selects the store.
             accessory: {
@@ -246,6 +247,7 @@ export function UserDashboard() {
           storeId={store.id}
           storeName={store.name}
           catalogType={store.catalogType}
+          serviceType={serviceTypeLabel(store)}
           initial={picks}
           onClose={() => setServicesOpen(false)}
           onSave={(next) => {

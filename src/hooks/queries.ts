@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { api } from '@/api';
 import { useSession } from '@/auth/session';
 import type {
+  AppNotification,
   BookingChanges,
   BookingRating,
   BookingStatus,
@@ -216,21 +217,35 @@ export function useStoreReviews(storeId: string | undefined) {
   });
 }
 
-/** Notifications load only while `enabled` (the panel is open) and on explicit refetch. No polling. */
-export function useNotifications(enabled: boolean) {
+/**
+ * The signed-in account's notifications: fetched once when the app starts (so the bell can show the
+ * unseen count), then only on explicit refetch (opening the panel, Refresh). No polling.
+ */
+export function useNotifications() {
   const { session } = useSession();
   return useQuery({
     queryKey: queryKeys.notifications(session?.accountId ?? ''),
     queryFn: () => api.getNotifications(),
-    enabled: enabled && !!session,
-    staleTime: 0,
+    enabled: !!session,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
 }
 
+/** Marks notifications seen on the server; the cache is updated separately (see `useShowNotificationsRead`). */
 export function useMarkNotificationsRead() {
   return useMutation({ mutationFn: (ids: string[]) => api.markNotificationsRead(ids) });
+}
+
+/** Shows the given notifications as seen in the cache, so the bell's count clears without a refetch. */
+export function useShowNotificationsRead() {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+  return (ids: string[]) =>
+    queryClient.setQueryData<AppNotification[]>(queryKeys.notifications(session?.accountId ?? ''), (list) =>
+      list?.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n)),
+    );
 }
 
 /** Accepted bookings from today on, for scheduling reminders (native only). */

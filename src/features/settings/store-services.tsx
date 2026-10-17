@@ -11,7 +11,7 @@ import { Spacing } from '@/constants/theme';
 import { ServiceFormModal } from '@/features/settings/service-form-modal';
 import { useDeleteService, useStoreServices } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { catalogWords } from '@/lib/order-types';
+import { catalogWords, serviceTypeLabel } from '@/lib/order-types';
 import { formatPrice } from '@/lib/services';
 import type { Store, StoreService } from '@/types/domain';
 
@@ -33,6 +33,11 @@ export function StoreServices({ store }: { store: Store }) {
           <ThemedText type="subtitle" style={styles.title}>
             {words.Items}
           </ThemedText>
+          {serviceTypeLabel(store) ? (
+            <ThemedText type="small">
+              Type of service: <ThemedText type="smallBold">{serviceTypeLabel(store)}</ThemedText>
+            </ThemedText>
+          ) : null}
           <ThemedText type="small" themeColor="textSecondary">
             Customers can add these to a booking.
           </ThemedText>

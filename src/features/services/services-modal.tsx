@@ -19,6 +19,8 @@ type ServicesModalProps = {
   storeName: string;
   /** Products or Services: only the wording changes. */
   catalogType: CatalogType;
+  /** The store's type of service (e.g. "Plumber"), shown in the title; null when none. */
+  serviceType?: string | null;
   /** Picks so far; changes stay in a draft until Save. */
   initial: ServicePicks;
   onSave(picks: ServicePicks): void;
@@ -27,7 +29,15 @@ type ServicesModalProps = {
 };
 
 /** Pick a store's products or services, with quantities, before booking. Mount it only while open. */
-export function ServicesModal({ storeId, storeName, catalogType, initial, onSave, onClose }: ServicesModalProps) {
+export function ServicesModal({
+  storeId,
+  storeName,
+  catalogType,
+  serviceType,
+  initial,
+  onSave,
+  onClose,
+}: ServicesModalProps) {
   const words = catalogWords(catalogType);
   const services = useStoreServices(storeId);
   const [draft, setDraft] = useState<ServicePicks>(initial);
@@ -53,7 +63,7 @@ export function ServicesModal({ storeId, storeName, catalogType, initial, onSave
   return (
     <Sheet
       visible
-      title={`${storeName} ${words.items}`}
+      title={`${storeName} ${words.items}${serviceType ? ` · ${serviceType}` : ''}`}
       onClose={onClose}
       footer={
         <Button

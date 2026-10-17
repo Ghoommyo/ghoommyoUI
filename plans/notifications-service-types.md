@@ -99,3 +99,18 @@ Branch `notifications_service_types` (from `catalog_type`). The Next.js repo's `
 - **Expo:** the same flows on the web build (real backend and dummy), plus Android: the badge after launch, New/Earlier, and Settings type with Other. iOS is untested (no Xcode).
 - `tsc`, lint and `next build` (web); `tsc` and `expo lint` (app). Commit and push both branches.
 - **Production:** migrations 007 and 008 must run on Prisma Postgres before merging. I'll ask before running them.
+
+## Done notes (2026-10-17, app)
+- **Notifications:**
+  - **Fetching:** loaded once at app start; the bell shows the unseen count (`9+` cap) without a tap. Opening the panel fetches again (one request).
+  - **Sections:** New (tinted, bold) and Earlier.
+  - **Marking seen:** tapping an item marks only that one; closing marks the rest, whether with ✕ or Android back. The badge then clears without a refetch.
+  - **Reopening:** everything sits under Earlier.
+- **Type of service:**
+  - **Settings:** a Type of service dropdown for Service stores, plus Other with its own field. An Other name that matches an existing type in any case ("drone PILOT") is saved under the listed spelling, so no duplicate is added.
+  - **Shown in:** the store dropdown ("Claude Web Shop · Plumber"), the picker title, the booking form's Services card, and the Settings services header.
+- **Backends:** the dummy backend lists the 34 trades plus "Barber" (City Salon's type), and the stub serves `GET /service-types` with the server's rules.
+- **Verified:**
+  - Playwright on the web build: the real backend (store and user) and the dummy backend
+  - Android (Pixel_9a): the badge after login, New/Earlier, and back marking items seen on the server; the type in the store dropdown and the picker title
+- **Not checked:** the store's Settings screen on Android, and iOS (no Xcode).

@@ -105,4 +105,4 @@ The web app's phase 6 (dark stores, order types) and phase 16 (Product or Servic
 
 Notifications fetched on app start with an unseen count, New/Earlier sections; a service store's type of service.
 
-- [ ] [Unseen notifications on load, service types](notifications-service-types.md)
+- [x] [Unseen notifications on load, service types](notifications-service-types.md)
