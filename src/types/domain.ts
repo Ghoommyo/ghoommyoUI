@@ -4,6 +4,12 @@ export type LimitUnit = 'day' | 'hour' | 'halfHour';
 
 export type BookingStatus = 'pending' | 'accepted' | 'rejected';
 
+/** How the customer gets what they booked. Which ones a store offers: `src/lib/order-types.ts`. */
+export type OrderType = 'table' | 'pickup' | 'porter' | 'appointment' | 'homeVisit';
+
+/** What a store's items are called and which order types it offers. */
+export type CatalogType = 'product' | 'service';
+
 /** `YYYY-MM-DD`, local time. */
 export type DateKey = string;
 
@@ -50,8 +56,10 @@ export interface StoreSettings {
   openAt: string;
   /** `HH:mm` */
   closeAt: string;
-  /** No dine-in: bookings are orders, so the head count can't change. Read-only in the app. */
-  isDarkStore?: boolean;
+  /** No dine-in: bookings are orders (1 each), with no head count. */
+  isDarkStore: boolean;
+  /** Products (default) or Services: the items' name and the order types offered. */
+  catalogType: CatalogType;
   /** How many of each service a booking may include, for services without their own limit. */
   maxServiceQty: number;
 }
@@ -140,6 +148,8 @@ export interface Booking {
   rating: BookingRating | null;
   /** Services added to the booking; empty when none. */
   services: BookedService[];
+  /** Null for bookings made before order types existed. */
+  orderType: OrderType | null;
 }
 
 export interface BookingRating {
@@ -201,6 +211,7 @@ export interface NewBooking {
   people: number;
   description: string;
   services: BookedService[];
+  orderType: OrderType;
 }
 
 export interface Slot {

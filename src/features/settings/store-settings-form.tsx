@@ -12,7 +12,8 @@ import { Spacing } from '@/constants/theme';
 import { useUpdateStoreSettings } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { timeOptions, toMinutes } from '@/lib/date';
-import type { LimitUnit, Store, StoreSettings } from '@/types/domain';
+import { catalogWords, ORDER_TYPE_LABEL, orderTypeChoices } from '@/lib/order-types';
+import type { CatalogType, LimitUnit, Store, StoreSettings } from '@/types/domain';
 
 // Fields the Ghoomo API can't store yet are shown read-only in API mode (see API_DEFAULTS).
 const NOT_SAVED_HINT = "Can't be changed yet — the server doesn't support it.";
@@ -21,6 +22,11 @@ const LIMIT_UNITS: SelectOption<LimitUnit>[] = [
   { label: 'Day', value: 'day' },
   { label: 'Hour', value: 'hour' },
   { label: 'Half hour', value: 'halfHour' },
+];
+
+const CATALOG_TYPES: SelectOption<CatalogType>[] = [
+  { label: 'Product', value: 'product' },
+  { label: 'Service', value: 'service' },
 ];
 
 type Draft = Omit<StoreSettings, 'maxPerSlot' | 'maxPerBooking' | 'maxServiceQty'> & {
@@ -39,16 +45,18 @@ const toDraft = (store: Store): Draft => ({
   autoApprove: store.autoApprove,
   openAt: store.openAt,
   closeAt: store.closeAt,
+  isDarkStore: store.isDarkStore,
+  catalogType: store.catalogType,
 });
 
 const positiveInt = (value: string) => (/^\d+$/.test(value) && Number(value) >= 1 ? Number(value) : null);
 
 export function StoreSettingsForm({ store }: { store: Store }) {
-  const theme = useTheme();
   const [draft, setDraft] = useState(() => toDraft(store));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<BannerMessage | null>(null);
   const update = useUpdateStoreSettings(store.id);
+  const words = catalogWords(draft.catalogType);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -101,7 +109,7 @@ export function StoreSettingsForm({ store }: { store: Store }) {
       <View style={styles.row}>
         <View style={styles.flex}>
           <TextField
-            label="Max limit per unit"
+            label={draft.isDarkStore ? 'Max orders per unit' : 'Max limit per unit'}
             value={draft.maxPerSlot}
             onChangeText={(v) => set('maxPerSlot', v)}
             error={errors.maxPerSlot}
@@ -125,14 +133,6 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         editable={!USE_REAL_API}
         hint={USE_REAL_API ? NOT_SAVED_HINT : undefined}
       />
-      <TextField
-        label="Max of each service per booking"
-        value={draft.maxServiceQty}
-        onChangeText={(v) => set('maxServiceQty', v)}
-        error={errors.maxServiceQty}
-        keyboardType="number-pad"
-        hint="Used for services without their own limit."
-      />
       <View style={styles.row}>
         <Select
           label="Open at"
@@ -150,24 +150,64 @@ export function StoreSettingsForm({ store }: { store: Store }) {
           style={styles.flex}
         />
       </View>
-      <View style={[styles.switchRow, { borderColor: theme.border }]}>
-        <View style={styles.flex}>
-          <ThemedText type="smallBold">Auto approve</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Accept new bookings without reviewing them.
-          </ThemedText>
-        </View>
-        <Switch
-          accessibilityLabel="Auto approve"
-          value={draft.autoApprove}
-          onValueChange={(v) => set('autoApprove', v)}
-          trackColor={{ true: theme.success }}
+      <View style={styles.field}>
+        <Select
+          label="Store type"
+          value={draft.catalogType}
+          options={CATALOG_TYPES}
+          onChange={(v) => set('catalogType', v)}
         />
+        <ThemedText type="small" themeColor="textSecondary">
+          Customers see {words.items} and can choose:{' '}
+          {orderTypeChoices(draft)
+            .map((type) => ORDER_TYPE_LABEL[type])
+            .join(', ')}
+          .
+        </ThemedText>
       </View>
+      <TextField
+        label={`Max of each ${words.item} per booking`}
+        value={draft.maxServiceQty}
+        onChangeText={(v) => set('maxServiceQty', v)}
+        error={errors.maxServiceQty}
+        keyboardType="number-pad"
+        hint={`1 means one of each ${words.item}. Used for ${words.items} without their own limit.`}
+      />
+      <SwitchRow
+        label="Auto approve"
+        description="Accept new bookings without reviewing them."
+        value={draft.autoApprove}
+        onChange={(v) => set('autoApprove', v)}
+      />
+      <SwitchRow
+        label="Dark store"
+        description={`No dine-in. Customers don't say how many people are coming, slots count orders, and they can only choose ${
+          draft.catalogType === 'service' ? 'Book home visit' : 'Pickup or Porter'
+        }.`}
+        value={draft.isDarkStore}
+        onChange={(v) => set('isDarkStore', v)}
+      />
       <View style={styles.actions}>
         <Button label="Cancel" variant="secondary" onPress={cancel} />
         <Button label="Save" variant="success" onPress={save} loading={update.isPending} />
       </View>
+    </View>
+  );
+}
+
+type SwitchRowProps = { label: string; description: string; value: boolean; onChange(value: boolean): void };
+
+function SwitchRow({ label, description, value, onChange }: SwitchRowProps) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.switchRow, { borderColor: theme.border }]}>
+      <View style={styles.flex}>
+        <ThemedText type="smallBold">{label}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {description}
+        </ThemedText>
+      </View>
+      <Switch accessibilityLabel={label} value={value} onValueChange={onChange} trackColor={{ true: theme.success }} />
     </View>
   );
 }
@@ -178,6 +218,9 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  field: {
+    gap: Spacing.one,
   },
   row: {
     flexDirection: 'row',

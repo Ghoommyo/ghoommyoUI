@@ -41,14 +41,32 @@ export function resolvePicks(
   });
 }
 
-/** Booking description listing the services by item number, e.g. `1. Haircut × 2 — ₹400`. */
-export function servicesDescription(picked: ReturnType<typeof resolvePicks>): string {
+/**
+ * Booking description listing the items by number, e.g. `1. Haircut × 2 — ₹400`, under
+ * `Products:` or `Services:` (the store's word for its items).
+ */
+export function servicesDescription(picked: ReturnType<typeof resolvePicks>, header = 'Products'): string {
   if (picked.length === 0) return '';
   const lines = picked.map(
     (s) => `${s.number}. ${s.name}${s.qty > 1 ? ` × ${s.qty}` : ''} — ${formatPrice(s.price * s.qty)}`,
   );
   const total = picked.reduce((sum, s) => sum + s.price * s.qty, 0);
-  return ['Services:', ...lines, `Total: ${formatPrice(total)}`].join('\n');
+  return [`${header}:`, ...lines, `Total: ${formatPrice(total)}`].join('\n');
+}
+
+/**
+ * Swaps the old items block in a description for the new one, keeping what the user typed
+ * around it. If they edited the block itself, the new block goes on top instead.
+ */
+export function replaceServicesBlock(description: string, oldBlock: string, newBlock: string): string {
+  if (oldBlock && description.includes(oldBlock)) {
+    return description
+      .replace(oldBlock, newBlock)
+      .replace(/^\s*\n/, '')
+      .replace(/\n{3,}/g, '\n\n');
+  }
+  if (!newBlock) return description;
+  return description.trim() ? `${newBlock}\n${description}` : newBlock;
 }
 
 const SERVICE_IMAGE_PATTERN = /^https?:\/\/\S+$/;

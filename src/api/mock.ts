@@ -1,5 +1,6 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
+import { orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
 import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type {
@@ -71,6 +72,8 @@ const stores: StoreRecord[] = [
     openAt: '09:00',
     closeAt: '22:00',
     maxServiceQty: 2,
+    isDarkStore: false,
+    catalogType: 'service',
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -92,6 +95,8 @@ const stores: StoreRecord[] = [
     openAt: '10:00',
     closeAt: '19:00',
     maxServiceQty: 1,
+    isDarkStore: false,
+    catalogType: 'service',
     profile: {
       address: '45 Vijay Nagar',
       pin: '452010',
@@ -113,6 +118,9 @@ const stores: StoreRecord[] = [
     openAt: '07:00',
     closeAt: '21:00',
     maxServiceQty: 1,
+    // No dine-in: bookings are orders.
+    isDarkStore: true,
+    catalogType: 'product',
     profile: {
       address: '8 Palasia Square',
       pin: '452001',
@@ -151,6 +159,8 @@ function seedBookings(): Booking[] {
     createdAt: new Date().toISOString(),
     rating: null,
     services: [],
+    // The oldest one predates order types.
+    orderType: i === 0 ? null : 'appointment',
   }));
 }
 
@@ -318,6 +328,8 @@ export const mockApi: Api = {
       openAt: '09:00',
       closeAt: '18:00',
       maxServiceQty: 1,
+      isDarkStore: false,
+      catalogType: 'product',
       profile: {
         address: '',
         pin: '',
@@ -443,8 +455,16 @@ export const mockApi: Api = {
     if (input.slotStart.slice(0, 10) < todayKey()) {
       throw new ApiError('You cannot book a date in the past.', 400);
     }
-    if (input.people < 1 || input.people > store.maxPerBooking) {
+    // Dark stores take orders: each booking counts as 1, whatever the head count.
+    const people = store.isDarkStore ? 1 : input.people;
+    if (people < 1 || people > store.maxPerBooking) {
       throw new ApiError(`${store.name} allows 1–${store.maxPerBooking} people per booking.`, 400);
+    }
+    const allowed = orderTypeChoices(store);
+    if (!allowed.includes(input.orderType)) {
+      const labels = allowed.map(orderTypeToApi);
+      const list = labels.length > 1 ? `${labels.slice(0, -1).join(', ')} or ${labels.at(-1)}` : labels[0];
+      throw new ApiError(`This store takes ${list} bookings`, 400);
     }
     // Booked services: each one the store's, listed once, within its limit. Name and price are snapshotted.
     const ids = new Set<string>();
@@ -460,6 +480,7 @@ export const mockApi: Api = {
     });
     const booking: Booking = {
       ...input,
+      people,
       services: booked,
       id: newId('b'),
       storeName: store.name,

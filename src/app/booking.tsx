@@ -14,8 +14,18 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useCreateBooking, useMyProfile, useStore, useStoreServices } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
+import { ServicesModal } from '@/features/services/services-modal';
 import { formatSlotStart } from '@/lib/date';
-import { formatPrice, parseServices, resolvePicks, servicesDescription } from '@/lib/services';
+import { catalogWords, defaultOrderType, orderTypeOptions } from '@/lib/order-types';
+import {
+  countServices,
+  formatPrice,
+  parseServices,
+  replaceServicesBlock,
+  resolvePicks,
+  servicesDescription,
+} from '@/lib/services';
+import type { OrderType, ServicePicks, Store, StoreService } from '@/types/domain';
 
 const MOBILE_PATTERN = /^\+?\d{10,15}$/;
 
@@ -28,10 +38,10 @@ export default function BookingScreen() {
   const hasPicks = Object.keys(picks).length > 0;
   const store = useStore(storeId);
   const profile = useMyProfile();
-  // Services are only needed to turn the picks from the dashboard into names and prices.
-  const services = useStoreServices(hasPicks ? storeId : undefined);
+  const services = useStoreServices(storeId);
 
-  if (store.isLoading || profile.isLoading || services.isLoading) {
+  // Without picks the form doesn't wait for the items; their card appears once they load.
+  if (store.isLoading || profile.isLoading || (hasPicks && services.isLoading)) {
     return (
       <ThemedView style={styles.center}>
         <ActivityIndicator />
@@ -52,17 +62,13 @@ export default function BookingScreen() {
     );
   }
 
-  // Picked services that still exist, numbered as in the store's list and clamped to their limits.
-  const picked = resolvePicks(services.data ?? [], picks);
-
-  // Mounted only after loading, so the profile and services prefill seed the form state once.
+  // Mounted only after loading, so the profile and picks prefill seed the form state once.
   return (
     <BookingForm
-      picked={picked}
-      servicesError={services.isError ? errorMessage(services.error) : null}
-      storeId={store.data.id}
-      storeName={store.data.name}
-      maxPerBooking={store.data.maxPerBooking}
+      services={services.data ?? []}
+      initialPicks={picks}
+      servicesError={hasPicks && services.isError ? errorMessage(services.error) : null}
+      store={store.data}
       slotStart={slotStart}
       initialName={profile.data?.name ?? ''}
       initialMobile={profile.data?.mobile ?? ''}
@@ -71,33 +77,46 @@ export default function BookingScreen() {
 }
 
 type BookingFormProps = {
-  picked: ReturnType<typeof resolvePicks>;
+  /** The store's products or services (empty while loading or if it has none). */
+  services: StoreService[];
+  /** Picked on the dashboard; the form can change them. */
+  initialPicks: ServicePicks;
   /** The picks couldn't be loaded; the booking can still go ahead without them. */
   servicesError: string | null;
-  storeId: string;
-  storeName: string;
-  maxPerBooking: number;
+  store: Store;
   slotStart: string;
   initialName: string;
   initialMobile: string;
 };
 
 function BookingForm({
-  picked,
+  services,
+  initialPicks,
   servicesError,
-  storeId,
-  storeName,
-  maxPerBooking,
+  store,
   slotStart,
   initialName,
   initialMobile,
 }: BookingFormProps) {
+  const [picks, setPicks] = useState(initialPicks);
+  const [servicesOpen, setServicesOpen] = useState(false);
+  // Picked items that still exist, numbered as in the store's list and clamped to their limits.
+  const picked = resolvePicks(services, picks);
+  const words = catalogWords(store.catalogType);
   const [name, setName] = useState(initialName);
   const [mobile, setMobile] = useState(initialMobile);
   const [people, setPeople] = useState<number>();
+  const [orderType, setOrderType] = useState<OrderType>(() => defaultOrderType(store));
+  // Dark stores take orders, so there's no head count to ask for.
+  const asksPeople = !store.isDarkStore;
   const theme = useTheme();
-  // Prefilled with the numbered services and prices; the user can edit it.
-  const [description, setDescription] = useState(() => servicesDescription(picked));
+  // Prefilled with the numbered items and prices; the user can edit it.
+  const [description, setDescription] = useState(() =>
+    servicesDescription(
+      resolvePicks(services, initialPicks),
+      catalogWords(store.catalogType).Items,
+    ),
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [confirmCancel, setConfirmCancel] = useState(false);
   const createBooking = useCreateBooking();
@@ -107,20 +126,21 @@ function BookingForm({
     const next: FieldErrors = {
       name: name.trim() ? undefined : 'Name is required.',
       mobile: MOBILE_PATTERN.test(cleanMobile) ? undefined : 'Enter a valid mobile number.',
-      people: people ? undefined : 'Choose how many people are coming.',
+      people: !asksPeople || people ? undefined : 'Choose how many people are coming.',
       // The server rejects bookings without a description.
       description: description.trim() ? undefined : 'Description is required.',
     };
     setErrors(next);
-    if (!people || Object.values(next).some(Boolean)) return;
+    if (Object.values(next).some(Boolean)) return;
 
     createBooking.mutate(
       {
-        storeId,
+        storeId: store.id,
         slotStart,
         name: name.trim(),
         mobile: cleanMobile,
-        people,
+        people: asksPeople && people ? people : 1,
+        orderType,
         description: description.trim(),
         services: picked.map(({ serviceId, name: serviceName, price, qty }) => ({
           serviceId,
@@ -139,11 +159,26 @@ function BookingForm({
     );
   };
 
+  /** New picks from the picker: swap the description's items block, keeping the rest. */
+  const saveServices = (next: ServicePicks) => {
+    const nextPicked = resolvePicks(services, next);
+    setDescription((d) =>
+      replaceServicesBlock(
+        d,
+        servicesDescription(picked, words.Items),
+        servicesDescription(nextPicked, words.Items),
+      ),
+    );
+    setErrors((e) => ({ ...e, description: undefined }));
+    setPicks(next);
+    setServicesOpen(false);
+  };
+
   return (
     <Screen>
       <View style={styles.summary}>
         <ThemedText type="smallBold" themeColor="textSecondary">
-          {storeName}
+          {store.name}
         </ThemedText>
         <ThemedText type="subtitle">{formatSlotStart(slotStart)}</ThemedText>
       </View>
@@ -153,18 +188,37 @@ function BookingForm({
           createBooking.isError
             ? { type: 'error', text: errorMessage(createBooking.error) }
             : servicesError
-              ? { type: 'error', text: `Your services couldn't be loaded: ${servicesError}` }
+              ? { type: 'error', text: `Your ${words.items} couldn't be loaded: ${servicesError}` }
               : null
         }
       />
 
-      {picked.length ? (
-        <View
-          style={[styles.services, { backgroundColor: theme.backgroundElement }]}
-          accessibilityLabel="Selected services">
-          <ThemedText type="smallBold">Services</ThemedText>
-          {picked.map((s) => (
-            <View key={s.serviceId} style={styles.serviceLine}>
+      {services.length || picked.length ? (
+        <View style={[styles.services, { backgroundColor: theme.backgroundElement }]}>
+          <View style={styles.servicesHeader}>
+            <View style={styles.flex}>
+              <ThemedText type="smallBold" accessibilityRole="header">
+                {words.Items}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                You can select {words.items} by clicking here
+              </ThemedText>
+            </View>
+            <Button
+              label={picked.length ? `${words.Items} (${countServices(picks)})` : words.Items}
+              variant="secondary"
+              size="sm"
+              onPress={() => setServicesOpen(true)}
+            />
+          </View>
+          {picked.map((s, i) => (
+            <View
+              key={s.serviceId}
+              style={[
+                styles.serviceLine,
+                i === 0 && styles.firstLine,
+                i === 0 && { borderTopColor: theme.border },
+              ]}>
               <ThemedText type="small" style={styles.flex}>
                 {s.number}. {s.name}
                 {s.qty > 1 ? ` × ${s.qty}` : ''}
@@ -172,14 +226,16 @@ function BookingForm({
               <ThemedText type="small">{formatPrice(s.price * s.qty)}</ThemedText>
             </View>
           ))}
-          <View style={[styles.serviceLine, styles.total, { borderTopColor: theme.border }]}>
-            <ThemedText type="smallBold" style={styles.flex}>
-              Total
-            </ThemedText>
-            <ThemedText type="smallBold">
-              {formatPrice(picked.reduce((sum, s) => sum + s.price * s.qty, 0))}
-            </ThemedText>
-          </View>
+          {picked.length ? (
+            <View style={[styles.serviceLine, styles.total, { borderTopColor: theme.border }]}>
+              <ThemedText type="smallBold" style={styles.flex}>
+                Total
+              </ThemedText>
+              <ThemedText type="smallBold">
+                {formatPrice(picked.reduce((sum, s) => sum + s.price * s.qty, 0))}
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -201,19 +257,27 @@ function BookingForm({
         textContentType="telephoneNumber"
       />
       <Select
-        label="How many people are coming"
-        placeholder={`1 to ${maxPerBooking}`}
-        value={people}
-        options={Array.from({ length: maxPerBooking }, (_, i) => ({
-          label: String(i + 1),
-          value: i + 1,
-        }))}
-        onChange={(value) => {
-          setPeople(value);
-          setErrors((e) => ({ ...e, people: undefined }));
-        }}
-        error={errors.people}
+        label="Order type"
+        value={orderType}
+        options={orderTypeOptions(store)}
+        onChange={setOrderType}
       />
+      {asksPeople ? (
+        <Select
+          label="How many people are coming"
+          placeholder={`1 to ${store.maxPerBooking}`}
+          value={people}
+          options={Array.from({ length: store.maxPerBooking }, (_, i) => ({
+            label: String(i + 1),
+            value: i + 1,
+          }))}
+          onChange={(value) => {
+            setPeople(value);
+            setErrors((e) => ({ ...e, people: undefined }));
+          }}
+          error={errors.people}
+        />
+      ) : null}
       <TextField
         label="Description"
         value={description}
@@ -237,6 +301,16 @@ function BookingForm({
         />
       </View>
 
+      {servicesOpen ? (
+        <ServicesModal
+          storeId={store.id}
+          storeName={store.name}
+          catalogType={store.catalogType}
+          initial={picks}
+          onClose={() => setServicesOpen(false)}
+          onSave={saveServices}
+        />
+      ) : null}
       <ConfirmModal
         visible={confirmCancel}
         title="Discard this booking?"
@@ -270,6 +344,17 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     padding: Spacing.three,
     gap: Spacing.one,
+  },
+  servicesHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  firstLine: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: Spacing.two,
+    marginTop: Spacing.one,
   },
   serviceLine: {
     flexDirection: 'row',

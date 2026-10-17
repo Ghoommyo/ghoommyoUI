@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MONTHS, parseDateKey, WEEKDAYS } from '@/lib/date';
+import { countNoun } from '@/lib/order-types';
 import { monthGrid, slotState } from '@/lib/slots';
 import type { DateKey } from '@/types/domain';
 
@@ -14,6 +15,8 @@ type MonthCalendarProps = {
   /** Visitors per day for the shown month. */
   counts: Map<DateKey, number>;
   capacity: number;
+  /** Dark stores count orders instead of visitors. */
+  isDarkStore?: boolean;
   selected: Set<DateKey>;
   onToggle(date: DateKey): void;
   onPrev(): void;
@@ -26,6 +29,7 @@ export function MonthCalendar({
   today,
   counts,
   capacity,
+  isDarkStore,
   selected,
   onToggle,
   onPrev,
@@ -63,6 +67,7 @@ export function MonthCalendar({
                 date={date}
                 count={counts.get(date)}
                 capacity={capacity}
+                isDarkStore={isDarkStore}
                 isToday={date === today}
                 isSelected={selected.has(date)}
                 onPress={() => onToggle(date)}
@@ -98,12 +103,21 @@ type DayCellProps = {
   date: DateKey;
   count: number | undefined;
   capacity: number;
+  isDarkStore?: boolean;
   isToday: boolean;
   isSelected: boolean;
   onPress(): void;
 };
 
-function DayCell({ date, count, capacity, isToday, isSelected, onPress }: DayCellProps) {
+function DayCell({
+  date,
+  count,
+  capacity,
+  isDarkStore,
+  isToday,
+  isSelected,
+  onPress,
+}: DayCellProps) {
   const theme = useTheme();
   const { day } = parseDateKey(date);
   const state = count ? slotState(count, capacity) : 'ok';
@@ -113,7 +127,7 @@ function DayCell({ date, count, capacity, isToday, isSelected, onPress }: DayCel
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${date}, ${count ?? 0} visitors${stateLabel}${isToday ? ', today' : ''}`}
+      accessibilityLabel={`${date}, ${count ?? 0} ${countNoun(isDarkStore, count ?? 0)}${stateLabel}${isToday ? ', today' : ''}`}
       accessibilityState={{ selected: isSelected }}
       onPress={onPress}
       style={({ pressed }) => [

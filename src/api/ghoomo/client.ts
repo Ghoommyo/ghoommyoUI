@@ -32,6 +32,7 @@ import type {
 import { decodeJwt } from '@/lib/jwt';
 import { normalizeStoreName, storeKey } from '@/lib/store-name';
 import { parseDateKey } from '@/lib/date';
+import { orderTypeFromApi, orderTypeToApi } from '@/lib/order-types';
 import type { AppNotification, Booking, NotificationKind, Session, Store, UserProfile } from '@/types/domain';
 
 type RequestOptions = {
@@ -278,7 +279,9 @@ export function createGhoomoApi(baseUrl: string): Api {
       const store = await findShop(input.storeId);
       const { userId } = claims<GhoomoUserClaims>();
       const createdAt = new Date().toISOString();
-      const res = await request<{ appointmentId: string; status?: string }>('/appointment', {
+      // A dark-store booking is one order, whatever the head count.
+      const count = store.isDarkStore ? 1 : input.people;
+      const res = await request<{ appointmentId: string; status?: string; orderType?: string }>('/appointment', {
         method: 'POST',
         body: {
           loc_id: store.id,
@@ -289,7 +292,8 @@ export function createGhoomoApi(baseUrl: string): Api {
           cret_by: input.name,
           bokng_name: input.name,
           bokng_mobile: input.mobile,
-          bokng_cnt: input.people,
+          bokng_cnt: count,
+          order_type: orderTypeToApi(input.orderType),
           bokng_desc: input.description,
           ...(input.services.length
             ? { services: input.services.map((svc) => ({ svc_id: svc.serviceId, qty: svc.qty })) }
@@ -306,7 +310,7 @@ export function createGhoomoApi(baseUrl: string): Api {
           method: 'POST',
           body: {
             plan_id: appointmentId,
-            count_of_ppl: input.people,
+            count_of_ppl: count,
             type: 'SHOP',
             details: [
               {
@@ -330,6 +334,9 @@ export function createGhoomoApi(baseUrl: string): Api {
         status: res!.status === 'ACCEPTED' ? 'accepted' : 'pending',
         createdAt,
         rating: null,
+        people: count,
+        // The server's pick when it differs from what was sent (it never should).
+        orderType: orderTypeFromApi(res!.orderType) ?? input.orderType,
       };
     },
 

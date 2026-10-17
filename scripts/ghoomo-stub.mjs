@@ -72,7 +72,7 @@ function ensureSettings(loc) {
   if (!settings.has(loc.user_id)) {
     settings.set(loc.user_id, {
       stng_id: randomUUID(), loc_id: loc.user_id, max_limit: '100', unit: 'DAY', is_auto_approval: 1,
-      open_at: '09:00', close_at: '21:00', max_svc_qty: 1, created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
+      open_at: '09:00', close_at: '21:00', max_svc_qty: 1, is_dark_store: 0, catalog_type: 'PRODUCT', created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
     });
   }
   return settings.get(loc.user_id);
@@ -87,6 +87,11 @@ function ensureProfile(loc) {
   }
   return profiles.get(loc.user_id);
 }
+/** Order types a location takes, the first being the default (docs/API.md). */
+function allowedOrderTypes(catalogType, dark) {
+  if (catalogType === 'SERVICE') return dark ? ['HOME_VISIT'] : ['APPOINTMENT', 'HOME_VISIT'];
+  return dark ? ['PORTER', 'PICKUP'] : ['TABLE', 'PICKUP', 'PORTER'];
+}
 const PERIOD_MS = { HOUR: 3600e3, DAY: 86400e3, WEEK: 7 * 86400e3 };
 function addAppointment(body, userId) {
   const start = new Date(body.apntmnt_time);
@@ -99,6 +104,7 @@ function addAppointment(body, userId) {
     cret_on: body.cret_on ?? now(), cret_by: body.cret_by ?? null, updt_on: now(), updt_by: body.cret_by ?? null,
     status: 'PENDING', status_updt_by: null, status_updt_on: null, updt_reason: null,
     services: body.services ?? null,
+    order_type: body.order_type ?? null,
   };
   appointments.push(row);
   return row;
@@ -129,7 +135,7 @@ function addToCalendar({ plan_id, count_of_ppl, type, details }) {
 // Seed: two shops, one place, and appointments around today (local time, like the app books).
 {
   const raju = addLocation('Raju Tailor', 'SHOP', 'raju@example.com');
-  Object.assign(ensureSettings(raju), { max_limit: '3', unit: 'HOUR', is_auto_approval: 0, open_at: '09:00', close_at: '22:00', max_svc_qty: 2 });
+  Object.assign(ensureSettings(raju), { max_limit: '3', unit: 'HOUR', is_auto_approval: 0, open_at: '09:00', close_at: '22:00', max_svc_qty: 2, catalog_type: 'SERVICE' });
   for (const [name, desc, price, maxQty] of [
     ['Blouse stitching', 'Lined blouse, fitted to your measurements', 450, null],
     ['Kurta alteration', 'Take in, let out or shorten', 150, null],
@@ -179,7 +185,7 @@ const browseRow = (loc) => {
   const avg = rated.length ? (rated.reduce((sum, r) => sum + r.stars, 0) / rated.length).toFixed(1) : null;
   return {
     ...row, max_limit: s?.max_limit ?? null, unit: s?.unit ?? null, is_auto_approval: s?.is_auto_approval ?? null, open_at: s?.open_at ?? null, close_at: s?.close_at ?? null,
-    max_svc_qty: s?.max_svc_qty ?? null,
+    max_svc_qty: s?.max_svc_qty ?? null, is_dark_store: s?.is_dark_store ?? null, catalog_type: s?.catalog_type ?? null,
     rating_avg: avg, rating_count: rated.length ? String(rated.length) : null,
   };
 };
@@ -293,6 +299,14 @@ route('PUT', /^\/location\/([^/]+)\/settings$/, 'any', ({ claims, params, body }
     if (!Number.isInteger(body.maxServiceQty) || body.maxServiceQty < 1) return [400, { error: 'maxServiceQty must be a whole number of at least 1' }];
     row.max_svc_qty = body.maxServiceQty;
   }
+  if (body?.isDarkStore !== undefined) {
+    if (body.isDarkStore !== 0 && body.isDarkStore !== 1) return [400, { error: 'isDarkStore must be 0 or 1' }];
+    row.is_dark_store = body.isDarkStore;
+  }
+  if (body?.catalogType !== undefined) {
+    if (!['PRODUCT', 'SERVICE'].includes(body.catalogType)) return [400, { error: 'catalogType must be PRODUCT or SERVICE' }];
+    row.catalog_type = body.catalogType;
+  }
   Object.assign(row, { updated_on: now(), updated_by: loc.loc_name });
   return [200, { settings: row }];
 });
@@ -362,12 +376,20 @@ route('POST', /^\/appointment$/, 'any', ({ claims, body }) => {
     }
     if (!booked.length) booked = null;
   }
-  const appt = addAppointment({ ...body, services: booked }, claims.userId);
+  // Dark stores take orders (each counts as one); the order types depend on the store type.
+  const stng = settings.get(body.loc_id);
+  const dark = Number(stng?.is_dark_store ?? 0) === 1;
+  const allowed = allowedOrderTypes(stng?.catalog_type, dark);
+  const orderType = body.order_type ?? allowed[0];
+  if (!allowed.includes(orderType)) {
+    return [400, { error: `This store takes ${allowed.length > 1 ? `${allowed.slice(0, -1).join(', ')} or ${allowed.at(-1)}` : allowed[0]} bookings` }];
+  }
+  const appt = addAppointment({ ...body, services: booked, order_type: orderType, bokng_cnt: dark ? 1 : body.bokng_cnt }, claims.userId);
   // Auto-approving locations (the default for new settings) accept on creation.
-  const auto = Number(settings.get(body.loc_id)?.is_auto_approval ?? 1) === 1;
+  const auto = Number(stng?.is_auto_approval ?? 1) === 1;
   if (auto) Object.assign(appt, { status: 'ACCEPTED', status_updt_by: 'SYSTEM', status_updt_on: now() });
   notify(body.loc_id, appt.apntmnt_id, auto ? 'AUTO_ACCEPTED' : 'NEW_REQUEST', `${body.bokng_name || 'A customer'} requested a booking${auto ? ' — auto-approved' : ''}`);
-  return [201, { message: 'Appointment added successfully', appointmentId: appt.apntmnt_id, status: appt.status }];
+  return [201, { message: 'Appointment added successfully', appointmentId: appt.apntmnt_id, status: appt.status, orderType }];
 });
 route('PUT', /^\/appointment$/, 'any', ({ claims, body }) => {
   if (!isLocToken(claims)) return [403, { error: 'Forbidden: location login required' }];
@@ -392,6 +414,9 @@ route('PUT', /^\/appointment\/([^/]+)$/, 'any', ({ claims, params, body }) => {
   if (!/^\+?\d{10,15}$/.test(String(mobile).replace(/[\s-]/g, ''))) return [400, { error: 'mobile must be a valid phone number' }];
   const parts = [message && 'sent a message', people !== current && `changed the booking to ${people} ${people === 1 ? 'person' : 'people'}`, mobile !== appt.mobile_number && 'updated their mobile number'].filter(Boolean);
   if (!parts.length) return [400, { error: 'Nothing to change' }];
+  if (people !== current && Number(settings.get(appt.loc_id)?.is_dark_store ?? 0) === 1) {
+    return [400, { error: "This store takes orders; the number of people can't change" }];
+  }
   if (message) appt.bokng_desc = `${appt.bokng_desc}\n=====\n${message}`;
   Object.assign(appt, { bokng_cnt: String(people), mobile_number: mobile, updt_on: now() });
   notify(appt.loc_id, appt.apntmnt_id, 'UPDATED', `${appt.user_name || 'A customer'} ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}`);

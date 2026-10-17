@@ -27,8 +27,7 @@ export function NotificationsPanel({ onClose }: { onClose(): void }) {
   const [open, setOpen] = useState<Booking | null>(null);
   const ownStore = useStore(isStore ? session?.accountId : undefined);
   const stores = useStores();
-  const isDarkStore = (storeId: string) =>
-    isStore ? !!ownStore.data?.isDarkStore : !!stores.data?.find((s) => s.id === storeId)?.isDarkStore;
+  const storeOf = (storeId: string) => (isStore ? ownStore.data : stores.data?.find((s) => s.id === storeId));
 
   // Mark what was shown as read (it stays highlighted until the next refresh).
   const marked = useRef(new Set<string>());
@@ -77,7 +76,8 @@ export function NotificationsPanel({ onClose }: { onClose(): void }) {
         <BookingDetailsModal
           booking={open}
           viewer={isStore ? 'store' : 'user'}
-          isDarkStore={isDarkStore(open.storeId)}
+          isDarkStore={storeOf(open.storeId)?.isDarkStore}
+          catalogType={storeOf(open.storeId)?.catalogType}
           onClose={() => setOpen(null)}
         />
       ) : null}

@@ -13,7 +13,9 @@ import { DescriptionHistory } from '@/features/bookings/description-history';
 import { useSetBookingStatus } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { formatSlotStart } from '@/lib/date';
-import type { Booking, BookingStatus } from '@/types/domain';
+import { catalogWords, ORDER_TYPE_LABEL, showsPeople } from '@/lib/order-types';
+import { formatPrice } from '@/lib/services';
+import type { Booking, BookingStatus, CatalogType } from '@/types/domain';
 
 type BookingDetailsModalProps = {
   booking: Booking;
@@ -21,6 +23,8 @@ type BookingDetailsModalProps = {
   viewer: 'store' | 'user';
   /** Dark-store bookings are orders: no head count. */
   isDarkStore?: boolean;
+  /** Products or Services: the heading of the booked items. */
+  catalogType?: CatalogType;
   onClose(): void;
   /** Shown to users while the booking can still be changed. */
   onEdit?(booking: Booking): void;
@@ -29,8 +33,17 @@ type BookingDetailsModalProps = {
 };
 
 /** Everything about one booking. Mount it only while open. */
-export function BookingDetailsModal({ booking: initial, viewer, isDarkStore, onClose, onEdit, onRate }: BookingDetailsModalProps) {
+export function BookingDetailsModal({
+  booking: initial,
+  viewer,
+  isDarkStore,
+  catalogType,
+  onClose,
+  onEdit,
+  onRate,
+}: BookingDetailsModalProps) {
   const theme = useTheme();
+  const words = catalogWords(catalogType);
   // Keep the latest version after accepting/rejecting from here.
   const [booking, setBooking] = useState(initial);
   const setStatus = useSetBookingStatus();
@@ -58,7 +71,8 @@ export function BookingDetailsModal({ booking: initial, viewer, isDarkStore, onC
     ]);
   }
   rows.push(['When', formatSlotStart(booking.slotStart)]);
-  if (!isDarkStore) rows.push(['People', String(booking.people)]);
+  if (booking.orderType) rows.push(['Order type', ORDER_TYPE_LABEL[booking.orderType]]);
+  if (showsPeople(booking, isDarkStore)) rows.push(['People', String(booking.people)]);
 
   const footer =
     viewer === 'store' ? (
@@ -102,10 +116,35 @@ export function BookingDetailsModal({ booking: initial, viewer, isDarkStore, onC
         ))}
       </View>
 
+      {booking.services.length ? (
+        <View style={styles.section}>
+          <ThemedText type="smallBold">{words.Items}</ThemedText>
+          <View style={[styles.box, { backgroundColor: theme.backgroundSelected }]}>
+            {booking.services.map((s) => (
+              <View key={s.serviceId} style={styles.itemLine}>
+                <ThemedText type="small" style={styles.itemName}>
+                  {s.name}
+                  {s.qty > 1 ? ` × ${s.qty}` : ''}
+                </ThemedText>
+                <ThemedText type="small">{formatPrice(s.price * s.qty)}</ThemedText>
+              </View>
+            ))}
+            <View style={[styles.itemLine, styles.itemTotal, { borderTopColor: theme.border }]}>
+              <ThemedText type="smallBold" style={styles.itemName}>
+                Total
+              </ThemedText>
+              <ThemedText type="smallBold">
+                {formatPrice(booking.services.reduce((sum, s) => sum + s.price * s.qty, 0))}
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {viewer === 'user' && booking.rating ? (
         <View style={styles.section}>
           <ThemedText type="smallBold">Your rating</ThemedText>
-          <View style={[styles.ratingBox, { backgroundColor: theme.backgroundSelected }]}>
+          <View style={[styles.box, { backgroundColor: theme.backgroundSelected }]}>
             <Stars value={booking.rating.stars} />
             {booking.rating.review ? <ThemedText>{booking.rating.review}</ThemedText> : null}
           </View>
@@ -143,10 +182,22 @@ const styles = StyleSheet.create({
   section: {
     gap: Spacing.one,
   },
-  ratingBox: {
+  box: {
     borderRadius: Spacing.two,
     padding: Spacing.three,
     gap: Spacing.one,
+  },
+  itemLine: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  itemName: {
+    flex: 1,
+  },
+  itemTotal: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: Spacing.one,
+    marginTop: Spacing.one,
   },
   actions: {
     flexDirection: 'row',

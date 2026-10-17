@@ -10,7 +10,8 @@ import { SegmentedTabs, type Tab } from '@/components/ui/segmented-tabs';
 import { BookingDetailsModal } from '@/features/bookings/booking-details-modal';
 import { Spacing } from '@/constants/theme';
 import { useSetBookingStatus, useStoreBookings } from '@/hooks/queries';
-import type { Booking, BookingStatus, DateKey } from '@/types/domain';
+import { showsPeople } from '@/lib/order-types';
+import type { Booking, BookingStatus, CatalogType, DateKey } from '@/types/domain';
 
 type TabKey = 'open' | 'accepted' | 'rejected' | 'all';
 
@@ -34,10 +35,11 @@ type StoreBookingsProps = {
   /** What the list covers, e.g. "Today's bookings". */
   caption: string;
   isDarkStore?: boolean;
+  catalogType?: CatalogType;
 };
 
 /** Bookings for the shown days, split by status, with accept/reject; tap a row for details. */
-export function StoreBookings({ storeId, dates, caption, isDarkStore }: StoreBookingsProps) {
+export function StoreBookings({ storeId, dates, caption, isDarkStore, catalogType }: StoreBookingsProps) {
   const [tab, setTab] = useState<TabKey>('open');
   const [open, setOpen] = useState<Booking | null>(null);
   const bookings = useStoreBookings(storeId, dates);
@@ -108,14 +110,14 @@ export function StoreBookings({ storeId, dates, caption, isDarkStore }: StoreBoo
             booking={b}
             title={b.name}
             subtitle={b.mobile || undefined}
-            showPeople={!isDarkStore}
+            showPeople={showsPeople(b, isDarkStore)}
             actions={renderActions(b)}
             onPress={() => setOpen(b)}
           />
         ))
       )}
       {open ? (
-        <BookingDetailsModal booking={open} viewer="store" isDarkStore={isDarkStore} onClose={() => setOpen(null)} />
+        <BookingDetailsModal booking={open} viewer="store" isDarkStore={isDarkStore} catalogType={catalogType} onClose={() => setOpen(null)} />
       ) : null}
     </View>
   );

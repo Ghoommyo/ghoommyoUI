@@ -1,0 +1,74 @@
+import type { Booking, CatalogType, OrderType, StoreSettings } from '@/types/domain';
+
+export const ORDER_TYPE_LABEL: Record<OrderType, string> = {
+  table: 'Book table',
+  pickup: 'Pickup',
+  porter: 'Porter',
+  appointment: 'Book appointment',
+  homeVisit: 'Book home visit',
+};
+
+const TO_API: Record<OrderType, string> = {
+  table: 'TABLE',
+  pickup: 'PICKUP',
+  porter: 'PORTER',
+  appointment: 'APPOINTMENT',
+  homeVisit: 'HOME_VISIT',
+};
+const FROM_API = Object.fromEntries(Object.entries(TO_API).map(([k, v]) => [v, k])) as Record<
+  string,
+  OrderType
+>;
+
+export const orderTypeToApi = (type: OrderType) => TO_API[type];
+export const orderTypeFromApi = (value: unknown): OrderType | null =>
+  FROM_API[String(value ?? '').toUpperCase()] ?? null;
+
+type OrderTypeStore = Pick<StoreSettings, 'isDarkStore' | 'catalogType'>;
+
+/**
+ * The order types a store offers, the first being the default.
+ * Products: Book table / Pickup / Porter (dark stores: Porter / Pickup).
+ * Services: Book appointment / Book home visit (dark stores: home visit only).
+ */
+export function orderTypeChoices(store: OrderTypeStore): OrderType[] {
+  if (store.catalogType === 'service')
+    return store.isDarkStore ? ['homeVisit'] : ['appointment', 'homeVisit'];
+  return store.isDarkStore ? ['porter', 'pickup'] : ['table', 'pickup', 'porter'];
+}
+
+export function orderTypeOptions(store: OrderTypeStore): { label: string; value: OrderType }[] {
+  return orderTypeChoices(store).map((value) => ({ label: ORDER_TYPE_LABEL[value], value }));
+}
+
+export const defaultOrderType = (store: OrderTypeStore): OrderType => orderTypeChoices(store)[0];
+
+/**
+ * Whether a booking shows its head count: not for dark-store orders (always 1),
+ * but yes for bookings made before the store went dark (no type, table or appointment).
+ */
+export const showsPeople = (
+  booking: Pick<Booking, 'orderType'>,
+  isDarkStore: boolean | undefined,
+) =>
+  !isDarkStore ||
+  booking.orderType === null ||
+  booking.orderType === 'table' ||
+  booking.orderType === 'appointment';
+
+/** What a slot or day counts: orders at dark stores, visitors elsewhere. */
+export const countNoun = (isDarkStore: boolean | undefined, n: number) =>
+  isDarkStore ? (n === 1 ? 'order' : 'orders') : n === 1 ? 'visitor' : 'visitors';
+
+/** How a store's items are called: Products (default) or Services. */
+export function catalogWords(catalogType: CatalogType | undefined) {
+  const service = catalogType === 'service';
+  return {
+    Items: service ? 'Services' : 'Products',
+    items: service ? 'services' : 'products',
+    Item: service ? 'Service' : 'Product',
+    item: service ? 'service' : 'product',
+  };
+}
+
+export type CatalogWords = ReturnType<typeof catalogWords>;

@@ -18,14 +18,16 @@ type ServiceFormModalProps = {
   service?: StoreService;
   /** The store's default limit, shown as the placeholder for "Limit per booking". */
   defaultMaxQty: number;
+  /** `product` or `service`, by the store type. */
+  item: string;
   onClose(): void;
   onSaved(service: StoreService): void;
 };
 
 type FieldErrors = ReturnType<typeof validateService>;
 
-/** Add or edit a store service. Mount it only while open. */
-export function ServiceFormModal({ storeId, service, defaultMaxQty, onClose, onSaved }: ServiceFormModalProps) {
+/** Add or edit a store's product or service. Mount it only while open. */
+export function ServiceFormModal({ storeId, service, defaultMaxQty, item, onClose, onSaved }: ServiceFormModalProps) {
   const create = useCreateService(storeId);
   const update = useUpdateService(storeId);
   const mutation = service ? update : create;
@@ -61,7 +63,7 @@ export function ServiceFormModal({ storeId, service, defaultMaxQty, onClose, onS
   return (
     <Sheet
       visible
-      title={service ? 'Edit service' : 'Add service'}
+      title={service ? `Edit ${item}` : `Add ${item}`}
       onClose={onClose}
       footer={
         <View style={styles.actions}>
@@ -109,7 +111,7 @@ export function ServiceFormModal({ storeId, service, defaultMaxQty, onClose, onS
         error={errors.maxQty}
         keyboardType="number-pad"
         placeholder={`Default (${defaultMaxQty})`}
-        hint="How many of this service one booking can include. Leave empty for the store default."
+        hint={`How many of this ${item} one booking can include. Leave empty for the store default.`}
       />
     </Sheet>
   );

@@ -14,6 +14,7 @@ import { RateBookingModal } from '@/features/bookings/rate-booking-modal';
 import { useMyBookings, useStores } from '@/hooks/queries';
 import { canEditBooking, canRateBooking } from '@/lib/bookings';
 import { todayKey } from '@/lib/date';
+import { showsPeople } from '@/lib/order-types';
 import { bucketEvents } from '@/lib/slots';
 import type { Booking } from '@/types/domain';
 
@@ -87,7 +88,7 @@ export function UserEventsTabs() {
             key={b.id}
             booking={b}
             title={b.storeName}
-            showPeople={!storeOf(b)?.isDarkStore}
+            showPeople={showsPeople(b, storeOf(b)?.isDarkStore)}
             onPress={() => setOpen(b)}
             actions={
               <>
@@ -105,6 +106,7 @@ export function UserEventsTabs() {
           booking={open}
           viewer="user"
           isDarkStore={storeOf(open)?.isDarkStore}
+          catalogType={storeOf(open)?.catalogType}
           onClose={() => setOpen(null)}
           onEdit={canEditBooking(open, today) ? startEdit : undefined}
           onRate={canRateBooking(open) ? startRate : undefined}
