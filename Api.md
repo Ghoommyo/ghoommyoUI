@@ -150,6 +150,8 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 | Appointment `status`          | `PENDING` (set on create), `ACCEPTED`, `REJECTED`                         |
 | `apntmnt_period`              | `HOUR` (+1h), `DAY` (+24h), `WEEK` (+7d); anything else makes end = start |
 | Settings `unit` / `limitUnit` | free text; the app uses `DAY` (default) and `HOUR`                        |
+| Appointment `order_type`      | product locations: `TABLE` (book a table), `PICKUP`, `PORTER` (dark: no `TABLE`); service locations: `APPOINTMENT`, `HOME_VISIT` (dark: `HOME_VISIT` only) |
+| Settings `catalog_type` / `catalogType` | `PRODUCT` (default), `SERVICE`                                  |
 | `userType` (customers)        | `CUSTOMER` (assigned on signup)                                           |
 | `userAccess` / `loc_access`   | `LIMITED` (assigned on signup)                                            |
 
@@ -271,7 +273,10 @@ curl "$BASE/location"
       "unit": "DAY",
       "is_auto_approval": 1,
       "open_at": "09:00",
-      "close_at": "21:00"
+      "close_at": "21:00",
+      "max_svc_qty": 1,
+      "is_dark_store": 0,
+      "catalog_type": "PRODUCT"
     }
   ]
 }
@@ -398,7 +403,7 @@ All fields are optional. Omitted fields keep their current values, while `0` and
 
 ```bash
 curl -X PUT "$BASE/location/raju_tailor/settings" -H "Authorization: $LOC_TOKEN" -H "Content-Type: application/json" \
-  -d '{"maxLimit":5,"limitUnit":"HOUR","isAutoApprove":0,"openAt":"10:00","closeAt":"18:00","maxServiceQty":2}'
+  -d '{"maxLimit":5,"limitUnit":"HOUR","isAutoApprove":0,"openAt":"10:00","closeAt":"18:00","maxServiceQty":2,"isDarkStore":0,"catalogType":"SERVICE"}'
 ```
 
 | Field            | Type      | Notes                                              |
@@ -408,9 +413,11 @@ curl -X PUT "$BASE/location/raju_tailor/settings" -H "Authorization: $LOC_TOKEN"
 | isAutoApprove    | 0 \| 1    |                                                    |
 | openAt / closeAt | `"HH:MM"` | 24-hour; the booking UI limits slots to this range |
 | maxServiceQty    | integer ≥ 1 | default quantity of each service per booking, for services without their own `maxQty` (column `max_svc_qty`, default 1; also on `GET /location` rows) |
+| isDarkStore      | 0 \| 1    | dark store: no dine-in, bookings are orders (column `is_dark_store`, default 0). Appointments then can't use `order_type: "TABLE"` and always count as 1 (`bokng_cnt = 1`) |
+| catalogType      | `PRODUCT` \| `SERVICE` | what the location sells (column `catalog_type`, default `PRODUCT`). Decides what its items are called (Products / Services) and which `order_type`s bookings may use (see §5.6) |
 
 - 200 `{"settings":{ ...same fields as GET... }}`
-- 400 `{"error":"maxServiceQty must be a whole number of at least 1"}`
+- 400 `{"error":"maxServiceQty must be a whole number of at least 1"}` / `{"error":"isDarkStore must be 0 or 1"}` / `{"error":"catalogType must be PRODUCT or SERVICE"}`
 - 404 `{"error":"Location settings not found, call GET first to create defaults"}`
 
 ### 5.4a Services (add-ons)
@@ -545,12 +552,22 @@ curl -X POST "$BASE/appointment" -H "Authorization: $USER_TOKEN" -H "Content-Typ
 | cret_by        | string                |     | display name              |
 | bokng_name     | string                |     | stored as `user_name`     |
 | bokng_mobile   | string                |     | stored as `mobile_number` |
-| bokng_cnt      | number                |     | number of people          |
-| bokng_desc     | string                |     |                           |
+| bokng_cnt      | number                |     | number of people; ignored (stored as 1) at dark stores |
+| order_type     | see below             |     | optional; defaults to the first allowed value. Send `count_of_ppl: 1` to `POST /calendar` for dark-store bookings |
+| bokng_desc     | string                | ✔   | note for the store; must not be empty or only spaces |
 | services       | array of `{svc_id, qty}` | | add-ons (§5.4a); each one of the location's active services, listed once, with `1 ≤ qty ≤ effectiveMaxQty`. Saved as a snapshot of name and price |
 
-- 201 `{"message":"Appointment added successfully","appointmentId":"60834c7e-ca6b-4b13-a724-c27df35feec8"}`
-- 400 `{"error":"Missing required fields"}` / `{"error":"Invalid apntmnt_time"}` / `{"error":"qty for Haircut must be between 1 and 2"}` / `{"error":"services contains a service this location doesn't offer"}` · 401
+Allowed `order_type` by location:
+
+| Location | Allowed | Default |
+|---|---|---|
+| `PRODUCT` | `TABLE`, `PICKUP`, `PORTER` | `TABLE` |
+| `PRODUCT`, dark store | `PORTER`, `PICKUP` | `PORTER` |
+| `SERVICE` | `APPOINTMENT`, `HOME_VISIT` | `APPOINTMENT` |
+| `SERVICE`, dark store | `HOME_VISIT` | `HOME_VISIT` |
+
+- 201 `{"message":"Appointment added successfully","appointmentId":"60834c7e-ca6b-4b13-a724-c27df35feec8","status":"ACCEPTED","orderType":"TABLE"}`
+- 400 `{"error":"Missing required fields"}` / `{"error":"bokng_desc is required"}` / `{"error":"Invalid apntmnt_time"}` / `{"error":"qty for Haircut must be between 1 and 2"}` / `{"error":"services contains a service this location doesn't offer"}` / `{"error":"This store takes APPOINTMENT or HOME_VISIT bookings"}` (any type the location doesn't allow) · 401
 
 **Appointment object** (returned by the list endpoints and the PUT):
 
@@ -576,11 +593,12 @@ curl -X POST "$BASE/appointment" -H "Authorization: $USER_TOKEN" -H "Content-Typ
   "status_updt_by": null,
   "status_updt_on": null,
   "updt_reason": null,
-  "services": [{ "svc_id": "c4753b3f-...", "name": "Haircut", "price": 200, "qty": 2 }]
+  "services": [{ "svc_id": "c4753b3f-...", "name": "Haircut", "price": 200, "qty": 2 }],
+  "order_type": "TABLE"
 }
 ```
 
-`bokng_cnt` comes back as a string. `services` is the snapshot of booked add-ons (name and price at booking time), or `null`.
+`bokng_cnt` comes back as a string. `services` is the snapshot of booked add-ons (name and price at booking time), or `null`. `order_type` is `null` for bookings made before order types existed.
 
 #### PUT /appointment
 
