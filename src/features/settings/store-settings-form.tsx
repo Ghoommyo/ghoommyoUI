@@ -47,6 +47,7 @@ const toDraft = (store: Store): Draft => ({
   closeAt: store.closeAt,
   isDarkStore: store.isDarkStore,
   catalogType: store.catalogType,
+  serviceType: store.serviceType,
 });
 
 const positiveInt = (value: string) => (/^\d+$/.test(value) && Number(value) >= 1 ? Number(value) : null);

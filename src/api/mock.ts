@@ -1,6 +1,7 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
 import { orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
+import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
 import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type {
@@ -74,6 +75,7 @@ const stores: StoreRecord[] = [
     maxServiceQty: 2,
     isDarkStore: false,
     catalogType: 'service',
+    serviceType: null,
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -97,6 +99,7 @@ const stores: StoreRecord[] = [
     maxServiceQty: 1,
     isDarkStore: false,
     catalogType: 'service',
+    serviceType: 'Barber',
     profile: {
       address: '45 Vijay Nagar',
       pin: '452010',
@@ -121,6 +124,7 @@ const stores: StoreRecord[] = [
     // No dine-in: bookings are orders.
     isDarkStore: true,
     catalogType: 'product',
+    serviceType: null,
     profile: {
       address: '8 Palasia Square',
       pin: '452001',
@@ -165,6 +169,21 @@ function seedBookings(): Booking[] {
 }
 
 const bookings: Booking[] = seedBookings();
+
+/** Types of service stores added through "Other"; every store can pick them. */
+const addedServiceTypes = new Set<string>(['Barber']);
+
+/** Validates a type of service and adds it to the list if new; returns the listed spelling. */
+function addServiceType(name: string): string {
+  const clean = cleanServiceType(name);
+  if (!clean || clean.length > MAX_SERVICE_TYPE_LENGTH) {
+    throw new ApiError('serviceType must be 1 to 60 characters, or null', 400);
+  }
+  const listed = [...STANDARD_SERVICE_TYPES, ...addedServiceTypes].find((t) => t.toLowerCase() === clean.toLowerCase());
+  if (listed) return listed;
+  addedServiceTypes.add(clean);
+  return clean;
+}
 
 /** Services as kept in memory; the effective `maxQty` is worked out from the store when read. */
 interface StoredService extends Omit<StoreService, 'maxQty'> {
@@ -330,6 +349,7 @@ export const mockApi: Api = {
       maxServiceQty: 1,
       isDarkStore: false,
       catalogType: 'product',
+      serviceType: null,
       profile: {
         address: '',
         pin: '',
@@ -416,6 +436,11 @@ export const mockApi: Api = {
         .filter((b) => b.storeId === storeId && days.has(b.slotStart.slice(0, 10)))
         .sort((a, b) => a.slotStart.localeCompare(b.slotStart)),
     );
+  },
+
+  async getServiceTypes() {
+    await delay();
+    return [...STANDARD_SERVICE_TYPES, ...[...addedServiceTypes].sort((a, b) => a.localeCompare(b))];
   },
 
   async getStoreServices(storeId) {
@@ -654,7 +679,7 @@ export const mockApi: Api = {
     await delay();
     requireStoreOwner(storeId);
     const store = findStore(storeId);
-    Object.assign(store, settings);
+    Object.assign(store, settings, { serviceType: settings.serviceType && addServiceType(settings.serviceType) });
     for (const b of bookings) if (b.storeId === storeId) b.storeName = store.name;
     return clone(withRating(store));
   },

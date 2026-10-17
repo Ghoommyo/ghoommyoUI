@@ -139,7 +139,7 @@ export function daySummaryFromCalendar(
   }));
 }
 
-type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type'>;
+type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type'>;
 /** Settings columns, which are null on browse rows for locations that never opened settings. */
 type SettingsInput = { [K in keyof SettingsFields]?: SettingsFields[K] | null };
 
@@ -155,6 +155,7 @@ export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'>
     isDarkStore: row.is_dark_store === 1,
     maxServiceQty: Number(row.max_svc_qty) || d.maxServiceQty,
     catalogType: row.catalog_type === 'SERVICE' ? 'service' : 'product',
+    serviceType: row.svc_type || null,
   };
 }
 
@@ -168,6 +169,7 @@ export function settingsToRequest(settings: StoreSettings) {
     maxServiceQty: settings.maxServiceQty,
     isDarkStore: settings.isDarkStore ? 1 : 0,
     catalogType: settings.catalogType === 'service' ? 'SERVICE' : 'PRODUCT',
+    serviceType: settings.serviceType,
   };
 }
 

@@ -27,6 +27,7 @@ export const queryKeys = {
   myProfile: (accountId: string) => ['me', accountId, 'profile'] as const,
   storeReviews: (storeId: string) => ['stores', storeId, 'reviews'] as const,
   storeServices: (storeId: string) => ['stores', storeId, 'services'] as const,
+  serviceTypes: ['service-types'] as const,
   notifications: (accountId: string) => ['me', accountId, 'notifications'] as const,
   reminderBookings: (accountId: string) => ['me', accountId, 'reminder-bookings'] as const,
 };
@@ -66,6 +67,10 @@ export function useStoreBookings(storeId: string | undefined, dates: DateKey[] |
     queryFn: () => api.getStoreBookings(storeId!, dates!),
     enabled: !!storeId && !!dates && dates.length > 0,
   });
+}
+
+export function useServiceTypes() {
+  return useQuery({ queryKey: queryKeys.serviceTypes, queryFn: () => api.getServiceTypes() });
 }
 
 export function useStoreServices(storeId: string | undefined) {
@@ -148,7 +153,11 @@ export function useUpdateStoreSettings(storeId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (settings: StoreSettings) => api.updateStoreSettings(storeId, settings),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.stores }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.stores });
+      // A new "Other" type joins the shared list.
+      queryClient.invalidateQueries({ queryKey: queryKeys.serviceTypes });
+    },
   });
 }
 

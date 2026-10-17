@@ -60,6 +60,8 @@ export interface StoreSettings {
   isDarkStore: boolean;
   /** Products (default) or Services: the items' name and the order types offered. */
   catalogType: CatalogType;
+  /** Type of service, e.g. "Plumber" (see `getServiceTypes`); null = not set. Shown for service stores only. */
+  serviceType: string | null;
   /** How many of each service a booking may include, for services without their own limit. */
   maxServiceQty: number;
 }

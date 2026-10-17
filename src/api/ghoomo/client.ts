@@ -249,6 +249,11 @@ export function createGhoomoApi(baseUrl: string): Api {
       return (res?.services ?? []).map(serviceToStore);
     },
 
+    async getServiceTypes() {
+      const res = await request<{ serviceTypes: string[] }>('/service-types');
+      return res?.serviceTypes ?? [];
+    },
+
     // Owner routes are addressed by the token's location code; the store id isn't needed.
     async createService(_storeId, input) {
       const locCode = requireOwnLocCode();

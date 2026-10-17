@@ -22,6 +22,8 @@ export interface GhoomoLocation {
   max_svc_qty?: number | null;
   /** `PRODUCT` (default) or `SERVICE`. */
   catalog_type?: string | null;
+  /** Type of service, e.g. `Plumber`; null = not set. */
+  svc_type?: string | null;
   /** Average stars (1 decimal) and number of ratings; strings, null when unrated. */
   rating_avg?: string | null;
   rating_count?: string | null;
@@ -40,6 +42,7 @@ export interface GhoomoSettings {
   max_svc_qty?: number;
   /** `PRODUCT` (default) or `SERVICE`. */
   catalog_type?: string;
+  svc_type?: string | null;
 }
 
 /** A location's service (Api.md §5.4a). Already camelCase on the wire. */
