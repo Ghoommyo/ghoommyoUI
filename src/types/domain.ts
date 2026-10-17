@@ -15,13 +15,28 @@ export interface Session {
   role: Role;
   /** For stores this is also the store id. */
   accountId: string;
+  /** Users: their email. Stores: their login (location) code. */
   email: string;
+  /** Display name: the user's name or the store's name. */
+  name?: string;
+  /** Store login code (Ghoomo `loc_code`); owner endpoints are addressed by it. */
+  locCode?: string;
 }
 
-export interface Credentials {
-  email: string;
-  password: string;
-  role: Role;
+/** Users sign in with their email; stores with their email or store name. */
+export type Credentials =
+  | { role: 'user'; email: string; password: string }
+  | { role: 'store'; /** Email, or store name in any case/spacing. */ login: string; password: string };
+
+export type SignupInput =
+  /** `username` is a display name and may be shared by several users. */
+  | { role: 'user'; username: string; email: string; password: string }
+  /** `locationName` is unique per store once normalized (see `storeKey`). */
+  | { role: 'store'; locationName: string; email: string; password: string };
+
+export interface SignupResult {
+  /** For stores: the code to log in with. */
+  loginCode?: string;
 }
 
 export interface StoreSettings {
@@ -44,8 +59,11 @@ export interface StoreProfile {
   state: string;
   country: string;
   bio: string;
-  lat: number;
-  lng: number;
+  /** Not stored by the Ghoomo API yet, so absent in API mode (no map pin). */
+  lat?: number;
+  lng?: number;
+  /** Navigation link set by the store (Ghoomo `loc_nav`). */
+  mapUrl?: string;
 }
 
 export interface Store extends StoreSettings {

@@ -22,6 +22,12 @@ export function validateEmail(email: string) {
   if (!EMAIL_PATTERN.test(email.trim())) return 'Enter a valid email address.';
 }
 
+export function validateUsername(username: string) {
+  const length = username.trim().length;
+  if (!length) return 'Username is required.';
+  if (length < 2 || length > 40) return 'Username must be 2–40 characters.';
+}
+
 type AuthFormLayoutProps = PropsWithChildren<{
   title: string;
   footerText: string;

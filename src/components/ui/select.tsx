@@ -1,9 +1,21 @@
 import { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
+// react-native-web can leave a fading modal stuck on screen if navigation happens mid-fade.
+const MODAL_ANIMATION = Platform.OS === 'web' ? 'none' : 'fade';
 
 const OPTION_HEIGHT = 52;
 
@@ -78,7 +90,7 @@ export function Select<T extends string | number>({
         </ThemedText>
       ) : null}
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType={MODAL_ANIMATION} onRequestClose={() => setOpen(false)}>
         <Pressable
           style={[styles.backdrop, { backgroundColor: theme.overlay }]}
           onPress={() => setOpen(false)}

@@ -2,11 +2,12 @@ import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { Platform, StyleSheet } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
-import type { StoreProfile } from '@/types/domain';
+
+type NativeMapProps = { name: string; latitude: number; longitude: number };
 
 /** Read-only map with a pin at the store. Requires a development build. */
-export default function NativeMap({ name, profile }: { name: string; profile: StoreProfile }) {
-  const coordinates = { latitude: profile.lat, longitude: profile.lng };
+export default function NativeMap({ name, latitude, longitude }: NativeMapProps) {
+  const coordinates = { latitude, longitude };
   const cameraPosition = { coordinates, zoom: 15 };
 
   if (Platform.OS === 'ios') {

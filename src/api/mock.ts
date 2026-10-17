@@ -1,14 +1,15 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
 import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
+import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type { Booking, Role, Store, UserProfile } from '@/types/domain';
 
 /**
  * In-memory backend used until a real API exists. Data resets on reload;
  * the seeded accounts below always exist.
  *
- *   user@ghoomyo.app  / password123  (user)
- *   store@ghoomyo.app / password123  (store, owns "Raju Tailor")
+ *   user@ghoomyo.app  / password123  (user, logs in by email)
+ *   store@ghoomyo.app / password123  (store "Raju Tailor"; also logs in as "Raju Tailor" or "raju_tailor")
  */
 
 interface Account {
@@ -16,6 +17,8 @@ interface Account {
   email: string;
   password: string;
   role: Role;
+  /** Stores only: the unique key derived from the store name (`storeKey`). */
+  locCode?: string;
   profile: UserProfile;
 }
 
@@ -38,6 +41,7 @@ const accounts: Account[] = [
     email: 'store@ghoomyo.app',
     password: 'password123',
     role: 'store',
+    locCode: 'raju_tailor',
     profile: { name: 'Raju Tailor', mobile: '9123456780' },
   },
 ];
@@ -154,49 +158,84 @@ function requireStoreOwner(storeId: string) {
 }
 
 export const mockApi: Api = {
-  async signup({ email, password, role }) {
+  async signup(input) {
     await delay();
-    const normalized = email.trim().toLowerCase();
-    if (accounts.some((a) => a.email === normalized)) {
-      throw new ApiError('An account with this email already exists.', 409);
-    }
-    const id = newId(role === 'store' ? 's' : 'u');
-    const name = normalized.split('@')[0];
-    accounts.push({ id, email: normalized, password, role, profile: { name, mobile: '' } });
-    if (role === 'store') {
-      stores.push({
-        id,
-        name,
-        maxPerSlot: 10,
-        maxPerBooking: 4,
-        limitUnit: 'hour',
-        autoApprove: false,
-        openAt: '09:00',
-        closeAt: '18:00',
-        profile: {
-          address: '',
-          pin: '',
-          city: '',
-          state: '',
-          country: '',
-          bio: '',
-          lat: 22.7196,
-          lng: 75.8577,
-        },
+    const email = input.email.trim().toLowerCase();
+    if (input.role === 'user') {
+      // Users log in by email, so it must be unique; usernames may repeat.
+      if (accounts.some((a) => a.role === 'user' && a.email === email)) {
+        throw new ApiError('Email already registered', 409);
+      }
+      accounts.push({
+        id: newId('u'),
+        email,
+        password: input.password,
+        role: 'user',
+        profile: { name: input.username.trim(), mobile: '' },
       });
+      return {};
     }
+
+    const nameError = validateStoreName(input.locationName);
+    if (nameError) throw new ApiError(nameError, 400);
+    const name = normalizeStoreName(input.locationName);
+    const locCode = storeKey(name);
+    if (accounts.some((a) => a.locCode === locCode)) {
+      throw new ApiError('Store name already taken', 409);
+    }
+    // Stores can log in by email, so it must be unique among stores.
+    if (accounts.some((a) => a.role === 'store' && a.email === email)) {
+      throw new ApiError('Email already registered', 409);
+    }
+    const id = newId('s');
+    accounts.push({ id, email, password: input.password, role: 'store', locCode, profile: { name, mobile: '' } });
+    stores.push({
+      id,
+      name,
+      maxPerSlot: 10,
+      maxPerBooking: 4,
+      limitUnit: 'hour',
+      autoApprove: false,
+      openAt: '09:00',
+      closeAt: '18:00',
+      profile: {
+        address: '',
+        pin: '',
+        city: '',
+        state: '',
+        country: '',
+        bio: '',
+        lat: 22.7196,
+        lng: 75.8577,
+      },
+    });
+    return { loginCode: locCode };
   },
 
-  async login({ email, password, role }) {
+  async login(credentials) {
     await delay();
-    const account = accounts.find((a) => a.email === email.trim().toLowerCase());
-    if (!account || account.password !== password) {
-      throw new ApiError('Incorrect email or password.', 401);
+    let account: Account | undefined;
+    if (credentials.role === 'user') {
+      const email = credentials.email.trim().toLowerCase();
+      account = accounts.find((a) => a.role === 'user' && a.email === email);
+    } else {
+      // Stores log in with their email or their store name (any case/spacing, or the key itself).
+      const login = credentials.login.trim().toLowerCase();
+      account = login.includes('@')
+        ? accounts.find((a) => a.role === 'store' && a.email === login)
+        : accounts.find((a) => a.locCode === storeKey(login));
     }
-    if (account.role !== role) {
-      throw new ApiError(`This account is registered as a ${account.role}.`, 401);
-    }
-    return { token: `mock.${account.id}`, role, accountId: account.id, email: account.email };
+    if (!account) throw new ApiError('User not found', 404);
+    if (account.password !== credentials.password) throw new ApiError('Invalid credentials', 401);
+    const store = account.role === 'store' ? stores.find((s) => s.id === account.id) : undefined;
+    return {
+      token: `mock.${account.id}`,
+      role: account.role,
+      accountId: account.id,
+      email: account.email,
+      name: store?.name ?? account.profile.name,
+      locCode: account.locCode,
+    };
   },
 
   async listStores() {
