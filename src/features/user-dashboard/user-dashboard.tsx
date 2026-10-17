@@ -10,6 +10,7 @@ import { Banner, type BannerMessage } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Select, type SelectOption } from '@/components/ui/select';
+import { RatingBadge } from '@/components/ui/stars';
 import { Spacing } from '@/constants/theme';
 import { UserEventsTabs } from '@/features/events/user-events-tabs';
 import { SlotGrid } from '@/features/user-dashboard/slot-grid';
@@ -104,7 +105,17 @@ export function UserDashboard() {
         <Select
           placeholder={stores.isLoading ? 'Loading stores…' : 'Select a store'}
           value={storeId}
-          options={(stores.data ?? []).map((s) => ({ label: s.name, value: s.id }))}
+          options={(stores.data ?? []).map((s) => ({
+            label: s.name,
+            value: s.id,
+            // The rating opens the store's reviews; the name still selects the store.
+            accessory: {
+              content: <RatingBadge rating={s.rating} />,
+              accessibilityLabel: `See reviews for ${s.name}`,
+              onPress: () => router.push({ pathname: '/reviews', params: { storeId: s.id } }),
+            },
+          }))}
+          fieldAccessory={store ? <RatingBadge rating={store.rating} color={theme.cardTextSecondary} /> : null}
           onChange={(id) => {
             setStoreId(id);
             setSelectedSlot(null);

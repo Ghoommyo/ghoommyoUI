@@ -1,10 +1,15 @@
 import type {
+  AppNotification,
   Booking,
+  BookingChanges,
+  BookingRating,
   BookingStatus,
   Credentials,
   DateKey,
   DaySummary,
   NewBooking,
+  ReminderSettings,
+  ReviewsPage,
   Session,
   SignupInput,
   SignupResult,
@@ -40,6 +45,22 @@ export interface Api {
   createBooking(booking: NewBooking): Promise<Booking>;
   setBookingStatus(bookingId: string, status: BookingStatus): Promise<Booking>;
   getMyBookings(): Promise<Booking[]>;
+  /** The customer edits their own pending/accepted booking; the store is notified. */
+  updateBooking(bookingId: string, changes: BookingChanges): Promise<Booking>;
+  /** The customer rates (or re-rates) their own accepted booking; the store is notified. */
+  rateBooking(bookingId: string, rating: BookingRating): Promise<BookingRating>;
+  /** A store's reviews, newest first, 10 per page. Public. */
+  getReviews(storeId: string, cursor?: string | null): Promise<ReviewsPage>;
+
+  /** The signed-in account's notifications (latest 50). */
+  getNotifications(): Promise<AppNotification[]>;
+  markNotificationsRead(ids: string[]): Promise<void>;
+
+  /** Accepted bookings from today on for the signed-in account (user: their bookings; store: its own). */
+  getReminderBookings(): Promise<Booking[]>;
+  /** The server copy of the reminder setting (kept for auditing). */
+  getReminderSettings(): Promise<ReminderSettings>;
+  saveReminderSettings(settings: ReminderSettings, platform: 'ios' | 'android' | 'web'): Promise<ReminderSettings>;
 
   updateStoreSettings(storeId: string, settings: StoreSettings): Promise<Store>;
   updateStoreProfile(storeId: string, profile: StoreProfile): Promise<Store>;

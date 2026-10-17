@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   FlatList,
   Modal,
@@ -22,6 +22,11 @@ const OPTION_HEIGHT = 52;
 export interface SelectOption<T extends string | number> {
   label: string;
   value: T;
+  /**
+   * A second, separate button at the end of the option's row (e.g. a store's rating that opens its
+   * reviews). It sits beside the option, never inside it, so buttons don't nest.
+   */
+  accessory?: { content: ReactNode; accessibilityLabel: string; onPress(): void };
 }
 
 type SelectProps<T extends string | number> = {
@@ -35,6 +40,8 @@ type SelectProps<T extends string | number> = {
   onCard?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Shown in the closed field after the selected label (e.g. the selected store's rating). */
+  fieldAccessory?: ReactNode;
 };
 
 /** Cross-platform dropdown: a field that opens a modal list (native pickers have no web support). */
@@ -48,6 +55,7 @@ export function Select<T extends string | number>({
   onCard = false,
   disabled = false,
   style,
+  fieldAccessory,
 }: SelectProps<T>) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
@@ -80,6 +88,7 @@ export function Select<T extends string | number>({
           style={[styles.fieldText, { color: selected ? fieldText : theme.textSecondary }]}>
           {selected?.label ?? placeholder}
         </ThemedText>
+        {selected ? fieldAccessory : null}
         <ThemedText aria-hidden style={{ color: fieldText }}>
           ▾
         </ThemedText>
@@ -113,7 +122,7 @@ export function Select<T extends string | number>({
               })}
               renderItem={({ item }) => {
                 const isSelected = item.value === value;
-                return (
+                const option = (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityState={{ selected: isSelected }}
@@ -123,15 +132,35 @@ export function Select<T extends string | number>({
                     }}
                     style={({ pressed }) => [
                       styles.option,
+                      item.accessory && styles.optionWithAccessory,
                       (isSelected || pressed) && { backgroundColor: theme.backgroundSelected },
                     ]}>
-                    <ThemedText type={isSelected ? 'smallBold' : 'small'}>{item.label}</ThemedText>
+                    <ThemedText type={isSelected ? 'smallBold' : 'small'} numberOfLines={1} style={styles.fieldText}>
+                      {item.label}
+                    </ThemedText>
                     {isSelected ? (
                       <ThemedText aria-hidden style={{ color: theme.primary }}>
                         ✓
                       </ThemedText>
                     ) : null}
                   </Pressable>
+                );
+                if (!item.accessory) return option;
+                const { accessory } = item;
+                return (
+                  <View style={[styles.optionRow, isSelected && { backgroundColor: theme.backgroundSelected }]}>
+                    {option}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={accessory.accessibilityLabel}
+                      onPress={() => {
+                        setOpen(false);
+                        accessory.onPress();
+                      }}
+                      style={({ pressed }) => [styles.accessory, pressed && { backgroundColor: theme.backgroundSelected }]}>
+                      {accessory.content}
+                    </Pressable>
+                  </View>
                 );
               }}
             />
@@ -185,6 +214,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  optionWithAccessory: {
+    flex: 1,
+  },
+  accessory: {
+    height: OPTION_HEIGHT,
+    justifyContent: 'center',
     paddingHorizontal: Spacing.three,
   },
 });

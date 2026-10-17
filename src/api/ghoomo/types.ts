@@ -18,6 +18,10 @@ export interface GhoomoLocation {
   is_auto_approval?: number | null;
   open_at?: string | null;
   close_at?: string | null;
+  is_dark_store?: number | null;
+  /** Average stars (1 decimal) and number of ratings; strings, null when unrated. */
+  rating_avg?: string | null;
+  rating_count?: string | null;
 }
 
 export interface GhoomoSettings {
@@ -28,6 +32,7 @@ export interface GhoomoSettings {
   is_auto_approval: number;
   open_at: string;
   close_at: string;
+  is_dark_store?: number;
 }
 
 export interface GhoomoProfile {
@@ -60,6 +65,33 @@ export interface GhoomoAppointment {
   end_time: string;
   cret_on: string | null;
   status: GhoomoStatus;
+  /** The customer's own rating, on the customer's event lists only. */
+  rtng_stars?: number | null;
+  rtng_review?: string | null;
+}
+
+/** GET /notifications row: a notification joined with its appointment. */
+export interface GhoomoNotification {
+  ntfy_id: string;
+  apntmnt_id: string | null;
+  kind: string;
+  text: string;
+  cret_on: string;
+  read_on: string | null;
+  appointment: GhoomoAppointment | null;
+}
+
+export interface GhoomoReviewsResponse {
+  reviews: { id: string; name: string; stars: number; review: string; createdAt: string }[];
+  nextCursor: string | null;
+  summary?: { average: number | null; count: number };
+}
+
+export interface GhoomoReminderSettings {
+  enabled: boolean;
+  hoursBefore: number;
+  platform: string | null;
+  updatedAt: string | null;
 }
 
 /** SHOP: day-of-month → "H:M" slot → counts. PLACE: day-of-month → counts. */

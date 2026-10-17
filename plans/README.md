@@ -82,3 +82,9 @@ These are the account rules for signup and login: unique store names with no spe
 A self-contained spec for rebuilding the web screens in the separate Next.js project, against that project's own API client. Copy it there along with `references/`.
 
 - [Next.js web-port spec](nextjs-web-port.md)
+
+## Bookings, notifications, ratings and reminders (branch `booking_features`)
+
+The web app's prompts 4–6 brought to iOS and Android, plus device reminders (an alarm-style notification with Snooze/Close).
+
+- [x] [Bookings, notifications, ratings and reminders](features-bookings-notifications-ratings-reminders.md)

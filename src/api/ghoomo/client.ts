@@ -19,17 +19,20 @@ import type {
   GhoomoCalendar,
   GhoomoLocation,
   GhoomoLocationClaims,
+  GhoomoNotification,
   GhoomoProfile,
+  GhoomoReminderSettings,
+  GhoomoReviewsResponse,
   GhoomoSettings,
   GhoomoUserClaims,
 } from '@/api/ghoomo/types';
 import { decodeJwt } from '@/lib/jwt';
 import { normalizeStoreName, storeKey } from '@/lib/store-name';
 import { parseDateKey } from '@/lib/date';
-import type { Booking, Session, Store, UserProfile } from '@/types/domain';
+import type { AppNotification, Booking, NotificationKind, Session, Store, UserProfile } from '@/types/domain';
 
 type RequestOptions = {
-  method?: 'GET' | 'POST' | 'PUT';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   /** Statuses that mean "nothing there" for this call; they resolve to `null` instead of throwing. */
   emptyOn?: number[];
@@ -124,6 +127,8 @@ export function createGhoomoApi(baseUrl: string): Api {
       name: row.loc_name,
       ...settingsToStore(settings?.locationList[0] ?? {}),
       profile: profileToStore(profile?.locationList[0]),
+      // The owner's own rating summary is on the Reviews screen (GET /reviews).
+      rating: { average: null, count: 0 },
     };
   }
 
@@ -239,7 +244,7 @@ export function createGhoomoApi(baseUrl: string): Api {
       const store = await findShop(input.storeId);
       const { userId } = claims<GhoomoUserClaims>();
       const createdAt = new Date().toISOString();
-      const res = await request<{ appointmentId: string }>('/appointment', {
+      const res = await request<{ appointmentId: string; status?: string }>('/appointment', {
         method: 'POST',
         body: {
           loc_id: store.id,
@@ -284,9 +289,10 @@ export function createGhoomoApi(baseUrl: string): Api {
         id: appointmentId,
         storeName: store.name,
         userId,
-        // New appointments always start PENDING on the server, even with auto-approve on.
-        status: 'pending',
+        // Auto-approving stores accept the booking on creation.
+        status: res!.status === 'ACCEPTED' ? 'accepted' : 'pending',
         createdAt,
+        rating: null,
       };
     },
 
@@ -306,6 +312,71 @@ export function createGhoomoApi(baseUrl: string): Api {
       const rows = lists.flatMap((res) => res?.data ?? []);
       const unique = new Map(rows.map((row) => [row.apntmnt_id, appointmentToBooking(row)]));
       return [...unique.values()];
+    },
+
+    async updateBooking(bookingId, changes) {
+      const res = await request<{ appointment: GhoomoAppointment }>(
+        `/appointment/${encodeURIComponent(bookingId)}`,
+        { method: 'PUT', body: changes },
+      );
+      return appointmentToBooking(res!.appointment);
+    },
+
+    async rateBooking(bookingId, rating) {
+      const res = await request<{ rating: { stars: number; review: string } }>(
+        `/appointment/${encodeURIComponent(bookingId)}/rating`,
+        { method: 'PUT', body: rating },
+      );
+      return { stars: res!.rating.stars, review: res!.rating.review ?? '' };
+    },
+
+    async getReviews(storeId, cursor) {
+      const query = new URLSearchParams({ limit: '10', ...(cursor ? { cursor } : {}) });
+      const res = await request<GhoomoReviewsResponse>(`/reviews/${encodeURIComponent(storeId)}?${query}`);
+      return {
+        reviews: res?.reviews ?? [],
+        nextCursor: res?.nextCursor ?? null,
+        ...(res?.summary ? { summary: res.summary } : {}),
+      };
+    },
+
+    async getNotifications(): Promise<AppNotification[]> {
+      const res = await request<{ notifications: GhoomoNotification[] }>('/notifications');
+      return (res?.notifications ?? []).map((n) => ({
+        id: n.ntfy_id,
+        kind: n.kind as NotificationKind,
+        text: n.text,
+        createdAt: n.cret_on,
+        read: Boolean(n.read_on),
+        booking: n.appointment ? appointmentToBooking(n.appointment) : null,
+      }));
+    },
+
+    async markNotificationsRead(ids) {
+      if (ids.length) await request('/notifications/read', { method: 'POST', body: { ids } });
+    },
+
+    // The events endpoints are scoped to the caller: a location token gets the store's own bookings.
+    async getReminderBookings() {
+      const lists = await Promise.all(
+        ['inprogress-events', 'coming-events'].map((range) => request<EventsResponse>(`/events/${range}`)),
+      );
+      const rows = lists.flatMap((res) => res?.data ?? []);
+      const unique = new Map(rows.map((row) => [row.apntmnt_id, appointmentToBooking(row)]));
+      return [...unique.values()].filter((b) => b.status === 'accepted');
+    },
+
+    async getReminderSettings() {
+      const res = await request<{ settings: GhoomoReminderSettings }>('/reminder-settings');
+      return { enabled: !!res?.settings.enabled, hoursBefore: res?.settings.hoursBefore ?? 1 };
+    },
+
+    async saveReminderSettings(settings, platform) {
+      const res = await request<{ settings: GhoomoReminderSettings }>('/reminder-settings', {
+        method: 'PUT',
+        body: { ...settings, platform },
+      });
+      return { enabled: !!res?.settings.enabled, hoursBefore: res?.settings.hoursBefore ?? settings.hoursBefore };
     },
 
     // Name and max-per-booking aren't stored by the API yet (see API_DEFAULTS); the rest is saved.

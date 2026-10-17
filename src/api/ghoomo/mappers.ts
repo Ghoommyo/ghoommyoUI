@@ -135,7 +135,7 @@ export function daySummaryFromCalendar(
   }));
 }
 
-type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at'>;
+type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store'>;
 /** Settings columns, which are null on browse rows for locations that never opened settings. */
 type SettingsInput = { [K in keyof SettingsFields]?: SettingsFields[K] | null };
 
@@ -148,6 +148,7 @@ export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'>
     autoApprove: row.is_auto_approval == null ? d.autoApprove : row.is_auto_approval === 1,
     openAt: row.open_at || d.openAt,
     closeAt: row.close_at || d.closeAt,
+    isDarkStore: row.is_dark_store === 1,
   };
 }
 
@@ -202,6 +203,10 @@ export function locationToStore(row: GhoomoLocation, profile?: GhoomoProfile | n
     name: row.loc_name,
     ...settingsToStore(row),
     profile: profileToStore(profile),
+    rating: {
+      average: row.rating_avg == null ? null : Number(row.rating_avg),
+      count: Number(row.rating_count ?? 0),
+    },
   };
 }
 
@@ -218,5 +223,6 @@ export function appointmentToBooking(row: GhoomoAppointment): Booking {
     description: row.bokng_desc ?? '',
     status: toStatus(row.status),
     createdAt: row.cret_on ?? '',
+    rating: row.rtng_stars ? { stars: Number(row.rtng_stars), review: row.rtng_review ?? '' } : null,
   };
 }

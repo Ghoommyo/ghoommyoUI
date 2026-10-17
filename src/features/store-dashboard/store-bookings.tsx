@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { SegmentedTabs, type Tab } from '@/components/ui/segmented-tabs';
+import { BookingDetailsModal } from '@/features/bookings/booking-details-modal';
 import { Spacing } from '@/constants/theme';
 import { useSetBookingStatus, useStoreBookings } from '@/hooks/queries';
 import type { Booking, BookingStatus, DateKey } from '@/types/domain';
@@ -26,9 +27,19 @@ const TAB_STATUS: Record<Exclude<TabKey, 'all'>, BookingStatus> = {
   rejected: 'rejected',
 };
 
-/** Bookings for the searched days, split by status, with accept/reject. */
-export function StoreBookings({ storeId, dates }: { storeId: string; dates: DateKey[] | null }) {
+type StoreBookingsProps = {
+  storeId: string;
+  /** Today until the store searches, then the searched days. */
+  dates: DateKey[];
+  /** What the list covers, e.g. "Today's bookings". */
+  caption: string;
+  isDarkStore?: boolean;
+};
+
+/** Bookings for the shown days, split by status, with accept/reject; tap a row for details. */
+export function StoreBookings({ storeId, dates, caption, isDarkStore }: StoreBookingsProps) {
   const [tab, setTab] = useState<TabKey>('open');
+  const [open, setOpen] = useState<Booking | null>(null);
   const bookings = useStoreBookings(storeId, dates);
   const setStatus = useSetBookingStatus();
 
@@ -67,23 +78,45 @@ export function StoreBookings({ storeId, dates }: { storeId: string; dates: Date
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <ThemedText type="default" style={styles.caption}>
+          {caption}
+        </ThemedText>
+        <Button
+          label="↻ Refresh"
+          variant="secondary"
+          size="sm"
+          accessibilityLabel="Refresh bookings"
+          loading={bookings.isFetching && !bookings.isLoading}
+          onPress={() => bookings.refetch()}
+        />
+      </View>
       <SegmentedTabs tabs={TABS} value={tab} onChange={setTab} />
       <Banner
         message={setStatus.isError ? { type: 'error', text: errorMessage(setStatus.error) } : null}
       />
-      {!dates ? (
-        <Empty text="Select days on the calendar and tap Search to see bookings." />
-      ) : bookings.isLoading ? (
+      {bookings.isLoading ? (
         <ActivityIndicator style={styles.empty} />
       ) : bookings.isError ? (
         <Banner message={{ type: 'error', text: errorMessage(bookings.error) }} />
       ) : visible.length === 0 ? (
-        <Empty text="No bookings here for the selected days." />
+        <Empty text={caption === "Today's bookings" ? 'No bookings here for today.' : 'No bookings here for the selected days.'} />
       ) : (
         visible.map((b) => (
-          <EventCard key={b.id} booking={b} title={b.name} actions={renderActions(b)} />
+          <EventCard
+            key={b.id}
+            booking={b}
+            title={b.name}
+            subtitle={b.mobile || undefined}
+            showPeople={!isDarkStore}
+            actions={renderActions(b)}
+            onPress={() => setOpen(b)}
+          />
         ))
       )}
+      {open ? (
+        <BookingDetailsModal booking={open} viewer="store" isDarkStore={isDarkStore} onClose={() => setOpen(null)} />
+      ) : null}
     </View>
   );
 }
@@ -99,6 +132,16 @@ function Empty({ text }: { text: string }) {
 const styles = StyleSheet.create({
   container: {
     gap: Spacing.three,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  caption: {
+    flex: 1,
+    fontWeight: 700,
   },
   empty: {
     textAlign: 'center',

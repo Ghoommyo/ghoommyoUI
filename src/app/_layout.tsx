@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ApiError } from '@/api';
 import { SessionProvider, useSession } from '@/auth/session';
 import { Colors } from '@/constants/theme';
+import { ReminderSync } from '@/features/reminders/reminder-sync';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 SplashScreen.preventAutoHideAsync();
@@ -33,6 +34,7 @@ export default function RootLayout() {
         <SessionProvider>
           <QueryProvider>
             <RootNavigator />
+            <ReminderSync />
           </QueryProvider>
         </SessionProvider>
       </ThemeProvider>

@@ -1,8 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/api';
 import { useSession } from '@/auth/session';
 import type {
+  BookingChanges,
+  BookingRating,
   BookingStatus,
   DateKey,
   NewBooking,
@@ -22,6 +24,9 @@ export const queryKeys = {
     ['stores', storeId, 'bookings', dates] as const,
   myBookings: (accountId: string) => ['me', accountId, 'bookings'] as const,
   myProfile: (accountId: string) => ['me', accountId, 'profile'] as const,
+  storeReviews: (storeId: string) => ['stores', storeId, 'reviews'] as const,
+  notifications: (accountId: string) => ['me', accountId, 'notifications'] as const,
+  reminderBookings: (accountId: string) => ['me', accountId, 'reminder-bookings'] as const,
 };
 
 export function useStores() {
@@ -126,5 +131,69 @@ export function useUpdateMyProfile() {
     mutationFn: (profile: UserProfile) => api.updateUserProfile(profile),
     onSuccess: (profile) =>
       queryClient.setQueryData(queryKeys.myProfile(session?.accountId ?? ''), profile),
+  });
+}
+
+/** The customer edits their own booking; refreshes the store's lists and the customer's own. */
+export function useUpdateBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, changes }: { bookingId: string; changes: BookingChanges }) =>
+      api.updateBooking(bookingId, changes),
+    onSuccess: (booking) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useRateBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, rating }: { bookingId: string; storeId: string; rating: BookingRating }) =>
+      api.rateBooking(bookingId, rating),
+    onSuccess: (_rating, { storeId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.stores });
+      queryClient.invalidateQueries({ queryKey: queryKeys.storeReviews(storeId) });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+/** A store's reviews, 10 per page; `fetchNextPage()` loads more. */
+export function useStoreReviews(storeId: string | undefined) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.storeReviews(storeId ?? ''),
+    queryFn: ({ pageParam }) => api.getReviews(storeId!, pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
+    enabled: !!storeId,
+  });
+}
+
+/** Notifications load only while `enabled` (the panel is open) and on explicit refetch. No polling. */
+export function useNotifications(enabled: boolean) {
+  const { session } = useSession();
+  return useQuery({
+    queryKey: queryKeys.notifications(session?.accountId ?? ''),
+    queryFn: () => api.getNotifications(),
+    enabled: enabled && !!session,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+}
+
+export function useMarkNotificationsRead() {
+  return useMutation({ mutationFn: (ids: string[]) => api.markNotificationsRead(ids) });
+}
+
+/** Accepted bookings from today on, for scheduling reminders (native only). */
+export function useReminderBookings(enabled: boolean) {
+  const { session } = useSession();
+  return useQuery({
+    queryKey: queryKeys.reminderBookings(session?.accountId ?? ''),
+    queryFn: () => api.getReminderBookings(),
+    enabled: enabled && !!session,
   });
 }
