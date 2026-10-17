@@ -88,3 +88,9 @@ A self-contained spec for rebuilding the web screens in the separate Next.js pro
 The web app's prompts 4–6 brought to iOS and Android, plus device reminders (an alarm-style notification with Snooze/Close).
 
 - [x] [Bookings, notifications, ratings and reminders](features-bookings-notifications-ratings-reminders.md)
+
+## Store services (branch `store_services`)
+
+Stores offer priced services; users pick them, with quantities, before submitting a booking request.
+
+- [x] [Store services](store-services.md)

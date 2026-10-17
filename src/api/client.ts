@@ -10,12 +10,14 @@ import type {
   NewBooking,
   ReminderSettings,
   ReviewsPage,
+  ServiceInput,
   Session,
   SignupInput,
   SignupResult,
   Slot,
   Store,
   StoreProfile,
+  StoreService,
   StoreSettings,
   UserProfile,
 } from '@/types/domain';
@@ -41,6 +43,12 @@ export interface Api {
   /** `month` is 0-based. */
   getStoreMonthSummary(storeId: string, year: number, month: number): Promise<DaySummary[]>;
   getStoreBookings(storeId: string, dates: DateKey[]): Promise<Booking[]>;
+  /** A store's active services, in the order they were added. Public. */
+  getStoreServices(storeId: string): Promise<StoreService[]>;
+  /** Owner only, like the other store updates. */
+  createService(storeId: string, input: ServiceInput): Promise<StoreService>;
+  updateService(storeId: string, serviceId: string, input: ServiceInput): Promise<StoreService>;
+  deleteService(storeId: string, serviceId: string): Promise<void>;
 
   createBooking(booking: NewBooking): Promise<Booking>;
   setBookingStatus(bookingId: string, status: BookingStatus): Promise<Booking>;

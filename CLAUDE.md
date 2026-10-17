@@ -59,6 +59,10 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
   - **Endpoints:** `PUT /appointment/{id}` (customer edit: message appended below `=====`, people, mobile), `PUT /appointment/{id}/rating`, `GET /reviews/{locId}` (10 per page, `nextCursor`), `GET /notifications` + `POST /notifications/read`, and `GET/PUT /reminder-settings` (append-only server audit copy).
   - **Server-driven behaviour:** new bookings take their status from the server (auto-approve), and the server rejects bookings without a description.
   - **Real backend:** the Next.js `ghoomo` repo (`improved_screens`) serves all of these. Its `docs/API.md` §5.6–5.6b is the reference, and it runs locally on :3000 (`npm run dev` there).
+- **Store services** (branch `store_services`, plan `plans/store-services.md`):
+  - **Endpoints:** public `GET /services/{locId}`; owner `GET/POST /location/{locCode}/services` and `PUT/DELETE …/{svcId}`; the `maxServiceQty` setting (`max_svc_qty`); `services: [{svc_id, qty}]` on `POST /appointment`, snapshotted on booking rows (`Api.md` §5.4a).
+  - **Limit per booking:** `service.maxQty ?? store.maxServiceQty` (both default 1); no cap on the total.
+  - **Flow:** the dashboard's **Services** modal → **Submit request** passes picks as the `services` route param (`id:qty,…`, `src/lib/services.ts`) → the booking form prefills the description with the numbered services and total, and sends them as structured data too.
 - **API gaps:** the API has nowhere to store store name edits, max per booking, state, map coordinates, or the user's name and mobile. Usernames at signup and store login by email aren't supported either. They use `API_DEFAULTS` or session-only values, and are read-only in the UI when the flag is on. Wire each one through when the API supports it.
 
 ### Session and auth

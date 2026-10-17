@@ -87,6 +87,9 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 | 26  | GET    | `/traveller/upcoming`          | User                 | Customer's PLACE events starting after today         |
 | 27  | GET    | `/traveller/progress`          | User                 | Customer's PLACE events in progress today            |
 | 28  | GET    | `/traveller/completed`         | User                 | Customer's past PLACE events                         |
+| 29  | GET    | `/services/{locationId}`       | none                 | A location's active services (§5.4a)                 |
+| 30  | GET, POST | `/location/{locCode}/services` | Location (own)    | List / add services                                  |
+| 31  | PUT, DELETE | `/location/{locCode}/services/{serviceId}` | Location (own) | Replace / soft-delete a service          |
 
 **Do not use:** `GET /shop/{shopCode}`, `GET|PUT /shop/profile`, `GET|PUT /shop/settings`. These are broken legacy copies of the `/location/{locCode}/*` routes and respond 403 to location tokens. Use rows 9–13 instead.
 
@@ -395,7 +398,7 @@ All fields are optional. Omitted fields keep their current values, while `0` and
 
 ```bash
 curl -X PUT "$BASE/location/raju_tailor/settings" -H "Authorization: $LOC_TOKEN" -H "Content-Type: application/json" \
-  -d '{"maxLimit":5,"limitUnit":"HOUR","isAutoApprove":0,"openAt":"10:00","closeAt":"18:00"}'
+  -d '{"maxLimit":5,"limitUnit":"HOUR","isAutoApprove":0,"openAt":"10:00","closeAt":"18:00","maxServiceQty":2}'
 ```
 
 | Field            | Type      | Notes                                              |
@@ -404,9 +407,56 @@ curl -X PUT "$BASE/location/raju_tailor/settings" -H "Authorization: $LOC_TOKEN"
 | limitUnit        | string    | `DAY` / `HOUR`                                     |
 | isAutoApprove    | 0 \| 1    |                                                    |
 | openAt / closeAt | `"HH:MM"` | 24-hour; the booking UI limits slots to this range |
+| maxServiceQty    | integer ≥ 1 | default quantity of each service per booking, for services without their own `maxQty` (column `max_svc_qty`, default 1; also on `GET /location` rows) |
 
 - 200 `{"settings":{ ...same fields as GET... }}`
+- 400 `{"error":"maxServiceQty must be a whole number of at least 1"}`
 - 404 `{"error":"Location settings not found, call GET first to create defaults"}`
+
+### 5.4a Services (add-ons)
+
+A location's priced services that a customer can add to an appointment (backend migration `002_services.sql`).
+
+**Service object**
+
+```json
+{"id":"c4753b3f-...","name":"Haircut","description":"Classic cut and wash","price":200,
+ "imageUrl":"https://img.example/cut.jpg","maxQty":null,"effectiveMaxQty":2}
+```
+
+- `maxQty` is the service's own per-booking limit, or `null` to use the location's `maxServiceQty` setting.
+- `effectiveMaxQty` is the limit that applies: `maxQty ?? maxServiceQty ?? 1`.
+- `description` and `imageUrl` are `""` when unset. Lists are ordered by creation time; number the items in that order.
+
+#### GET /services/{locationId}
+
+Public. The location's active services: 200 `{"services":[ ...service objects... ]}` (an empty array when there are none).
+
+#### GET /location/{locCode}/services · POST /location/{locCode}/services
+
+Owner list (same shape as the public one) and create. `{locCode}` must equal the token's `locCode` (403 otherwise; a user token also gets 403).
+
+```bash
+curl -X POST "$BASE/location/raju_tailor/services" -H "Authorization: $LOC_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"Haircut","description":"Classic cut and wash","price":200,"imageUrl":"https://img.example/cut.jpg","maxQty":null}'
+```
+
+| Field       | Type                 | Req | Notes                                         |
+| ----------- | -------------------- | --- | --------------------------------------------- |
+| name        | string               | ✔   |                                               |
+| price       | number ≥ 0           | ✔   | rounded to 2 decimals                         |
+| description | string               |     |                                               |
+| imageUrl    | string               |     | empty, or starts with `http://` / `https://`  |
+| maxQty      | integer ≥ 1 \| null  |     | null/omitted = location default               |
+
+- 201 `{"service":{ ...service object... }}`
+- 400 `{"error":"name is required"}` / `{"error":"price must be a number of at least 0"}` / `{"error":"maxQty must be empty or a whole number of at least 1"}` / `{"error":"imageUrl must start with http:// or https://"}`
+
+#### PUT /location/{locCode}/services/{serviceId} · DELETE …
+
+PUT takes the same body as POST and replaces all fields. DELETE is a soft delete; appointments keep their snapshot.
+
+- PUT 200 `{"service":{...}}` · DELETE 200 `{"message":"Service deleted"}` · 404 `{"error":"Service not found"}` (unknown, already deleted, or another location's)
 
 ---
 
@@ -497,9 +547,10 @@ curl -X POST "$BASE/appointment" -H "Authorization: $USER_TOKEN" -H "Content-Typ
 | bokng_mobile   | string                |     | stored as `mobile_number` |
 | bokng_cnt      | number                |     | number of people          |
 | bokng_desc     | string                |     |                           |
+| services       | array of `{svc_id, qty}` | | add-ons (§5.4a); each one of the location's active services, listed once, with `1 ≤ qty ≤ effectiveMaxQty`. Saved as a snapshot of name and price |
 
 - 201 `{"message":"Appointment added successfully","appointmentId":"60834c7e-ca6b-4b13-a724-c27df35feec8"}`
-- 400 `{"error":"Missing required fields"}` / `{"error":"Invalid apntmnt_time"}` · 401
+- 400 `{"error":"Missing required fields"}` / `{"error":"Invalid apntmnt_time"}` / `{"error":"qty for Haircut must be between 1 and 2"}` / `{"error":"services contains a service this location doesn't offer"}` · 401
 
 **Appointment object** (returned by the list endpoints and the PUT):
 
@@ -524,11 +575,12 @@ curl -X POST "$BASE/appointment" -H "Authorization: $USER_TOKEN" -H "Content-Typ
   "status": "PENDING",
   "status_updt_by": null,
   "status_updt_on": null,
-  "updt_reason": null
+  "updt_reason": null,
+  "services": [{ "svc_id": "c4753b3f-...", "name": "Haircut", "price": 200, "qty": 2 }]
 }
 ```
 
-`bokng_cnt` comes back as a string.
+`bokng_cnt` comes back as a string. `services` is the snapshot of booked add-ons (name and price at booking time), or `null`.
 
 #### PUT /appointment
 

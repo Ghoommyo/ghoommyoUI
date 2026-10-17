@@ -19,6 +19,7 @@ export interface GhoomoLocation {
   open_at?: string | null;
   close_at?: string | null;
   is_dark_store?: number | null;
+  max_svc_qty?: number | null;
   /** Average stars (1 decimal) and number of ratings; strings, null when unrated. */
   rating_avg?: string | null;
   rating_count?: string | null;
@@ -33,6 +34,28 @@ export interface GhoomoSettings {
   open_at: string;
   close_at: string;
   is_dark_store?: number;
+  /** Default quantity of each service per booking (services without their own limit). */
+  max_svc_qty?: number;
+}
+
+/** A location's service (Api.md §5.4a). Already camelCase on the wire. */
+export interface GhoomoService {
+  id: string;
+  name: string;
+  description: string;
+  price: number | string;
+  imageUrl: string;
+  /** The service's own limit; null = the location's `max_svc_qty`. */
+  maxQty: number | null;
+  effectiveMaxQty: number;
+}
+
+/** Snapshot of a booked service on an appointment row. */
+export interface GhoomoBookedService {
+  svc_id: string;
+  name: string;
+  price: number | string;
+  qty: number;
 }
 
 export interface GhoomoProfile {
@@ -68,6 +91,8 @@ export interface GhoomoAppointment {
   /** The customer's own rating, on the customer's event lists only. */
   rtng_stars?: number | null;
   rtng_review?: string | null;
+  /** Booked services, or null when none (or for bookings made before services existed). */
+  services?: GhoomoBookedService[] | null;
 }
 
 /** GET /notifications row: a notification joined with its appointment. */

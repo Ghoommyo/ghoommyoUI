@@ -9,7 +9,9 @@ import type {
   ReminderSettings,
   Review,
   Role,
+  ServiceInput,
   Store,
+  StoreService,
   UserProfile,
 } from '@/types/domain';
 
@@ -68,6 +70,7 @@ const stores: StoreRecord[] = [
     autoApprove: false,
     openAt: '09:00',
     closeAt: '22:00',
+    maxServiceQty: 2,
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -88,6 +91,7 @@ const stores: StoreRecord[] = [
     autoApprove: true,
     openAt: '10:00',
     closeAt: '19:00',
+    maxServiceQty: 1,
     profile: {
       address: '45 Vijay Nagar',
       pin: '452010',
@@ -108,6 +112,7 @@ const stores: StoreRecord[] = [
     autoApprove: true,
     openAt: '07:00',
     closeAt: '21:00',
+    maxServiceQty: 1,
     profile: {
       address: '8 Palasia Square',
       pin: '452001',
@@ -145,10 +150,57 @@ function seedBookings(): Booking[] {
     status,
     createdAt: new Date().toISOString(),
     rating: null,
+    services: [],
   }));
 }
 
 const bookings: Booking[] = seedBookings();
+
+/** Services as kept in memory; the effective `maxQty` is worked out from the store when read. */
+interface StoredService extends Omit<StoreService, 'maxQty'> {
+  storeId: string;
+}
+
+const services: StoredService[] = [
+  ['s1', 'Blouse stitching', 'Lined blouse, fitted to your measurements', 450, null],
+  ['s1', 'Kurta alteration', 'Take in, let out or shorten', 150, null],
+  ['s1', 'Hemming', 'Trousers, skirts or sarees', 80, 1],
+  ['s1', 'Express delivery', 'Ready the next day', 200, 1],
+  ['s2', 'Haircut', 'Classic cut and wash', 200, null],
+  ['s2', 'Beard trim', '', 100, null],
+].map(([storeId, name, description, price, maxQtyOverride], i) => ({
+  id: `svc${i + 1}`,
+  storeId: storeId as string,
+  name: name as string,
+  description: description as string,
+  price: price as number,
+  imageUrl: '',
+  maxQtyOverride: maxQtyOverride as number | null,
+}));
+
+function withMaxQty({ storeId, ...service }: StoredService): StoreService {
+  return { ...service, maxQty: service.maxQtyOverride ?? findStore(storeId).maxServiceQty };
+}
+
+/** The same rules as the server (Api.md §5.4a). */
+function checkServiceInput(input: ServiceInput): ServiceInput {
+  const name = input.name.trim();
+  if (!name) throw new ApiError('name is required', 400);
+  if (!Number.isFinite(input.price) || input.price < 0) throw new ApiError('price must be a number of at least 0', 400);
+  if (input.maxQty !== null && (!Number.isInteger(input.maxQty) || input.maxQty < 1)) {
+    throw new ApiError('maxQty must be empty or a whole number of at least 1', 400);
+  }
+  const imageUrl = input.imageUrl.trim();
+  if (imageUrl && !/^https?:\/\//.test(imageUrl)) throw new ApiError('imageUrl must start with http:// or https://', 400);
+  return { ...input, name, description: input.description.trim(), imageUrl, price: Math.round(input.price * 100) / 100 };
+}
+
+function findOwnService(storeId: string, serviceId: string): StoredService {
+  requireStoreOwner(storeId);
+  const service = services.find((svc) => svc.id === serviceId && svc.storeId === storeId);
+  if (!service) throw new ApiError('Service not found', 404);
+  return service;
+}
 
 interface StoredReview extends Review {
   storeId: string;
@@ -265,6 +317,7 @@ export const mockApi: Api = {
       autoApprove: false,
       openAt: '09:00',
       closeAt: '18:00',
+      maxServiceQty: 1,
       profile: {
         address: '',
         pin: '',
@@ -353,6 +406,35 @@ export const mockApi: Api = {
     );
   },
 
+  async getStoreServices(storeId) {
+    await delay();
+    findStore(storeId);
+    return clone(services.filter((svc) => svc.storeId === storeId).map(withMaxQty));
+  },
+
+  async createService(storeId, input) {
+    await delay();
+    requireStoreOwner(storeId);
+    const { maxQty, ...fields } = checkServiceInput(input);
+    const service: StoredService = { ...fields, id: newId('svc'), storeId, maxQtyOverride: maxQty };
+    services.push(service);
+    return clone(withMaxQty(service));
+  },
+
+  async updateService(storeId, serviceId, input) {
+    await delay();
+    const service = findOwnService(storeId, serviceId);
+    const { maxQty, ...fields } = checkServiceInput(input);
+    Object.assign(service, fields, { maxQtyOverride: maxQty });
+    return clone(withMaxQty(service));
+  },
+
+  async deleteService(storeId, serviceId) {
+    await delay();
+    const service = findOwnService(storeId, serviceId);
+    services.splice(services.indexOf(service), 1);
+  },
+
   async createBooking(input) {
     await delay();
     const account = currentAccount();
@@ -364,8 +446,21 @@ export const mockApi: Api = {
     if (input.people < 1 || input.people > store.maxPerBooking) {
       throw new ApiError(`${store.name} allows 1–${store.maxPerBooking} people per booking.`, 400);
     }
+    // Booked services: each one the store's, listed once, within its limit. Name and price are snapshotted.
+    const ids = new Set<string>();
+    const booked = input.services.map(({ serviceId, qty }) => {
+      const stored = services.find((svc) => svc.id === serviceId && svc.storeId === store.id);
+      if (!stored || ids.has(serviceId)) throw new ApiError("services contains a service this location doesn't offer", 400);
+      ids.add(serviceId);
+      const { maxQty } = withMaxQty(stored);
+      if (!Number.isInteger(qty) || qty < 1 || qty > maxQty) {
+        throw new ApiError(`qty for ${stored.name} must be between 1 and ${maxQty}`, 400);
+      }
+      return { serviceId, name: stored.name, price: stored.price, qty };
+    });
     const booking: Booking = {
       ...input,
+      services: booked,
       id: newId('b'),
       storeName: store.name,
       userId: account.id,

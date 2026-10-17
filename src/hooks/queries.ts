@@ -8,6 +8,7 @@ import type {
   BookingStatus,
   DateKey,
   NewBooking,
+  ServiceInput,
   StoreProfile,
   StoreSettings,
   UserProfile,
@@ -25,6 +26,7 @@ export const queryKeys = {
   myBookings: (accountId: string) => ['me', accountId, 'bookings'] as const,
   myProfile: (accountId: string) => ['me', accountId, 'profile'] as const,
   storeReviews: (storeId: string) => ['stores', storeId, 'reviews'] as const,
+  storeServices: (storeId: string) => ['stores', storeId, 'services'] as const,
   notifications: (accountId: string) => ['me', accountId, 'notifications'] as const,
   reminderBookings: (accountId: string) => ['me', accountId, 'reminder-bookings'] as const,
 };
@@ -63,6 +65,40 @@ export function useStoreBookings(storeId: string | undefined, dates: DateKey[] |
     queryKey: queryKeys.storeBookings(storeId ?? '', dates ?? []),
     queryFn: () => api.getStoreBookings(storeId!, dates!),
     enabled: !!storeId && !!dates && dates.length > 0,
+  });
+}
+
+export function useStoreServices(storeId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.storeServices(storeId ?? ''),
+    queryFn: () => api.getStoreServices(storeId!),
+    enabled: !!storeId,
+  });
+}
+
+/** Service edits refresh every store query, including the services lists. */
+export function useCreateService(storeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ServiceInput) => api.createService(storeId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.stores }),
+  });
+}
+
+export function useUpdateService(storeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serviceId, input }: { serviceId: string; input: ServiceInput }) =>
+      api.updateService(storeId, serviceId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.stores }),
+  });
+}
+
+export function useDeleteService(storeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (serviceId: string) => api.deleteService(storeId, serviceId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.stores }),
   });
 }
 

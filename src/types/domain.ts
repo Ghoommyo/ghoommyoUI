@@ -52,6 +52,8 @@ export interface StoreSettings {
   closeAt: string;
   /** No dine-in: bookings are orders, so the head count can't change. Read-only in the app. */
   isDarkStore?: boolean;
+  /** How many of each service a booking may include, for services without their own limit. */
+  maxServiceQty: number;
 }
 
 export interface StoreProfile {
@@ -80,6 +82,43 @@ export interface Store extends StoreSettings {
   rating: RatingSummary;
 }
 
+/** A priced add-on a store offers (e.g. "Haircut ₹200"). */
+export interface StoreService {
+  id: string;
+  name: string;
+  /** `''` when unset. */
+  description: string;
+  /** INR. */
+  price: number;
+  /** `''` when unset; a placeholder image is shown then. */
+  imageUrl: string;
+  /** The service's own per-booking limit; null uses the store's `maxServiceQty`. */
+  maxQtyOverride: number | null;
+  /** The limit that applies: `maxQtyOverride ?? maxServiceQty`. */
+  maxQty: number;
+}
+
+/** What a store enters to add or edit a service. */
+export interface ServiceInput {
+  name: string;
+  description: string;
+  price: number;
+  imageUrl: string;
+  /** null = the store default. */
+  maxQty: number | null;
+}
+
+/** Service id → quantity picked for a booking. */
+export type ServicePicks = Record<string, number>;
+
+/** A service as booked: name and price at booking time. */
+export interface BookedService {
+  serviceId: string;
+  name: string;
+  price: number;
+  qty: number;
+}
+
 export interface UserProfile {
   name: string;
   mobile: string;
@@ -99,6 +138,8 @@ export interface Booking {
   createdAt: string;
   /** The customer's own rating; only on the customer's bookings. */
   rating: BookingRating | null;
+  /** Services added to the booking; empty when none. */
+  services: BookedService[];
 }
 
 export interface BookingRating {
@@ -159,6 +200,7 @@ export interface NewBooking {
   mobile: string;
   people: number;
   description: string;
+  services: BookedService[];
 }
 
 export interface Slot {

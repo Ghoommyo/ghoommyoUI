@@ -23,16 +23,18 @@ const LIMIT_UNITS: SelectOption<LimitUnit>[] = [
   { label: 'Half hour', value: 'halfHour' },
 ];
 
-type Draft = Omit<StoreSettings, 'maxPerSlot' | 'maxPerBooking'> & {
+type Draft = Omit<StoreSettings, 'maxPerSlot' | 'maxPerBooking' | 'maxServiceQty'> & {
   maxPerSlot: string;
   maxPerBooking: string;
+  maxServiceQty: string;
 };
-type FieldErrors = Partial<Record<'name' | 'maxPerSlot' | 'maxPerBooking' | 'closeAt', string>>;
+type FieldErrors = Partial<Record<'name' | 'maxPerSlot' | 'maxPerBooking' | 'maxServiceQty' | 'closeAt', string>>;
 
 const toDraft = (store: Store): Draft => ({
   name: store.name,
   maxPerSlot: String(store.maxPerSlot),
   maxPerBooking: String(store.maxPerBooking),
+  maxServiceQty: String(store.maxServiceQty),
   limitUnit: store.limitUnit,
   autoApprove: store.autoApprove,
   openAt: store.openAt,
@@ -56,20 +58,22 @@ export function StoreSettingsForm({ store }: { store: Store }) {
   const save = () => {
     const maxPerSlot = positiveInt(draft.maxPerSlot);
     const maxPerBooking = positiveInt(draft.maxPerBooking);
+    const maxServiceQty = positiveInt(draft.maxServiceQty);
     const next: FieldErrors = {
       name: draft.name.trim() ? undefined : 'Store name is required.',
       maxPerSlot: maxPerSlot ? undefined : 'Enter a whole number of at least 1.',
       maxPerBooking: maxPerBooking ? undefined : 'Enter a whole number of at least 1.',
+      maxServiceQty: maxServiceQty ? undefined : 'Enter a whole number of at least 1.',
       closeAt:
         toMinutes(draft.closeAt) > toMinutes(draft.openAt)
           ? undefined
           : 'Closing time must be after opening time.',
     };
     setErrors(next);
-    if (!maxPerSlot || !maxPerBooking || Object.values(next).some(Boolean)) return;
+    if (!maxPerSlot || !maxPerBooking || !maxServiceQty || Object.values(next).some(Boolean)) return;
 
     update.mutate(
-      { ...draft, name: draft.name.trim(), maxPerSlot, maxPerBooking },
+      { ...draft, name: draft.name.trim(), maxPerSlot, maxPerBooking, maxServiceQty },
       {
         onSuccess: () => setMessage({ type: 'success', text: 'Settings saved.' }),
         onError: (error) => setMessage({ type: 'error', text: errorMessage(error) }),
@@ -120,6 +124,14 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         keyboardType="number-pad"
         editable={!USE_REAL_API}
         hint={USE_REAL_API ? NOT_SAVED_HINT : undefined}
+      />
+      <TextField
+        label="Max of each service per booking"
+        value={draft.maxServiceQty}
+        onChangeText={(v) => set('maxServiceQty', v)}
+        error={errors.maxServiceQty}
+        keyboardType="number-pad"
+        hint="Used for services without their own limit."
       />
       <View style={styles.row}>
         <Select

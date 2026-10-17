@@ -10,6 +10,7 @@ import { Banner } from '@/components/ui/banner';
 import { Screen } from '@/components/ui/screen';
 import { Spacing } from '@/constants/theme';
 import { ReminderSettingsSection } from '@/features/reminders/reminder-settings-form';
+import { StoreServices } from '@/features/settings/store-services';
 import { StoreSettingsForm } from '@/features/settings/store-settings-form';
 import { useStore } from '@/hooks/queries';
 
@@ -30,7 +31,12 @@ function StoreSettings({ storeId }: { storeId: string }) {
   const store = useStore(storeId);
   if (store.isLoading) return <ActivityIndicator />;
   if (!store.data) return <Banner message={{ type: 'error', text: errorMessage(store.error) }} />;
-  return <StoreSettingsForm store={store.data} />;
+  return (
+    <>
+      <StoreSettingsForm store={store.data} />
+      <StoreServices store={store.data} />
+    </>
+  );
 }
 
 function UserSettings() {
