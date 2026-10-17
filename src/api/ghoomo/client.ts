@@ -284,8 +284,8 @@ export function createGhoomoApi(baseUrl: string): Api {
       const store = await findShop(input.storeId);
       const { userId } = claims<GhoomoUserClaims>();
       const createdAt = new Date().toISOString();
-      // A dark-store booking is one order, whatever the head count.
-      const count = store.isDarkStore ? 1 : input.people;
+      // A dark-store order or a home visit counts as one, whatever the head count.
+      const count = store.isDarkStore || input.orderType === 'homeVisit' ? 1 : input.people;
       const res = await request<{ appointmentId: string; status?: string; orderType?: string }>('/appointment', {
         method: 'POST',
         body: {

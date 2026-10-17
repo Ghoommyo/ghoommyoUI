@@ -396,7 +396,7 @@ route('POST', /^\/appointment$/, 'any', ({ claims, body }) => {
   if (!allowed.includes(orderType)) {
     return [400, { error: `This store takes ${allowed.length > 1 ? `${allowed.slice(0, -1).join(', ')} or ${allowed.at(-1)}` : allowed[0]} bookings` }];
   }
-  const appt = addAppointment({ ...body, services: booked, order_type: orderType, bokng_cnt: dark ? 1 : body.bokng_cnt }, claims.userId);
+  const appt = addAppointment({ ...body, services: booked, order_type: orderType, bokng_cnt: dark || orderType === 'HOME_VISIT' ? 1 : body.bokng_cnt }, claims.userId);
   // Auto-approving locations (the default for new settings) accept on creation.
   const auto = Number(stng?.is_auto_approval ?? 1) === 1;
   if (auto) Object.assign(appt, { status: 'ACCEPTED', status_updt_by: 'SYSTEM', status_updt_on: now() });
@@ -426,6 +426,7 @@ route('PUT', /^\/appointment\/([^/]+)$/, 'any', ({ claims, params, body }) => {
   if (!/^\+?\d{10,15}$/.test(String(mobile).replace(/[\s-]/g, ''))) return [400, { error: 'mobile must be a valid phone number' }];
   const parts = [message && 'sent a message', people !== current && `changed the booking to ${people} ${people === 1 ? 'person' : 'people'}`, mobile !== appt.mobile_number && 'updated their mobile number'].filter(Boolean);
   if (!parts.length) return [400, { error: 'Nothing to change' }];
+  if (people !== current && appt.order_type === 'HOME_VISIT') return [400, { error: "Home visits don't have a number of people" }];
   if (people !== current && Number(settings.get(appt.loc_id)?.is_dark_store ?? 0) === 1) {
     return [400, { error: "This store takes orders; the number of people can't change" }];
   }

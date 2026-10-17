@@ -43,18 +43,23 @@ export function orderTypeOptions(store: OrderTypeStore): { label: string; value:
 
 export const defaultOrderType = (store: OrderTypeStore): OrderType => orderTypeChoices(store)[0];
 
+/** Whether a booking asks how many people are coming: not at dark stores (orders) and not for home visits. */
+export const asksPeople = (isDarkStore: boolean | undefined, orderType: OrderType | null) =>
+  !isDarkStore && orderType !== 'homeVisit';
+
 /**
- * Whether a booking shows its head count: not for dark-store orders (always 1),
+ * Whether a booking shows its head count: not for dark-store orders or home visits (always 1),
  * but yes for bookings made before the store went dark (no type, table or appointment).
  */
 export const showsPeople = (
   booking: Pick<Booking, 'orderType'>,
   isDarkStore: boolean | undefined,
 ) =>
-  !isDarkStore ||
-  booking.orderType === null ||
-  booking.orderType === 'table' ||
-  booking.orderType === 'appointment';
+  booking.orderType !== 'homeVisit' &&
+  (!isDarkStore ||
+    booking.orderType === null ||
+    booking.orderType === 'table' ||
+    booking.orderType === 'appointment');
 
 /** What a slot or day counts: orders at dark stores, visitors elsewhere. */
 export const countNoun = (isDarkStore: boolean | undefined, n: number) =>

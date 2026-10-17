@@ -480,8 +480,8 @@ export const mockApi: Api = {
     if (input.slotStart.slice(0, 10) < todayKey()) {
       throw new ApiError('You cannot book a date in the past.', 400);
     }
-    // Dark stores take orders: each booking counts as 1, whatever the head count.
-    const people = store.isDarkStore ? 1 : input.people;
+    // Dark-store orders and home visits count as 1, whatever the head count.
+    const people = store.isDarkStore || input.orderType === 'homeVisit' ? 1 : input.people;
     if (people < 1 || people > store.maxPerBooking) {
       throw new ApiError(`${store.name} allows 1–${store.maxPerBooking} people per booking.`, 400);
     }
@@ -559,6 +559,9 @@ export const mockApi: Api = {
     const peopleChanged = people !== booking.people;
     const mobileChanged = mobile !== booking.mobile;
     if (!message && !peopleChanged && !mobileChanged) throw new ApiError('Nothing to change', 400);
+    if (peopleChanged && booking.orderType === 'homeVisit') {
+      throw new ApiError("Home visits don't have a number of people", 400);
+    }
     if (peopleChanged && store.isDarkStore) {
       throw new ApiError("This store takes orders; the number of people can't change", 400);
     }

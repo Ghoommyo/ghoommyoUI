@@ -114,3 +114,11 @@ Branch `notifications_service_types` (from `catalog_type`). The Next.js repo's `
   - Playwright on the web build: the real backend (store and user) and the dummy backend
   - Android (Pixel_9a): the badge after login, New/Earlier, and back marking items seen on the server; the type in the store dropdown and the picker title
 - **Not checked:** the store's Settings screen on Android, and iOS (no Xcode).
+
+## Follow-up: no people count for home visits (2026-10-17)
+- When **Book home visit** is chosen, the booking form drops "How many people are coming", and the booking counts as 1 (`bokng_cnt` and the calendar). Its card, details and edit sheet show no head count either.
+- The dummy backend and the stub store 1 for home visits and refuse a people change ("Home visits don't have a number of people"), like the server (Next.js repo, phase 18).
+- **Verified:**
+  - **Web build, real backend:** switching Book appointment → Book home visit hides the field; the slot goes 0 → 1; the card and details show no people; the edit sheet has no people field.
+  - **Stub (curl):** the rules above.
+  - **Android:** switching the order type hides the field.
