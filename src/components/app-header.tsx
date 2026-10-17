@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Brand } from '@/components/ui/brand';
 import { Spacing } from '@/constants/theme';
 import { NotificationsPanel } from '@/features/notifications/notifications-panel';
+import { useNotifications } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Wordmark, the notifications bell (signed in) and the "≡ Menu" button. Used by every drawer screen. */
@@ -18,6 +19,9 @@ export function AppHeader({ title }: { title?: string }) {
   const { session } = useSession();
   const { width } = useWindowDimensions();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // Loaded once when the app starts, so the bell shows how many are unseen.
+  const notifications = useNotifications();
+  const unseen = notifications.data?.filter((n) => !n.read).length ?? 0;
   // Narrow phones: the wordmark shrinks so the bell and Menu fit on one line.
   const narrow = width < 400;
 
@@ -29,7 +33,7 @@ export function AppHeader({ title }: { title?: string }) {
           {session ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Notifications"
+              accessibilityLabel={unseen ? `Notifications, ${unseen} new` : 'Notifications'}
               onPress={() => setNotificationsOpen(true)}
               style={({ pressed }) => [
                 styles.bell,
@@ -37,6 +41,16 @@ export function AppHeader({ title }: { title?: string }) {
                 pressed && styles.pressed,
               ]}>
               <ThemedText type="default">🔔</ThemedText>
+              {unseen ? (
+                <View
+                  style={[styles.badge, { backgroundColor: theme.danger, borderColor: theme.background }]}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants">
+                  <ThemedText type="smallBold" style={styles.badgeText}>
+                    {unseen > 9 ? '9+' : unseen}
+                  </ThemedText>
+                </View>
+              ) : null}
             </Pressable>
           ) : null}
           <Pressable
@@ -83,6 +97,23 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    lineHeight: 14,
   },
   menu: {
     paddingHorizontal: Spacing.three,

@@ -1,6 +1,7 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
 import { orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
+import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
 import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type {
@@ -74,6 +75,7 @@ const stores: StoreRecord[] = [
     maxServiceQty: 2,
     isDarkStore: false,
     catalogType: 'service',
+    serviceType: null,
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -97,6 +99,7 @@ const stores: StoreRecord[] = [
     maxServiceQty: 1,
     isDarkStore: false,
     catalogType: 'service',
+    serviceType: 'Barber',
     profile: {
       address: '45 Vijay Nagar',
       pin: '452010',
@@ -121,6 +124,7 @@ const stores: StoreRecord[] = [
     // No dine-in: bookings are orders.
     isDarkStore: true,
     catalogType: 'product',
+    serviceType: null,
     profile: {
       address: '8 Palasia Square',
       pin: '452001',
@@ -165,6 +169,21 @@ function seedBookings(): Booking[] {
 }
 
 const bookings: Booking[] = seedBookings();
+
+/** Types of service stores added through "Other"; every store can pick them. */
+const addedServiceTypes = new Set<string>(['Barber']);
+
+/** Validates a type of service and adds it to the list if new; returns the listed spelling. */
+function addServiceType(name: string): string {
+  const clean = cleanServiceType(name);
+  if (!clean || clean.length > MAX_SERVICE_TYPE_LENGTH) {
+    throw new ApiError('serviceType must be 1 to 60 characters, or null', 400);
+  }
+  const listed = [...STANDARD_SERVICE_TYPES, ...addedServiceTypes].find((t) => t.toLowerCase() === clean.toLowerCase());
+  if (listed) return listed;
+  addedServiceTypes.add(clean);
+  return clean;
+}
 
 /** Services as kept in memory; the effective `maxQty` is worked out from the store when read. */
 interface StoredService extends Omit<StoreService, 'maxQty'> {
@@ -330,6 +349,7 @@ export const mockApi: Api = {
       maxServiceQty: 1,
       isDarkStore: false,
       catalogType: 'product',
+      serviceType: null,
       profile: {
         address: '',
         pin: '',
@@ -418,6 +438,11 @@ export const mockApi: Api = {
     );
   },
 
+  async getServiceTypes() {
+    await delay();
+    return [...STANDARD_SERVICE_TYPES, ...[...addedServiceTypes].sort((a, b) => a.localeCompare(b))];
+  },
+
   async getStoreServices(storeId) {
     await delay();
     findStore(storeId);
@@ -455,8 +480,8 @@ export const mockApi: Api = {
     if (input.slotStart.slice(0, 10) < todayKey()) {
       throw new ApiError('You cannot book a date in the past.', 400);
     }
-    // Dark stores take orders: each booking counts as 1, whatever the head count.
-    const people = store.isDarkStore ? 1 : input.people;
+    // Dark-store orders and home visits count as 1, whatever the head count.
+    const people = store.isDarkStore || input.orderType === 'homeVisit' ? 1 : input.people;
     if (people < 1 || people > store.maxPerBooking) {
       throw new ApiError(`${store.name} allows 1–${store.maxPerBooking} people per booking.`, 400);
     }
@@ -534,6 +559,9 @@ export const mockApi: Api = {
     const peopleChanged = people !== booking.people;
     const mobileChanged = mobile !== booking.mobile;
     if (!message && !peopleChanged && !mobileChanged) throw new ApiError('Nothing to change', 400);
+    if (peopleChanged && booking.orderType === 'homeVisit') {
+      throw new ApiError("Home visits don't have a number of people", 400);
+    }
     if (peopleChanged && store.isDarkStore) {
       throw new ApiError("This store takes orders; the number of people can't change", 400);
     }
@@ -654,7 +682,7 @@ export const mockApi: Api = {
     await delay();
     requireStoreOwner(storeId);
     const store = findStore(storeId);
-    Object.assign(store, settings);
+    Object.assign(store, settings, { serviceType: settings.serviceType && addServiceType(settings.serviceType) });
     for (const b of bookings) if (b.storeId === storeId) b.storeName = store.name;
     return clone(withRating(store));
   },

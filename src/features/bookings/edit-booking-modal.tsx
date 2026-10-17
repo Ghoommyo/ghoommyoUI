@@ -14,6 +14,7 @@ import { useUpdateBooking } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { MESSAGE_SEPARATOR } from '@/lib/bookings';
 import { formatSlotStart } from '@/lib/date';
+import { asksPeople } from '@/lib/order-types';
 import type { Booking, BookingChanges } from '@/types/domain';
 
 const MOBILE_PATTERN = /^\+?\d{10,15}$/;
@@ -22,7 +23,7 @@ type EditBookingModalProps = {
   booking: Booking;
   /** Most people the store allows per booking. */
   maxPerBooking: number;
-  /** Dark-store bookings are orders: no head count to change. */
+  /** Dark-store bookings are orders: no head count to change (nor for home visits). */
   isDarkStore?: boolean;
   onClose(): void;
   onSaved(booking: Booking): void;
@@ -35,6 +36,8 @@ type EditBookingModalProps = {
 export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose, onSaved }: EditBookingModalProps) {
   const theme = useTheme();
   const update = useUpdateBooking();
+  // Dark-store orders and home visits have no head count to change.
+  const hasPeople = asksPeople(isDarkStore, booking.orderType);
   const [people, setPeople] = useState(booking.people);
   const [mobile, setMobile] = useState(booking.mobile);
   const [message, setMessage] = useState('');
@@ -43,7 +46,7 @@ export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose,
   const save = () => {
     const changes: BookingChanges = {};
     if (message.trim()) changes.message = message.trim();
-    if (!isDarkStore && people !== booking.people) changes.people = people;
+    if (hasPeople && people !== booking.people) changes.people = people;
     if (mobile.trim() !== booking.mobile) changes.mobile = mobile.trim();
     const next = {
       mobile: MOBILE_PATTERN.test(mobile.replace(/[\s-]/g, '')) ? undefined : 'Enter a valid mobile number.',
@@ -86,7 +89,7 @@ export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose,
         </ThemedText>
       </View>
 
-      {!isDarkStore ? (
+      {hasPeople ? (
         <Select
           label="How many people are coming"
           value={people}

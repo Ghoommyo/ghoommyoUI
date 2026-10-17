@@ -90,6 +90,7 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 | 29  | GET    | `/services/{locationId}`       | none                 | A location's active services (§5.4a)                 |
 | 30  | GET, POST | `/location/{locCode}/services` | Location (own)    | List / add services                                  |
 | 31  | PUT, DELETE | `/location/{locCode}/services/{serviceId}` | Location (own) | Replace / soft-delete a service          |
+| 32  | GET    | `/service-types`               | none                 | Types of service a SERVICE location can pick (§5.4a) |
 
 **Do not use:** `GET /shop/{shopCode}`, `GET|PUT /shop/profile`, `GET|PUT /shop/settings`. These are broken legacy copies of the `/location/{locCode}/*` routes and respond 403 to location tokens. Use rows 9–13 instead.
 
@@ -276,7 +277,8 @@ curl "$BASE/location"
       "close_at": "21:00",
       "max_svc_qty": 1,
       "is_dark_store": 0,
-      "catalog_type": "PRODUCT"
+      "catalog_type": "PRODUCT",
+      "svc_type": null
     }
   ]
 }
@@ -415,9 +417,10 @@ curl -X PUT "$BASE/location/raju_tailor/settings" -H "Authorization: $LOC_TOKEN"
 | maxServiceQty    | integer ≥ 1 | default quantity of each service per booking, for services without their own `maxQty` (column `max_svc_qty`, default 1; also on `GET /location` rows) |
 | isDarkStore      | 0 \| 1    | dark store: no dine-in, bookings are orders (column `is_dark_store`, default 0). Appointments then can't use `order_type: "TABLE"` and always count as 1 (`bokng_cnt = 1`) |
 | catalogType      | `PRODUCT` \| `SERVICE` | what the location sells (column `catalog_type`, default `PRODUCT`). Decides what its items are called (Products / Services) and which `order_type`s bookings may use (see §5.6) |
+| serviceType      | string (1–60) \| null | the location's type of service, e.g. `"Plumber"` (column `svc_type`, default `null`; also on `GET /location` rows). Spaces are trimmed. A name not in `GET /service-types` (any case) is **added to that list** for every location; an existing one is saved with its listed spelling (`"plumber"` → `"Plumber"`). `null` clears it. Apps show it for `SERVICE` locations only |
 
 - 200 `{"settings":{ ...same fields as GET... }}`
-- 400 `{"error":"maxServiceQty must be a whole number of at least 1"}` / `{"error":"isDarkStore must be 0 or 1"}` / `{"error":"catalogType must be PRODUCT or SERVICE"}`
+- 400 `{"error":"maxServiceQty must be a whole number of at least 1"}` / `{"error":"isDarkStore must be 0 or 1"}` / `{"error":"catalogType must be PRODUCT or SERVICE"}` / `{"error":"serviceType must be 1 to 60 characters, or null"}`
 - 404 `{"error":"Location settings not found, call GET first to create defaults"}`
 
 ### 5.4a Services (add-ons)
@@ -464,6 +467,12 @@ curl -X POST "$BASE/location/raju_tailor/services" -H "Authorization: $LOC_TOKEN
 PUT takes the same body as POST and replaces all fields. DELETE is a soft delete; appointments keep their snapshot.
 
 - PUT 200 `{"service":{...}}` · DELETE 200 `{"message":"Service deleted"}` · 404 `{"error":"Service not found"}` (unknown, already deleted, or another location's)
+
+#### GET /service-types
+
+Public. The types of service a `SERVICE` location can pick in its settings: 34 standard trades in a fixed order, then the ones locations added themselves (A–Z).
+
+- 200 `{"serviceTypes":["Electrician","Wireman","Lineman","Plumber", … ,"Cleaning Supervisor","Drone pilot"]}`
 
 ---
 

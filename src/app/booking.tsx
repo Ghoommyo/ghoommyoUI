@@ -16,7 +16,13 @@ import { useCreateBooking, useMyProfile, useStore, useStoreServices } from '@/ho
 import { useTheme } from '@/hooks/use-theme';
 import { ServicesModal } from '@/features/services/services-modal';
 import { formatSlotStart } from '@/lib/date';
-import { catalogWords, defaultOrderType, orderTypeOptions } from '@/lib/order-types';
+import {
+  asksPeople as asksPeopleFor,
+  catalogWords,
+  defaultOrderType,
+  orderTypeOptions,
+  serviceTypeLabel,
+} from '@/lib/order-types';
 import {
   countServices,
   formatPrice,
@@ -107,8 +113,8 @@ function BookingForm({
   const [mobile, setMobile] = useState(initialMobile);
   const [people, setPeople] = useState<number>();
   const [orderType, setOrderType] = useState<OrderType>(() => defaultOrderType(store));
-  // Dark stores take orders, so there's no head count to ask for.
-  const asksPeople = !store.isDarkStore;
+  // Dark-store orders and home visits have no head count to ask for.
+  const asksPeople = asksPeopleFor(store.isDarkStore, orderType);
   const theme = useTheme();
   // Prefilled with the numbered items and prices; the user can edit it.
   const [description, setDescription] = useState(() =>
@@ -200,6 +206,11 @@ function BookingForm({
               <ThemedText type="smallBold" accessibilityRole="header">
                 {words.Items}
               </ThemedText>
+              {serviceTypeLabel(store) ? (
+                <ThemedText type="smallBold" style={{ color: theme.primary }}>
+                  {serviceTypeLabel(store)}
+                </ThemedText>
+              ) : null}
               <ThemedText type="small" themeColor="textSecondary">
                 You can select {words.items} by clicking here
               </ThemedText>
@@ -260,7 +271,11 @@ function BookingForm({
         label="Order type"
         value={orderType}
         options={orderTypeOptions(store)}
-        onChange={setOrderType}
+        onChange={(next) => {
+          setOrderType(next);
+          // The people field may have just gone away.
+          setErrors((e) => ({ ...e, people: undefined }));
+        }}
       />
       {asksPeople ? (
         <Select
@@ -306,6 +321,7 @@ function BookingForm({
           storeId={store.id}
           storeName={store.name}
           catalogType={store.catalogType}
+          serviceType={serviceTypeLabel(store)}
           initial={picks}
           onClose={() => setServicesOpen(false)}
           onSave={saveServices}

@@ -249,6 +249,11 @@ export function createGhoomoApi(baseUrl: string): Api {
       return (res?.services ?? []).map(serviceToStore);
     },
 
+    async getServiceTypes() {
+      const res = await request<{ serviceTypes: string[] }>('/service-types');
+      return res?.serviceTypes ?? [];
+    },
+
     // Owner routes are addressed by the token's location code; the store id isn't needed.
     async createService(_storeId, input) {
       const locCode = requireOwnLocCode();
@@ -279,8 +284,8 @@ export function createGhoomoApi(baseUrl: string): Api {
       const store = await findShop(input.storeId);
       const { userId } = claims<GhoomoUserClaims>();
       const createdAt = new Date().toISOString();
-      // A dark-store booking is one order, whatever the head count.
-      const count = store.isDarkStore ? 1 : input.people;
+      // A dark-store order or a home visit counts as one, whatever the head count.
+      const count = store.isDarkStore || input.orderType === 'homeVisit' ? 1 : input.people;
       const res = await request<{ appointmentId: string; status?: string; orderType?: string }>('/appointment', {
         method: 'POST',
         body: {

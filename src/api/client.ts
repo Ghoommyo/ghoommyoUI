@@ -45,6 +45,8 @@ export interface Api {
   getStoreBookings(storeId: string, dates: DateKey[]): Promise<Booking[]>;
   /** A store's active services, in the order they were added. Public. */
   getStoreServices(storeId: string): Promise<StoreService[]>;
+  /** Types of service a service store can pick: the standard trades, then ones stores added (A–Z). Public. */
+  getServiceTypes(): Promise<string[]>;
   /** Owner only, like the other store updates. */
   createService(storeId: string, input: ServiceInput): Promise<StoreService>;
   updateService(storeId: string, serviceId: string, input: ServiceInput): Promise<StoreService>;
