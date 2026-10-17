@@ -99,4 +99,4 @@ Stores offer priced services; users pick them, with quantities, before submittin
 
 The web app's phase 6 (dark stores, order types) and phase 16 (Product or Service stores) brought to iOS and Android.
 
-- [ ] [Dark stores, order types, Product or Service stores](catalog-type.md)
+- [x] [Dark stores, order types, Product or Service stores](catalog-type.md)

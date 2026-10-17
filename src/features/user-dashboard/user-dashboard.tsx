@@ -18,6 +18,7 @@ import { SlotGrid } from '@/features/user-dashboard/slot-grid';
 import { useStores, useStoreSlots } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDayLong, formatSlotStart, makeDateKey, MONTHS, toDateKey } from '@/lib/date';
+import { catalogWords } from '@/lib/order-types';
 import { countServices, encodeServices } from '@/lib/services';
 import { daysInMonth, LIMIT_UNIT_LABEL } from '@/lib/slots';
 import type { ServicePicks, SlotStart } from '@/types/domain';
@@ -65,6 +66,8 @@ export function UserDashboard() {
 
   const stores = useStores();
   const store = stores.data?.find((s) => s.id === storeId);
+  // Products or Services, by the store type; "Products" until a store is picked.
+  const words = catalogWords(store?.catalogType);
   const slots = useStoreSlots(storeId, dateKey);
 
   // Confirmation passed back from the booking modal.
@@ -147,7 +150,7 @@ export function UserDashboard() {
           style={styles.flex}
         />
         <Button
-          label={serviceCount ? `Services (${serviceCount})` : 'Services'}
+          label={serviceCount ? `${words.Items} (${serviceCount})` : words.Items}
           variant="secondary"
           disabled={!store}
           accessibilityHint={store ? undefined : 'Select a store first'}
@@ -156,7 +159,7 @@ export function UserDashboard() {
       </View>
       {store ? (
         <ThemedText type="default" themeColor="textSecondary">
-          Max Count : {store.maxPerSlot} per {LIMIT_UNIT_LABEL[store.limitUnit]}
+          Max Count : {store.maxPerSlot} {store.isDarkStore ? 'orders ' : ''}per {LIMIT_UNIT_LABEL[store.limitUnit]}
         </ThemedText>
       ) : null}
       {stores.isError ? (
@@ -167,10 +170,10 @@ export function UserDashboard() {
         <View style={styles.cardHeader}>
           <View style={styles.flex}>
             <ThemedText style={[styles.cardTitle, { color: theme.cardText }]}>
-              Visitor Schedule
+              {store?.isDarkStore ? 'Order Schedule' : 'Visitor Schedule'}
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.cardTextSecondary }}>
-              Monitor visitors by day and hour
+              Monitor {store?.isDarkStore ? 'orders' : 'visitors'} by day and hour
             </ThemedText>
           </View>
           <View style={[styles.datePill, { backgroundColor: theme.purple }]}>
@@ -220,6 +223,7 @@ export function UserDashboard() {
             slots={slots.data ?? []}
             maxPerSlot={store.maxPerSlot}
             limitUnit={store.limitUnit}
+            isDarkStore={store.isDarkStore}
             selected={selectedSlot}
             now={nowSlotStart(new Date())}
             onSelect={(start) => {
@@ -241,6 +245,7 @@ export function UserDashboard() {
         <ServicesModal
           storeId={store.id}
           storeName={store.name}
+          catalogType={store.catalogType}
           initial={picks}
           onClose={() => setServicesOpen(false)}
           onSave={(next) => {

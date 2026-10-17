@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatSlotStart } from '@/lib/date';
+import { ORDER_TYPE_LABEL } from '@/lib/order-types';
 import type { Booking, BookingStatus } from '@/types/domain';
 
 const STATUS_LABEL: Record<BookingStatus, string> = {
@@ -43,6 +44,13 @@ type EventCardProps = {
 /** Blue booking row from the dashboard references. */
 export function EventCard({ booking, title, actions, subtitle, showPeople = true, onPress }: EventCardProps) {
   const theme = useTheme();
+  // `Book table · 2 people`; older bookings have no order type.
+  const meta = [
+    booking.orderType ? ORDER_TYPE_LABEL[booking.orderType] : '',
+    showPeople ? `${booking.people} ${booking.people === 1 ? 'person' : 'people'}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   // The tappable part and the action buttons are siblings, so buttons never nest (invalid on web).
   return (
@@ -70,9 +78,9 @@ export function EventCard({ booking, title, actions, subtitle, showPeople = true
           <ThemedText style={styles.light} numberOfLines={6}>
             {booking.description || 'No description'}
           </ThemedText>
-          {showPeople ? (
+          {meta ? (
             <ThemedText type="small" style={styles.light}>
-              {booking.people} {booking.people === 1 ? 'person' : 'people'}
+              {meta}
             </ThemedText>
           ) : null}
         </View>

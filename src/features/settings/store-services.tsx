@@ -11,11 +11,13 @@ import { Spacing } from '@/constants/theme';
 import { ServiceFormModal } from '@/features/settings/service-form-modal';
 import { useDeleteService, useStoreServices } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
+import { catalogWords } from '@/lib/order-types';
 import { formatPrice } from '@/lib/services';
 import type { Store, StoreService } from '@/types/domain';
 
-/** The store's services, which users can add to a booking: list, add, edit, delete. */
+/** The store's products or services, which users can add to a booking: list, add, edit, delete. */
 export function StoreServices({ store }: { store: Store }) {
+  const words = catalogWords(store.catalogType);
   const theme = useTheme();
   const services = useStoreServices(store.id);
   const remove = useDeleteService(store.id);
@@ -29,14 +31,14 @@ export function StoreServices({ store }: { store: Store }) {
       <View style={styles.header}>
         <View style={styles.flex}>
           <ThemedText type="subtitle" style={styles.title}>
-            Services
+            {words.Items}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             Customers can add these to a booking.
           </ThemedText>
         </View>
         <Button
-          label="Add service"
+          label={`Add ${words.item}`}
           onPress={() => {
             setMessage(null);
             setEditing('new');
@@ -52,7 +54,7 @@ export function StoreServices({ store }: { store: Store }) {
         <Banner message={{ type: 'error', text: errorMessage(services.error) }} />
       ) : !services.data?.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-          No services yet. Tap Add service to offer one.
+          No {words.items} yet. Tap Add {words.item} to offer one.
         </ThemedText>
       ) : (
         services.data.map((service, i) => (
@@ -104,6 +106,7 @@ export function StoreServices({ store }: { store: Store }) {
           storeId={store.id}
           service={editing === 'new' ? undefined : editing}
           defaultMaxQty={store.maxServiceQty}
+          item={words.item}
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
             setEditing(null);
@@ -114,7 +117,7 @@ export function StoreServices({ store }: { store: Store }) {
 
       <ConfirmModal
         visible={!!deleting}
-        title={`Delete ${deleting?.name ?? 'service'}?`}
+        title={`Delete ${deleting?.name ?? words.item}?`}
         message="Customers won't be able to pick it any more. Existing bookings keep it."
         confirmLabel="Delete"
         destructive

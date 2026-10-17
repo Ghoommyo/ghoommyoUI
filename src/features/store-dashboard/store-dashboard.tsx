@@ -75,7 +75,7 @@ export function StoreDashboard() {
             {store.data.name}
           </ThemedText>
           <ThemedText type="default" themeColor="textSecondary">
-            Max Count : {dayCapacity(store.data)} per day
+            Max Count : {dayCapacity(store.data)} {store.data.isDarkStore ? 'orders ' : ''}per day
           </ThemedText>
         </View>
       ) : (
@@ -88,6 +88,7 @@ export function StoreDashboard() {
         today={todayKey()}
         counts={counts}
         capacity={store.data ? dayCapacity(store.data) : Infinity}
+        isDarkStore={store.data?.isDarkStore}
         selected={selected}
         onToggle={toggleDay}
         onPrev={() => shiftMonth(-1)}
@@ -119,6 +120,7 @@ export function StoreDashboard() {
         dates={searchDates ?? todayDates}
         caption={searchDates ? `Bookings for ${searchDates.map(formatDayLong).join(', ')}` : "Today's bookings"}
         isDarkStore={store.data?.isDarkStore}
+        catalogType={store.data?.catalogType}
       />
     </Screen>
   );

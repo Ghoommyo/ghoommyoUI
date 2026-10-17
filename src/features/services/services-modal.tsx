@@ -10,12 +10,15 @@ import { Sheet } from '@/components/ui/sheet';
 import { Spacing } from '@/constants/theme';
 import { useStoreServices } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
+import { catalogWords } from '@/lib/order-types';
 import { countServices, formatPrice } from '@/lib/services';
-import type { ServicePicks, StoreService } from '@/types/domain';
+import type { CatalogType, ServicePicks, StoreService } from '@/types/domain';
 
 type ServicesModalProps = {
   storeId: string;
   storeName: string;
+  /** Products or Services: only the wording changes. */
+  catalogType: CatalogType;
   /** Picks so far; changes stay in a draft until Save. */
   initial: ServicePicks;
   onSave(picks: ServicePicks): void;
@@ -23,8 +26,9 @@ type ServicesModalProps = {
   onClose(): void;
 };
 
-/** Pick a store's services, with quantities, before booking. Mount it only while open. */
-export function ServicesModal({ storeId, storeName, initial, onSave, onClose }: ServicesModalProps) {
+/** Pick a store's products or services, with quantities, before booking. Mount it only while open. */
+export function ServicesModal({ storeId, storeName, catalogType, initial, onSave, onClose }: ServicesModalProps) {
+  const words = catalogWords(catalogType);
   const services = useStoreServices(storeId);
   const [draft, setDraft] = useState<ServicePicks>(initial);
   const count = countServices(draft);
@@ -49,7 +53,7 @@ export function ServicesModal({ storeId, storeName, initial, onSave, onClose }: 
   return (
     <Sheet
       visible
-      title={`${storeName} services`}
+      title={`${storeName} ${words.items}`}
       onClose={onClose}
       footer={
         <Button
@@ -66,7 +70,7 @@ export function ServicesModal({ storeId, storeName, initial, onSave, onClose }: 
         <Banner message={{ type: 'error', text: errorMessage(services.error) }} />
       ) : !services.data?.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-          This store hasn&apos;t added any services yet.
+          This store hasn&apos;t added any {words.items} yet.
         </ThemedText>
       ) : (
         <View>
