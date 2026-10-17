@@ -100,3 +100,9 @@ Stores offer priced services; users pick them, with quantities, before submittin
 The web app's phase 6 (dark stores, order types) and phase 16 (Product or Service stores) brought to iOS and Android.
 
 - [x] [Dark stores, order types, Product or Service stores](catalog-type.md)
+
+## Unseen notifications on load, service types (branch `notifications_service_types`)
+
+Notifications fetched on app start with an unseen count, New/Earlier sections; a service store's type of service.
+
+- [ ] [Unseen notifications on load, service types](notifications-service-types.md)
