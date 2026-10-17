@@ -10,7 +10,7 @@ Reference for building a UI against the Ghoomo backend (the `/apis/*` routes of 
 
 | Item           | Value                                                                                                                                                     |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Base URL       | `http://localhost:3000/apis` (note: `/apis`, not `/api`)                                                                                                  |
+| Base URL       | `https://ghoommyo-eight.vercel.app/apis` (deployed; production data). Local server: `http://localhost:3000/apis`. Note `/apis`, not `/api`              |
 | Body format    | JSON. Send `Content-Type: application/json` on POST/PUT                                                                                                   |
 | CORS           | Any origin is allowed (`Access-Control-Allow-Origin: *`). Preflight `OPTIONS` returns 204                                                                 |
 | Auth header    | `Authorization: Bearer <jwt>`. The sign-in responses return the token **already prefixed** with `Bearer `, so send the `token` string exactly as received |
@@ -47,7 +47,7 @@ Errors are JSON with **either** an `error` or a `message` key, so read both:
 ### Shell setup for the curl examples
 
 ```bash
-BASE=http://localhost:3000/apis
+BASE=https://ghoommyo-eight.vercel.app/apis   # or http://localhost:3000/apis for a local server
 # After signing in, store the token exactly as returned (it already includes "Bearer "):
 USER_TOKEN="Bearer eyJ..."   # from POST /signin
 LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin

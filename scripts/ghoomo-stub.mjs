@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * In-memory stand-in for the Ghoomo backend (Api.md), for developing and testing with
- * EXPO_PUBLIC_USE_REAL_API=true when the real server isn't available.
+ * In-memory stand-in for the Ghoomo backend (Api.md), for developing and testing without the
+ * real server. Point the app at it with EXPO_PUBLIC_API_URL=http://localhost:3000/apis
+ * (the app defaults to the Vercel deployment).
  *
  *   npm run stub:api            # http://localhost:3000/apis
  *   PORT=4000 npm run stub:api
