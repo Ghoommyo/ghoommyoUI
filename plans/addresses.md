@@ -114,3 +114,19 @@ Record it in the plan. Main's live code ignores the new table and column until t
   - the details show "Deliver to" for the store and the user
 - **Expo:** the same on the web build (real backend and dummy); Android: the Porter dropdown, Other, the checkbox, and the Addresses screen. iOS untested (no Xcode).
 - `tsc`, lint and `next build`; `tsc` and `expo lint`. Restore Claude Web Shop's profile and settings afterwards.
+
+## Done notes (2026-10-18, app)
+- **Booking form:**
+  - Book table / Pickup / Book appointment show a Store address card (address, city and PIN, country, Open in maps when the store set a link)
+  - Porter / Book home visit show a Delivery (or Visit) address dropdown: saved addresses, newest first and default, plus Other…; Other opens a text box and a **Save this address** checkbox
+  - the address is required, and saving it happens after the booking succeeds
+- **Store without an address:** only Porter (Product) or Book home visit (Service). Its Settings hint says what adding an address would unlock.
+- **Addresses screen:** in the drawer, users only. List, add/edit in a sheet (optional label, address), delete with a confirmation; up to 20.
+- **Booking details:** "Deliver to" / "Visit at" for both roles; customers also see "Store address" for visit types.
+- **Backends:** the dummy backend seeds a "Home" address for `user@ghoomyo.app`, and Green Grocers has no address (Porter only). The stub implements `/traveller/addresses`, the address columns on list rows and the booking rules, like the server.
+- **Verified:**
+  - **Web build, real backend:** the store card for Book table; Porter defaults to the newest saved address; Other + Save → booked and saved; details show "Deliver to"; Addresses add/edit/delete.
+  - **Dummy backend:** Green Grocers offers Porter only, with Home as default; City Salon shows the store card.
+  - **Stub (curl):** the address rules.
+  - **Android (Pixel_9a):** the store card; the Porter dropdown with saved addresses and Other; the checkbox (reported checked); the Addresses screen from the drawer.
+- **Not verified on iOS** (no Xcode).

@@ -10,10 +10,10 @@ import { Sheet } from '@/components/ui/sheet';
 import { Stars } from '@/components/ui/stars';
 import { Spacing } from '@/constants/theme';
 import { DescriptionHistory } from '@/features/bookings/description-history';
-import { useSetBookingStatus } from '@/hooks/queries';
+import { useSetBookingStatus, useStores } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { formatSlotStart } from '@/lib/date';
-import { catalogWords, ORDER_TYPE_LABEL, showsPeople } from '@/lib/order-types';
+import { catalogWords, hasStoreAddress, ORDER_TYPE_LABEL, showsPeople, visitsStore } from '@/lib/order-types';
 import { formatPrice } from '@/lib/services';
 import type { Booking, BookingStatus, CatalogType } from '@/types/domain';
 
@@ -44,6 +44,8 @@ export function BookingDetailsModal({
 }: BookingDetailsModalProps) {
   const theme = useTheme();
   const words = catalogWords(catalogType);
+  // Customers visiting the store are reminded where it is.
+  const stores = useStores();
   // Keep the latest version after accepting/rejecting from here.
   const [booking, setBooking] = useState(initial);
   const setStatus = useSetBookingStatus();
@@ -73,6 +75,17 @@ export function BookingDetailsModal({
   rows.push(['When', formatSlotStart(booking.slotStart)]);
   if (booking.orderType) rows.push(['Order type', ORDER_TYPE_LABEL[booking.orderType]]);
   if (showsPeople(booking, isDarkStore)) rows.push(['People', String(booking.people)]);
+  if (booking.deliveryAddress) {
+    rows.push([booking.orderType === 'homeVisit' ? 'Visit at' : 'Deliver to', booking.deliveryAddress]);
+  }
+  const store =
+    viewer === 'user' && visitsStore(booking.orderType)
+      ? stores.data?.find((s) => s.id === booking.storeId)
+      : undefined;
+  if (store && hasStoreAddress(store)) {
+    const place = [store.profile.city, store.profile.pin].filter(Boolean).join(' ');
+    rows.push(['Store address', [store.profile.address, place].filter(Boolean).join('\n')]);
+  }
 
   const footer =
     viewer === 'store' ? (

@@ -32,7 +32,10 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
     ? [
         { label: 'Dashboard', href: '/dashboard', route: 'dashboard' },
         ...(session.role === 'user'
-          ? [{ label: 'Events', href: '/events' as const, route: 'events' }]
+          ? [
+              { label: 'Events', href: '/events' as const, route: 'events' },
+              { label: 'Addresses', href: '/addresses' as const, route: 'addresses' },
+            ]
           : []),
         ...(session.role === 'store'
           ? [{ label: 'Reviews', href: '/reviews' as const, route: 'reviews' }]

@@ -112,4 +112,4 @@ Notifications fetched on app start with an unseen count, New/Earlier sections; a
 
 Book table / Pickup / Book appointment show the store's address (and need one); Porter / Book home visit pick a saved delivery address or a new one; users manage addresses from the menu.
 
-- [ ] [Store address for visits, saved delivery addresses](addresses.md)
+- [x] [Store address for visits, saved delivery addresses](addresses.md)

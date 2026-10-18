@@ -14,6 +14,7 @@ export default function AppLayout() {
       <Drawer.Screen name="reviews" options={{ title: 'Reviews' }} />
       <Drawer.Protected guard={session?.role === 'user'}>
         <Drawer.Screen name="events" options={{ title: 'Events' }} />
+        <Drawer.Screen name="addresses" options={{ title: 'Addresses' }} />
       </Drawer.Protected>
       <Drawer.Protected guard={!!session}>
         <Drawer.Screen name="profile" options={{ title: 'Profile' }} />

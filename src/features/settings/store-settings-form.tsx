@@ -69,6 +69,9 @@ export function StoreSettingsForm({ store }: { store: Store }) {
   const serviceTypes = useServiceTypes();
   const words = catalogWords(draft.catalogType);
   const isService = draft.catalogType === 'service';
+  // Visit types (Book table, Pickup, Book appointment) need the store's address.
+  const offered = orderTypeChoices({ ...draft, profile: store.profile });
+  const needAddress = orderTypeChoices(draft).filter((type) => !offered.includes(type));
   // The saved type is normally in the list (the server adds new ones); keep it selectable while the list loads.
   const typeNames = serviceTypes.data ?? [];
   const typeOptions: SelectOption<string>[] = [
@@ -196,11 +199,10 @@ export function StoreSettingsForm({ store }: { store: Store }) {
           onChange={(v) => set('catalogType', v)}
         />
         <ThemedText type="small" themeColor="textSecondary">
-          Customers see {words.items} and can choose:{' '}
-          {orderTypeChoices(draft)
-            .map((type) => ORDER_TYPE_LABEL[type])
-            .join(', ')}
-          .
+          Customers see {words.items} and can choose: {offered.map((type) => ORDER_TYPE_LABEL[type]).join(', ')}.
+          {needAddress.length
+            ? ` Add your address in Profile to offer ${needAddress.map((type) => ORDER_TYPE_LABEL[type]).join(' and ')}.`
+            : ''}
         </ThemedText>
       </View>
       {isService ? (
