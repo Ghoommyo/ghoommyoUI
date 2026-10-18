@@ -107,3 +107,9 @@ The web app's phase 6 (dark stores, order types) and phase 16 (Product or Servic
 Notifications fetched on app start with an unseen count, New/Earlier sections; a service store's type of service.
 
 - [x] [Unseen notifications on load, service types](notifications-service-types.md)
+
+## Store address for visits, saved delivery addresses (branch `delivery_addresses`)
+
+Book table / Pickup / Book appointment show the store's address (and need one); Porter / Book home visit pick a saved delivery address or a new one; users manage addresses from the menu.
+
+- [ ] [Store address for visits, saved delivery addresses](addresses.md)
