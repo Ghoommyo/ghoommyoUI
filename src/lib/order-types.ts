@@ -1,4 +1,4 @@
-import type { Booking, CatalogType, OrderType, StoreSettings } from '@/types/domain';
+import type { Booking, CatalogType, OrderType, StoreProfile, StoreSettings } from '@/types/domain';
 
 export const ORDER_TYPE_LABEL: Record<OrderType, string> = {
   table: 'Book table',
@@ -24,17 +24,36 @@ export const orderTypeToApi = (type: OrderType) => TO_API[type];
 export const orderTypeFromApi = (value: unknown): OrderType | null =>
   FROM_API[String(value ?? '').toUpperCase()] ?? null;
 
-type OrderTypeStore = Pick<StoreSettings, 'isDarkStore' | 'catalogType'>;
+type OrderTypeStore = Pick<StoreSettings, 'isDarkStore' | 'catalogType'> & {
+  profile?: Pick<StoreProfile, 'address'>;
+};
+
+/** The customer goes to the store for these, so the store needs an address to offer them. */
+export const visitsStore = (type: OrderType | null) =>
+  type === 'table' || type === 'pickup' || type === 'appointment';
+/** The store goes to the customer for these, so the booking needs a delivery address. */
+export const needsDeliveryAddress = (type: OrderType | null) => type === 'porter' || type === 'homeVisit';
+/** Whether the store entered an address customers can visit. */
+export const hasStoreAddress = (store: { profile?: Pick<StoreProfile, 'address'> }) =>
+  !!store.profile?.address.trim();
 
 /**
- * The order types a store offers, the first being the default.
+ * The order types a store offers, the first being the default. Stores without an address only
+ * offer Porter / Book home visit.
  * Products: Book table / Pickup / Porter (dark stores: Porter / Pickup).
  * Services: Book appointment / Book home visit (dark stores: home visit only).
  */
 export function orderTypeChoices(store: OrderTypeStore): OrderType[] {
-  if (store.catalogType === 'service')
-    return store.isDarkStore ? ['homeVisit'] : ['appointment', 'homeVisit'];
-  return store.isDarkStore ? ['porter', 'pickup'] : ['table', 'pickup', 'porter'];
+  const all: OrderType[] =
+    store.catalogType === 'service'
+      ? store.isDarkStore
+        ? ['homeVisit']
+        : ['appointment', 'homeVisit']
+      : store.isDarkStore
+        ? ['porter', 'pickup']
+        : ['table', 'pickup', 'porter'];
+  // A store without an address can't be visited (only checked when the profile is known).
+  return store.profile && !hasStoreAddress(store) ? all.filter((type) => !visitsStore(type)) : all;
 }
 
 export function orderTypeOptions(store: OrderTypeStore): { label: string; value: OrderType }[] {

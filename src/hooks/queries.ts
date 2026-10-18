@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { api } from '@/api';
 import { useSession } from '@/auth/session';
 import type {
+  AddressInput,
   AppNotification,
   BookingChanges,
   BookingRating,
@@ -31,6 +32,7 @@ export const queryKeys = {
   serviceTypes: ['service-types'] as const,
   notifications: (accountId: string) => ['me', accountId, 'notifications'] as const,
   reminderBookings: (accountId: string) => ['me', accountId, 'reminder-bookings'] as const,
+  addresses: (accountId: string) => ['me', accountId, 'addresses'] as const,
 };
 
 export function useStores() {
@@ -67,6 +69,36 @@ export function useStoreBookings(storeId: string | undefined, dates: DateKey[] |
     queryKey: queryKeys.storeBookings(storeId ?? '', dates ?? []),
     queryFn: () => api.getStoreBookings(storeId!, dates!),
     enabled: !!storeId && !!dates && dates.length > 0,
+  });
+}
+
+/** The customer's saved delivery addresses (users only). */
+export function useAddresses() {
+  const { session } = useSession();
+  return useQuery({
+    queryKey: queryKeys.addresses(session?.accountId ?? ''),
+    queryFn: () => api.getAddresses(),
+    enabled: session?.role === 'user',
+  });
+}
+
+/** Adds an address, or edits `addressId`. */
+export function useSaveAddress() {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ input, addressId }: { input: AddressInput; addressId?: string }) =>
+      api.saveAddress(input, addressId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.addresses(session?.accountId ?? '') }),
+  });
+}
+
+export function useDeleteAddress() {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (addressId: string) => api.deleteAddress(addressId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.addresses(session?.accountId ?? '') }),
   });
 }
 

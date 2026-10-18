@@ -1,10 +1,12 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
-import { orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
+import { needsDeliveryAddress, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
 import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
 import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type {
+  SavedAddress,
+  AddressInput,
   AppNotification,
   Booking,
   NotificationKind,
@@ -126,7 +128,8 @@ const stores: StoreRecord[] = [
     catalogType: 'product',
     serviceType: null,
     profile: {
-      address: '8 Palasia Square',
+      // No address entered yet, so customers can't visit: only Porter.
+      address: '',
       pin: '452001',
       city: 'Indore',
       state: 'Madhya Pradesh',
@@ -165,10 +168,31 @@ function seedBookings(): Booking[] {
     services: [],
     // The oldest one predates order types.
     orderType: i === 0 ? null : 'appointment',
+    deliveryAddress: null,
   }));
 }
 
 const bookings: Booking[] = seedBookings();
+
+/** Customers' saved delivery addresses, newest first. */
+const addresses: (SavedAddress & { accountId: string })[] = [
+  { id: 'addr1', accountId: 'u1', label: 'Home', address: '21 Saket Nagar, Indore 452018' },
+];
+const MAX_ADDRESSES = 20;
+
+function readAddress(input: AddressInput): AddressInput {
+  const address = input.address.trim();
+  const label = input.label.trim();
+  if (!address || address.length > 500) throw new ApiError('address is required (at most 500 characters)', 400);
+  if (label.length > 40) throw new ApiError('label must be at most 40 characters', 400);
+  return { label, address };
+}
+
+function currentCustomer() {
+  const account = currentAccount();
+  if (account.role !== 'user') throw new ApiError('Forbidden: user login required', 403);
+  return account;
+}
 
 /** Types of service stores added through "Other"; every store can pick them. */
 const addedServiceTypes = new Set<string>(['Barber']);
@@ -438,6 +462,42 @@ export const mockApi: Api = {
     );
   },
 
+  async getAddresses() {
+    await delay();
+    const account = currentCustomer();
+    return clone(addresses.filter((a) => a.accountId === account.id).map(({ accountId: _owner, ...a }) => a));
+  },
+
+  async saveAddress(input, addressId) {
+    await delay();
+    const account = currentCustomer();
+    const clean = readAddress(input);
+    const own = addresses.filter((a) => a.accountId === account.id);
+    if (addressId) {
+      const existing = own.find((a) => a.id === addressId);
+      if (!existing) throw new ApiError('Address not found', 404);
+      Object.assign(existing, clean);
+      return clone({ id: existing.id, label: existing.label, address: existing.address });
+    }
+    // The same address text again returns the saved one instead of a copy.
+    const same = own.find((a) => a.address === clean.address);
+    if (same) return clone({ id: same.id, label: same.label, address: same.address });
+    if (own.length >= MAX_ADDRESSES) {
+      throw new ApiError(`You can save up to ${MAX_ADDRESSES} addresses. Delete one to add another.`, 400);
+    }
+    const saved = { id: newId('addr'), accountId: account.id, ...clean };
+    addresses.unshift(saved);
+    return clone({ id: saved.id, label: saved.label, address: saved.address });
+  },
+
+  async deleteAddress(addressId) {
+    await delay();
+    const account = currentCustomer();
+    const index = addresses.findIndex((a) => a.id === addressId && a.accountId === account.id);
+    if (index < 0) throw new ApiError('Address not found', 404);
+    addresses.splice(index, 1);
+  },
+
   async getServiceTypes() {
     await delay();
     return [...STANDARD_SERVICE_TYPES, ...[...addedServiceTypes].sort((a, b) => a.localeCompare(b))];
@@ -485,6 +545,7 @@ export const mockApi: Api = {
     if (people < 1 || people > store.maxPerBooking) {
       throw new ApiError(`${store.name} allows 1–${store.maxPerBooking} people per booking.`, 400);
     }
+    // Stores without an address only take Porter / home visits (orderTypeChoices checks the profile).
     const allowed = orderTypeChoices(store);
     if (!allowed.includes(input.orderType)) {
       const labels = allowed.map(orderTypeToApi);
@@ -503,8 +564,14 @@ export const mockApi: Api = {
       }
       return { serviceId, name: stored.name, price: stored.price, qty };
     });
+    // Porter and home visits go to the customer, so they need an address; store visits don't keep one.
+    const deliveryAddress = needsDeliveryAddress(input.orderType) ? (input.deliveryAddress ?? '').trim() : null;
+    if (deliveryAddress !== null && (!deliveryAddress || deliveryAddress.length > 500)) {
+      throw new ApiError('delivery_address is required for PORTER and HOME_VISIT bookings (at most 500 characters)', 400);
+    }
     const booking: Booking = {
       ...input,
+      deliveryAddress,
       people,
       services: booked,
       id: newId('b'),

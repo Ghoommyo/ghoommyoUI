@@ -92,9 +92,20 @@ function ensureProfile(loc) {
   return profiles.get(loc.user_id);
 }
 /** Order types a location takes, the first being the default (docs/API.md). */
-function allowedOrderTypes(catalogType, dark) {
-  if (catalogType === 'SERVICE') return dark ? ['HOME_VISIT'] : ['APPOINTMENT', 'HOME_VISIT'];
-  return dark ? ['PORTER', 'PICKUP'] : ['TABLE', 'PICKUP', 'PORTER'];
+// Without an address a location can't be visited, so only PORTER / HOME_VISIT remain.
+function allowedOrderTypes(catalogType, dark, hasAddress = true) {
+  const all = catalogType === 'SERVICE' ? (dark ? ['HOME_VISIT'] : ['APPOINTMENT', 'HOME_VISIT']) : dark ? ['PORTER', 'PICKUP'] : ['TABLE', 'PICKUP', 'PORTER'];
+  return hasAddress ? all : all.filter((t) => !['TABLE', 'PICKUP', 'APPOINTMENT'].includes(t));
+}
+const hasAddress = (locId) => !!profiles.get(locId)?.loc_address?.trim();
+const addresses = []; // { addr_id, user_id, addr_label, addr_text, cret_on, active }
+const addressJson = (a) => ({ id: a.addr_id, label: a.addr_label ?? '', address: a.addr_text });
+function readAddress(body) {
+  const address = typeof body?.address === 'string' ? body.address.trim() : '';
+  const label = body?.label == null ? '' : body.label;
+  if (!address || address.length > 500) return { error: 'address is required (at most 500 characters)' };
+  if (typeof label !== 'string' || label.trim().length > 40) return { error: 'label must be at most 40 characters' };
+  return { address, label: label.trim() || null };
 }
 const PERIOD_MS = { HOUR: 3600e3, DAY: 86400e3, WEEK: 7 * 86400e3 };
 function addAppointment(body, userId) {
@@ -109,6 +120,7 @@ function addAppointment(body, userId) {
     status: 'PENDING', status_updt_by: null, status_updt_on: null, updt_reason: null,
     services: body.services ?? null,
     order_type: body.order_type ?? null,
+    dlvry_addr: body.dlvry_addr ?? null,
   };
   appointments.push(row);
   return row;
@@ -185,11 +197,13 @@ function addToCalendar({ plan_id, count_of_ppl, type, details }) {
 const browseRow = (loc) => {
   const { password: _pw, email: _email, ...row } = loc;
   const s = settings.get(loc.user_id);
+  const p = profiles.get(loc.user_id);
   const rated = ratings.filter((r) => r.loc_id === loc.user_id);
   const avg = rated.length ? (rated.reduce((sum, r) => sum + r.stars, 0) / rated.length).toFixed(1) : null;
   return {
     ...row, max_limit: s?.max_limit ?? null, unit: s?.unit ?? null, is_auto_approval: s?.is_auto_approval ?? null, open_at: s?.open_at ?? null, close_at: s?.close_at ?? null,
     max_svc_qty: s?.max_svc_qty ?? null, is_dark_store: s?.is_dark_store ?? null, catalog_type: s?.catalog_type ?? null, svc_type: s?.svc_type ?? null,
+    loc_address: p?.loc_address ?? null, loc_city: p?.loc_city ?? null, loc_pin_code: p?.loc_pin_code ?? null, loc_country: p?.loc_country ?? null, loc_nav: p?.loc_nav ?? null,
     rating_avg: avg, rating_count: rated.length ? String(rated.length) : null,
   };
 };
@@ -392,12 +406,16 @@ route('POST', /^\/appointment$/, 'any', ({ claims, body }) => {
   // Dark stores take orders (each counts as one); the order types depend on the store type.
   const stng = settings.get(body.loc_id);
   const dark = Number(stng?.is_dark_store ?? 0) === 1;
-  const allowed = allowedOrderTypes(stng?.catalog_type, dark);
+  const allowed = allowedOrderTypes(stng?.catalog_type, dark, hasAddress(body.loc_id));
   const orderType = body.order_type ?? allowed[0];
   if (!allowed.includes(orderType)) {
     return [400, { error: `This store takes ${allowed.length > 1 ? `${allowed.slice(0, -1).join(', ')} or ${allowed.at(-1)}` : allowed[0]} bookings` }];
   }
-  const appt = addAppointment({ ...body, services: booked, order_type: orderType, bokng_cnt: dark || orderType === 'HOME_VISIT' ? 1 : body.bokng_cnt }, claims.userId);
+  // Porter and home visits go to the customer, so they need an address.
+  const delivery = ['PORTER', 'HOME_VISIT'].includes(orderType);
+  const dlvry = typeof body.delivery_address === 'string' ? body.delivery_address.trim() : '';
+  if (delivery && (!dlvry || dlvry.length > 500)) return [400, { error: 'delivery_address is required for PORTER and HOME_VISIT bookings (at most 500 characters)' }];
+  const appt = addAppointment({ ...body, services: booked, order_type: orderType, bokng_cnt: dark || orderType === 'HOME_VISIT' ? 1 : body.bokng_cnt, dlvry_addr: delivery ? dlvry : null }, claims.userId);
   // Auto-approving locations (the default for new settings) accept on creation.
   const auto = Number(stng?.is_auto_approval ?? 1) === 1;
   if (auto) Object.assign(appt, { status: 'ACCEPTED', status_updt_by: 'SYSTEM', status_updt_on: now() });
@@ -470,6 +488,39 @@ route('POST', /^\/notifications\/read$/, 'any', ({ claims, body }) => {
   let updated = 0;
   for (const n of notifications) if (n.rcpt_id === claims.userId && body.ids.includes(n.ntfy_id) && !n.read_on) { n.read_on = now(); updated++; }
   return [200, { updated }];
+});
+// Saved delivery addresses (user token; own rows only).
+route('GET', /^\/traveller\/addresses$/, 'any', ({ claims }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  return [200, { addresses: addresses.filter((a) => a.user_id === claims.userId && a.active).sort((a, b) => b.cret_on.localeCompare(a.cret_on)).map(addressJson) }];
+});
+route('POST', /^\/traveller\/addresses$/, 'any', ({ claims, body }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const input = readAddress(body);
+  if (input.error) return [400, { error: input.error }];
+  const own = addresses.filter((a) => a.user_id === claims.userId && a.active);
+  const same = own.find((a) => a.addr_text === input.address);
+  if (same) return [200, { address: addressJson(same) }];
+  if (own.length >= 20) return [400, { error: 'You can save up to 20 addresses. Delete one to add another.' }];
+  const row = { addr_id: randomUUID(), user_id: claims.userId, addr_label: input.label, addr_text: input.address, cret_on: now(), active: 1 };
+  addresses.push(row);
+  return [201, { address: addressJson(row) }];
+});
+route('PUT', /^\/traveller\/addresses\/([^/]+)$/, 'any', ({ claims, params, body }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const input = readAddress(body);
+  if (input.error) return [400, { error: input.error }];
+  const row = addresses.find((a) => a.addr_id === params[0] && a.user_id === claims.userId && a.active);
+  if (!row) return [404, { error: 'Address not found' }];
+  Object.assign(row, { addr_label: input.label, addr_text: input.address });
+  return [200, { address: addressJson(row) }];
+});
+route('DELETE', /^\/traveller\/addresses\/([^/]+)$/, 'any', ({ claims, params }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const row = addresses.find((a) => a.addr_id === params[0] && a.user_id === claims.userId && a.active);
+  if (!row) return [404, { error: 'Address not found' }];
+  row.active = 0;
+  return [200, { message: 'Address deleted' }];
 });
 route('GET', /^\/reminder-settings$/, 'any', ({ claims }) => {
   const latest = reminderSettings.filter((r) => r.acct_id === claims.userId).at(-1);

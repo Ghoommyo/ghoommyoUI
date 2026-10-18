@@ -152,6 +152,8 @@ export interface Booking {
   services: BookedService[];
   /** Null for bookings made before order types existed. */
   orderType: OrderType | null;
+  /** Where the store goes for Porter / home-visit bookings; null otherwise. */
+  deliveryAddress: string | null;
 }
 
 export interface BookingRating {
@@ -214,6 +216,21 @@ export interface NewBooking {
   description: string;
   services: BookedService[];
   orderType: OrderType;
+  /** Required for Porter / home visits; ignored otherwise. */
+  deliveryAddress: string | null;
+}
+
+/** A customer's saved delivery address. */
+export interface SavedAddress {
+  id: string;
+  /** e.g. "Home"; '' when none. */
+  label: string;
+  address: string;
+}
+
+export interface AddressInput {
+  label: string;
+  address: string;
 }
 
 export interface Slot {

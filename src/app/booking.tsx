@@ -147,6 +147,7 @@ function BookingForm({
         mobile: cleanMobile,
         people: asksPeople && people ? people : 1,
         orderType,
+        deliveryAddress: null,
         description: description.trim(),
         services: picked.map(({ serviceId, name: serviceName, price, qty }) => ({
           serviceId,

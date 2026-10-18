@@ -91,6 +91,8 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 | 30  | GET, POST | `/location/{locCode}/services` | Location (own)    | List / add services                                  |
 | 31  | PUT, DELETE | `/location/{locCode}/services/{serviceId}` | Location (own) | Replace / soft-delete a service          |
 | 32  | GET    | `/service-types`               | none                 | Types of service a SERVICE location can pick (§5.4a) |
+| 33  | GET, POST | `/traveller/addresses`      | User                 | Saved delivery addresses: list / add (§5.1)          |
+| 34  | PUT, DELETE | `/traveller/addresses/{addressId}` | User      | Edit / remove a saved address                        |
 
 **Do not use:** `GET /shop/{shopCode}`, `GET|PUT /shop/profile`, `GET|PUT /shop/settings`. These are broken legacy copies of the `/location/{locCode}/*` routes and respond 403 to location tokens. Use rows 9–13 instead.
 
@@ -209,6 +211,31 @@ curl "$BASE/traveller" -H "Authorization: $USER_TOKEN"
 
 - 200 `{"user":{"userId":"92177fd2-...","userName":"asha@example.com","userType":"CUSTOMER","userAccess":"LIMITED","iat":1791025490,"exp":1791111890}}`
 
+#### GET /traveller/addresses · POST /traveller/addresses
+
+The customer's saved delivery addresses, for Porter and home-visit bookings. User token only (403 for a location token).
+
+```bash
+curl "$BASE/traveller/addresses" -H "Authorization: $USER_TOKEN"
+curl -X POST "$BASE/traveller/addresses" -H "Authorization: $USER_TOKEN" -H "Content-Type: application/json" \
+  -d '{"label":"Home","address":"12 MG Road, Indore 452001"}'
+```
+
+| Field (POST/PUT) | Type   | Req | Notes                                                    |
+| ---------------- | ------ | --- | -------------------------------------------------------- |
+| address          | string | ✔   | 1–500 characters (trimmed)                               |
+| label            | string |     | up to 40 characters, e.g. `Home`; empty or missing = none |
+
+- GET 200 `{"addresses":[{"id":"c390f88b-...","label":"Home","address":"12 MG Road, Indore 452001"}]}`, newest first (`label` is `""` when unset)
+- POST 201 `{"address":{...}}`; the same address text again returns the saved one (200) instead of a copy
+- 400 `{"error":"address is required (at most 500 characters)"}` / `{"error":"label must be at most 40 characters"}` / `{"error":"You can save up to 20 addresses. Delete one to add another."}`
+
+#### PUT /traveller/addresses/{addressId} · DELETE …
+
+PUT replaces the label and address; DELETE removes it (soft delete; bookings keep their address).
+
+- PUT 200 `{"address":{...}}` · DELETE 200 `{"message":"Address deleted"}` · 404 `{"error":"Address not found"}` (unknown, deleted, or another customer's)
+
 ---
 
 ### 5.2 Location (owner) auth
@@ -278,13 +305,19 @@ curl "$BASE/location"
       "max_svc_qty": 1,
       "is_dark_store": 0,
       "catalog_type": "PRODUCT",
-      "svc_type": null
+      "svc_type": null,
+      "loc_address": "12 MG Road",
+      "loc_city": "Indore",
+      "loc_pin_code": "452001",
+      "loc_country": "India",
+      "loc_nav": null
     }
   ]
 }
 ```
 
 - `user_id` is the **location id**. Pass it as `loc_id` when booking.
+- `loc_address`, `loc_city`, `loc_pin_code`, `loc_country` and `loc_nav` (map link) come from the location's profile, so customers can be shown where to go; `null` when not filled in. A location without `loc_address` can't take store visits (see the appointment's `order_type`).
 - `max_limit` comes back as a string, so parse it.
 - 404 `{"error":"Locations not found"}` when the table is empty.
 
@@ -561,8 +594,9 @@ curl -X POST "$BASE/appointment" -H "Authorization: $USER_TOKEN" -H "Content-Typ
 | cret_by        | string                |     | display name              |
 | bokng_name     | string                |     | stored as `user_name`     |
 | bokng_mobile   | string                |     | stored as `mobile_number` |
-| bokng_cnt      | number                |     | number of people; ignored (stored as 1) at dark stores |
-| order_type     | see below             |     | optional; defaults to the first allowed value. Send `count_of_ppl: 1` to `POST /calendar` for dark-store bookings |
+| bokng_cnt      | number                |     | number of people; ignored (stored as 1) at dark stores and for `HOME_VISIT` |
+| order_type     | see below             |     | optional; defaults to the first allowed value. Send `count_of_ppl: 1` to `POST /calendar` for dark-store bookings and home visits |
+| delivery_address | string              | for `PORTER`, `HOME_VISIT` | where the store goes, 1–500 characters; stored as `dlvry_addr`. Ignored (stored `null`) for the other types |
 | bokng_desc     | string                | ✔   | note for the store; must not be empty or only spaces |
 | services       | array of `{svc_id, qty}` | | add-ons (§5.4a); each one of the location's active services, listed once, with `1 ≤ qty ≤ effectiveMaxQty`. Saved as a snapshot of name and price |
 
@@ -575,8 +609,10 @@ Allowed `order_type` by location:
 | `SERVICE` | `APPOINTMENT`, `HOME_VISIT` | `APPOINTMENT` |
 | `SERVICE`, dark store | `HOME_VISIT` | `HOME_VISIT` |
 
+`TABLE`, `PICKUP` and `APPOINTMENT` mean the customer goes to the store, so they're only allowed when the location's profile has an address (`loc_address` not blank). Without one, product locations take `PORTER` only and service locations `HOME_VISIT` only.
+
 - 201 `{"message":"Appointment added successfully","appointmentId":"60834c7e-ca6b-4b13-a724-c27df35feec8","status":"ACCEPTED","orderType":"TABLE"}`
-- 400 `{"error":"Missing required fields"}` / `{"error":"bokng_desc is required"}` / `{"error":"Invalid apntmnt_time"}` / `{"error":"qty for Haircut must be between 1 and 2"}` / `{"error":"services contains a service this location doesn't offer"}` / `{"error":"This store takes APPOINTMENT or HOME_VISIT bookings"}` (any type the location doesn't allow) · 401
+- 400 `{"error":"Missing required fields"}` / `{"error":"bokng_desc is required"}` / `{"error":"Invalid apntmnt_time"}` / `{"error":"qty for Haircut must be between 1 and 2"}` / `{"error":"services contains a service this location doesn't offer"}` / `{"error":"This store takes APPOINTMENT or HOME_VISIT bookings"}` (any type the location doesn't allow) / `{"error":"delivery_address is required for PORTER and HOME_VISIT bookings (at most 500 characters)"}` · 401
 
 **Appointment object** (returned by the list endpoints and the PUT):
 
@@ -603,11 +639,12 @@ Allowed `order_type` by location:
   "status_updt_on": null,
   "updt_reason": null,
   "services": [{ "svc_id": "c4753b3f-...", "name": "Haircut", "price": 200, "qty": 2 }],
-  "order_type": "TABLE"
+  "order_type": "TABLE",
+  "dlvry_addr": null
 }
 ```
 
-`bokng_cnt` comes back as a string. `services` is the snapshot of booked add-ons (name and price at booking time), or `null`. `order_type` is `null` for bookings made before order types existed.
+`bokng_cnt` comes back as a string. `services` is the snapshot of booked add-ons (name and price at booking time), or `null`. `order_type` is `null` for bookings made before order types existed. `dlvry_addr` is the delivery address of `PORTER` and `HOME_VISIT` bookings, otherwise `null`.
 
 #### PUT /appointment
 

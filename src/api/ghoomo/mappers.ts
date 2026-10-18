@@ -1,4 +1,5 @@
 import type {
+  GhoomoAddress,
   GhoomoAppointment,
   GhoomoDayDetails,
   GhoomoLocation,
@@ -17,6 +18,7 @@ import type {
   DateKey,
   DaySummary,
   LimitUnit,
+  SavedAddress,
   ServiceInput,
   Slot,
   SlotStart,
@@ -207,13 +209,14 @@ export function profileToRequest(profile: StoreProfile) {
   };
 }
 
-/** A browse-list row (location + settings) as a Store. The profile isn't part of this row. */
+/** A browse-list row (location + settings + the profile's address columns) as a Store. */
 export function locationToStore(row: GhoomoLocation, profile?: GhoomoProfile | null): Store {
   return {
     id: row.user_id,
     name: row.loc_name,
     ...settingsToStore(row),
-    profile: profileToStore(profile),
+    // List rows carry the address columns; the owner's own record passes the full profile row.
+    profile: profile ? profileToStore(profile) : addressFromRow(row),
     rating: {
       average: row.rating_avg == null ? null : Number(row.rating_avg),
       count: Number(row.rating_count ?? 0),
@@ -242,7 +245,24 @@ export function appointmentToBooking(row: GhoomoAppointment): Booking {
       qty: Number(s.qty) || 1,
     })),
     orderType: orderTypeFromApi(row.order_type),
+    deliveryAddress: row.dlvry_addr || null,
   };
+}
+
+/** The profile part of a list row: its address columns (no bio). */
+function addressFromRow(row: GhoomoLocation): StoreProfile {
+  return {
+    ...EMPTY_PROFILE,
+    address: row.loc_address ?? '',
+    city: row.loc_city ?? '',
+    pin: row.loc_pin_code ?? '',
+    country: row.loc_country ?? '',
+    mapUrl: row.loc_nav || undefined,
+  };
+}
+
+export function addressToSaved(row: GhoomoAddress): SavedAddress {
+  return { id: row.id, label: row.label ?? '', address: row.address ?? '' };
 }
 
 export function serviceToStore(row: GhoomoService): StoreService {

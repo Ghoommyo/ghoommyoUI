@@ -1,4 +1,5 @@
 import type {
+  AddressInput,
   AppNotification,
   Booking,
   BookingChanges,
@@ -20,6 +21,7 @@ import type {
   StoreService,
   StoreSettings,
   UserProfile,
+  SavedAddress,
 } from '@/types/domain';
 
 export class ApiError extends Error {
@@ -47,6 +49,11 @@ export interface Api {
   getStoreServices(storeId: string): Promise<StoreService[]>;
   /** Types of service a service store can pick: the standard trades, then ones stores added (A–Z). Public. */
   getServiceTypes(): Promise<string[]>;
+  /** The signed-in customer's saved delivery addresses, newest first. */
+  getAddresses(): Promise<SavedAddress[]>;
+  /** Adds an address, or edits `addressId`. Saving the same text twice returns the existing one. */
+  saveAddress(input: AddressInput, addressId?: string): Promise<SavedAddress>;
+  deleteAddress(addressId: string): Promise<void>;
   /** Owner only, like the other store updates. */
   createService(storeId: string, input: ServiceInput): Promise<StoreService>;
   updateService(storeId: string, serviceId: string, input: ServiceInput): Promise<StoreService>;
