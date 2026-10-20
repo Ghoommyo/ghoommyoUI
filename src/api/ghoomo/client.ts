@@ -1,5 +1,6 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
 import {
+  addressToSaved,
   API_DEFAULTS,
   appointmentToBooking,
   calendarId,
@@ -17,6 +18,7 @@ import {
   slotsFromCalendar,
 } from '@/api/ghoomo/mappers';
 import type {
+  GhoomoAddress,
   GhoomoAppointment,
   GhoomoCalendar,
   GhoomoLocation,
@@ -249,6 +251,33 @@ export function createGhoomoApi(baseUrl: string): Api {
       return (res?.services ?? []).map(serviceToStore);
     },
 
+    async getAddresses() {
+      const res = await request<{ addresses: GhoomoAddress[] }>('/traveller/addresses');
+      return (res?.addresses ?? []).map(addressToSaved);
+    },
+
+    async saveAddress(input, addressId) {
+      const res = await request<{ address: GhoomoAddress }>(
+        addressId ? `/traveller/addresses/${encodeURIComponent(addressId)}` : '/traveller/addresses',
+        { method: addressId ? 'PUT' : 'POST', body: { label: input.label.trim(), address: input.address.trim() } },
+      );
+      return addressToSaved(res!.address);
+    },
+
+    async deleteAddress(addressId) {
+      await request(`/traveller/addresses/${encodeURIComponent(addressId)}`, { method: 'DELETE' });
+    },
+
+    async getStoreCategories() {
+      const res = await request<{ storeCategories: string[] }>('/store-categories');
+      return res?.storeCategories ?? [];
+    },
+
+    async getProductTypes() {
+      const res = await request<{ productTypes: string[] }>('/product-types');
+      return res?.productTypes ?? [];
+    },
+
     async getServiceTypes() {
       const res = await request<{ serviceTypes: string[] }>('/service-types');
       return res?.serviceTypes ?? [];
@@ -299,6 +328,7 @@ export function createGhoomoApi(baseUrl: string): Api {
           bokng_mobile: input.mobile,
           bokng_cnt: count,
           order_type: orderTypeToApi(input.orderType),
+          ...(input.deliveryAddress ? { delivery_address: input.deliveryAddress } : {}),
           bokng_desc: input.description,
           ...(input.services.length
             ? { services: input.services.map((svc) => ({ svc_id: svc.serviceId, qty: svc.qty })) }
@@ -446,12 +476,27 @@ export function createGhoomoApi(baseUrl: string): Api {
     },
     async getUserProfile() {
       const { userId, userName } = claims<GhoomoUserClaims>();
-      return (
-        userProfiles.get(userId) ?? {
-          name: userName ? displayName(userName) : '',
-          mobile: API_DEFAULTS.userMobile,
-        }
-      );
+      const local = userProfiles.get(userId);
+      // The server knows whether the admin made the account inactive; name and mobile edited in
+      // this app session win over the server's copy.
+      // Only customer tokens may read it (a store gets 403), so stores skip the call.
+      const isStore = 'locCode' in claims<GhoomoUserClaims | GhoomoLocationClaims>();
+      const res = isStore
+        ? null
+        : await request<{ profile: { name?: string; mobile?: string; inactive?: boolean } }>(
+            '/traveller/profile',
+          ).catch(() => null);
+      const server = res?.profile;
+      return {
+        name: local?.name ?? (server?.name || (userName ? displayName(userName) : '')),
+        mobile: local?.mobile ?? (server?.mobile || API_DEFAULTS.userMobile),
+        inactive: !!server?.inactive,
+      };
+    },
+
+    async deleteAccount(password) {
+      await request('/account', { method: 'DELETE', body: { password } });
+      userProfiles.delete(claims<GhoomoUserClaims>().userId);
     },
 
     async updateUserProfile(profile) {

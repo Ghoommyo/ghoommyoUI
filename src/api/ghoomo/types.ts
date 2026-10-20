@@ -24,6 +24,14 @@ export interface GhoomoLocation {
   catalog_type?: string | null;
   /** Type of service, e.g. `Plumber`; null = not set. */
   svc_type?: string | null;
+  /** Category of a PRODUCT location, e.g. `Bakery`; null = not set. */
+  store_cat?: string | null;
+  /** From the location's profile, so customers know where to go; null when not filled in. */
+  loc_address?: string | null;
+  loc_city?: string | null;
+  loc_pin_code?: string | null;
+  loc_country?: string | null;
+  loc_nav?: string | null;
   /** Average stars (1 decimal) and number of ratings; strings, null when unrated. */
   rating_avg?: string | null;
   rating_count?: string | null;
@@ -43,6 +51,9 @@ export interface GhoomoSettings {
   /** `PRODUCT` (default) or `SERVICE`. */
   catalog_type?: string;
   svc_type?: string | null;
+  store_cat?: string | null;
+  /** 1 when the admin made the location inactive (GET settings only). */
+  store_inactive?: number;
 }
 
 /** A location's service (Api.md §5.4a). Already camelCase on the wire. */
@@ -55,6 +66,7 @@ export interface GhoomoService {
   /** The service's own limit; null = the location's `max_svc_qty`. */
   maxQty: number | null;
   effectiveMaxQty: number;
+  productType?: string | null;
 }
 
 /** Snapshot of a booked service on an appointment row. */
@@ -102,6 +114,15 @@ export interface GhoomoAppointment {
   services?: GhoomoBookedService[] | null;
   /** `TABLE` | `PICKUP` | `PORTER` | `APPOINTMENT` | `HOME_VISIT`; null on older rows. */
   order_type?: string | null;
+  /** Delivery address of PORTER / HOME_VISIT bookings; null otherwise. */
+  dlvry_addr?: string | null;
+}
+
+/** A saved address (GET/POST /traveller/addresses). Already camelCase on the wire. */
+export interface GhoomoAddress {
+  id: string;
+  label: string | null;
+  address: string;
 }
 
 /** GET /notifications row: a notification joined with its appointment. */

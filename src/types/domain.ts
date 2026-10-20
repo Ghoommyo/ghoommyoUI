@@ -62,6 +62,10 @@ export interface StoreSettings {
   catalogType: CatalogType;
   /** Type of service, e.g. "Plumber" (see `getServiceTypes`); null = not set. Shown for service stores only. */
   serviceType: string | null;
+  /** Category of a product store, e.g. "Bakery" (see `getStoreCategories`); null = not set. */
+  storeCategory: string | null;
+  /** The admin made the store inactive (only known for the signed-in store's own record). */
+  inactive?: boolean;
   /** How many of each service a booking may include, for services without their own limit. */
   maxServiceQty: number;
 }
@@ -106,6 +110,8 @@ export interface StoreService {
   maxQtyOverride: number | null;
   /** The limit that applies: `maxQtyOverride ?? maxServiceQty`. */
   maxQty: number;
+  /** From `getProductTypes`; null = none. */
+  productType: string | null;
 }
 
 /** What a store enters to add or edit a service. */
@@ -116,6 +122,8 @@ export interface ServiceInput {
   imageUrl: string;
   /** null = the store default. */
   maxQty: number | null;
+  /** One of `getProductTypes`, or null. */
+  productType: string | null;
 }
 
 /** Service id → quantity picked for a booking. */
@@ -132,6 +140,8 @@ export interface BookedService {
 export interface UserProfile {
   name: string;
   mobile: string;
+  /** The admin made the account inactive: no new or changed bookings. Read-only. */
+  inactive?: boolean;
 }
 
 export interface Booking {
@@ -152,6 +162,8 @@ export interface Booking {
   services: BookedService[];
   /** Null for bookings made before order types existed. */
   orderType: OrderType | null;
+  /** Where the store goes for Porter / home-visit bookings; null otherwise. */
+  deliveryAddress: string | null;
 }
 
 export interface BookingRating {
@@ -214,6 +226,21 @@ export interface NewBooking {
   description: string;
   services: BookedService[];
   orderType: OrderType;
+  /** Required for Porter / home visits; ignored otherwise. */
+  deliveryAddress: string | null;
+}
+
+/** A customer's saved delivery address. */
+export interface SavedAddress {
+  id: string;
+  /** e.g. "Home"; '' when none. */
+  label: string;
+  address: string;
+}
+
+export interface AddressInput {
+  label: string;
+  address: string;
 }
 
 export interface Slot {

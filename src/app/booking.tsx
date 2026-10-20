@@ -12,16 +12,26 @@ import { Screen } from '@/components/ui/screen';
 import { Select } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
-import { useCreateBooking, useMyProfile, useStore, useStoreServices } from '@/hooks/queries';
+import { DeliveryAddressField, OTHER_ADDRESS, StoreAddressCard } from '@/features/bookings/booking-address';
+import {
+  useAddresses,
+  useCreateBooking,
+  useMyProfile,
+  useSaveAddress,
+  useStore,
+  useStoreServices,
+} from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { ServicesModal } from '@/features/services/services-modal';
 import { formatSlotStart } from '@/lib/date';
 import {
   asksPeople as asksPeopleFor,
+  needsDeliveryAddress,
+  visitsStore,
   catalogWords,
   defaultOrderType,
   orderTypeOptions,
-  serviceTypeLabel,
+  storeTypeLabel,
 } from '@/lib/order-types';
 import {
   countServices,
@@ -32,10 +42,19 @@ import {
   servicesDescription,
 } from '@/lib/services';
 import type { OrderType, ServicePicks, Store, StoreService } from '@/types/domain';
+import { INACTIVE_USER_HINT } from '@/lib/account-status';
 
 const MOBILE_PATTERN = /^\+?\d{10,15}$/;
 
-type FieldErrors = { name?: string; mobile?: string; people?: string; description?: string };
+type FieldErrors = {
+  name?: string;
+  mobile?: string;
+  people?: string;
+  description?: string;
+  address?: string;
+};
+
+const MAX_ADDRESS_LENGTH = 500;
 
 export default function BookingScreen() {
   const params = useLocalSearchParams<{ storeId: string; slotStart: string; services?: string }>();
@@ -78,6 +97,7 @@ export default function BookingScreen() {
       slotStart={slotStart}
       initialName={profile.data?.name ?? ''}
       initialMobile={profile.data?.mobile ?? ''}
+      inactive={!!profile.data?.inactive}
     />
   );
 }
@@ -93,6 +113,8 @@ type BookingFormProps = {
   slotStart: string;
   initialName: string;
   initialMobile: string;
+  /** The admin made the customer inactive: they can't submit requests. */
+  inactive: boolean;
 };
 
 function BookingForm({
@@ -103,6 +125,7 @@ function BookingForm({
   slotStart,
   initialName,
   initialMobile,
+  inactive,
 }: BookingFormProps) {
   const [picks, setPicks] = useState(initialPicks);
   const [servicesOpen, setServicesOpen] = useState(false);
@@ -123,6 +146,19 @@ function BookingForm({
       catalogWords(store.catalogType).Items,
     ),
   );
+  // Porter / home visit: a saved address (newest by default) or Other with its own text.
+  const addresses = useAddresses();
+  const saveAddress = useSaveAddress();
+  const savedAddresses = addresses.data ?? [];
+  const [addressChoice, setAddressChoice] = useState<string | null>(null);
+  const choice = addressChoice ?? savedAddresses[0]?.id ?? OTHER_ADDRESS;
+  const [otherAddress, setOtherAddress] = useState('');
+  const [saveNewAddress, setSaveNewAddress] = useState(false);
+  const needsAddress = needsDeliveryAddress(orderType);
+  const deliveryAddress =
+    choice === OTHER_ADDRESS
+      ? otherAddress.trim()
+      : (savedAddresses.find((a) => a.id === choice)?.address ?? '');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [confirmCancel, setConfirmCancel] = useState(false);
   const createBooking = useCreateBooking();
@@ -135,6 +171,13 @@ function BookingForm({
       people: !asksPeople || people ? undefined : 'Choose how many people are coming.',
       // The server rejects bookings without a description.
       description: description.trim() ? undefined : 'Description is required.',
+      address: !needsAddress
+        ? undefined
+        : !deliveryAddress
+          ? 'Enter the address the store should come to.'
+          : deliveryAddress.length > MAX_ADDRESS_LENGTH
+            ? `Use at most ${MAX_ADDRESS_LENGTH} characters.`
+            : undefined,
     };
     setErrors(next);
     if (Object.values(next).some(Boolean)) return;
@@ -147,6 +190,7 @@ function BookingForm({
         mobile: cleanMobile,
         people: asksPeople && people ? people : 1,
         orderType,
+        deliveryAddress: needsAddress ? deliveryAddress : null,
         description: description.trim(),
         services: picked.map(({ serviceId, name: serviceName, price, qty }) => ({
           serviceId,
@@ -156,11 +200,16 @@ function BookingForm({
         })),
       },
       {
-        onSuccess: (booking) =>
+        onSuccess: (booking) => {
+          // The booking stands even if saving the address fails; it can be added from Addresses.
+          if (needsAddress && choice === OTHER_ADDRESS && saveNewAddress) {
+            saveAddress.mutate({ input: { label: '', address: deliveryAddress } });
+          }
           router.dismissTo({
             pathname: '/dashboard',
             params: { booked: booking.slotStart, status: booking.status },
-          }),
+          });
+        },
       },
     );
   };
@@ -193,7 +242,9 @@ function BookingForm({
         message={
           createBooking.isError
             ? { type: 'error', text: errorMessage(createBooking.error) }
-            : servicesError
+            : inactive
+              ? { type: 'error', text: INACTIVE_USER_HINT }
+              : servicesError
               ? { type: 'error', text: `Your ${words.items} couldn't be loaded: ${servicesError}` }
               : null
         }
@@ -206,9 +257,9 @@ function BookingForm({
               <ThemedText type="smallBold" accessibilityRole="header">
                 {words.Items}
               </ThemedText>
-              {serviceTypeLabel(store) ? (
+              {storeTypeLabel(store) ? (
                 <ThemedText type="smallBold" style={{ color: theme.primary }}>
-                  {serviceTypeLabel(store)}
+                  {storeTypeLabel(store)}
                 </ThemedText>
               ) : null}
               <ThemedText type="small" themeColor="textSecondary">
@@ -273,10 +324,31 @@ function BookingForm({
         options={orderTypeOptions(store)}
         onChange={(next) => {
           setOrderType(next);
-          // The people field may have just gone away.
-          setErrors((e) => ({ ...e, people: undefined }));
+          // The people or address field may have just gone away.
+          setErrors((e) => ({ ...e, people: undefined, address: undefined }));
         }}
       />
+      {visitsStore(orderType) ? <StoreAddressCard storeName={store.name} profile={store.profile} /> : null}
+      {needsAddress ? (
+        <DeliveryAddressField
+          isHomeVisit={orderType === 'homeVisit'}
+          saved={savedAddresses}
+          loading={addresses.isLoading}
+          choice={choice}
+          onChoice={(value) => {
+            setAddressChoice(value);
+            setErrors((e) => ({ ...e, address: undefined }));
+          }}
+          other={otherAddress}
+          onOther={(value) => {
+            setOtherAddress(value);
+            setErrors((e) => ({ ...e, address: undefined }));
+          }}
+          save={saveNewAddress}
+          onSave={setSaveNewAddress}
+          error={errors.address}
+        />
+      ) : null}
       {asksPeople ? (
         <Select
           label="How many people are coming"
@@ -313,6 +385,7 @@ function BookingForm({
           variant="success"
           onPress={confirm}
           loading={createBooking.isPending}
+          disabled={inactive}
         />
       </View>
 
@@ -321,7 +394,7 @@ function BookingForm({
           storeId={store.id}
           storeName={store.name}
           catalogType={store.catalogType}
-          serviceType={serviceTypeLabel(store)}
+          typeLabel={storeTypeLabel(store)}
           initial={picks}
           onClose={() => setServicesOpen(false)}
           onSave={saveServices}

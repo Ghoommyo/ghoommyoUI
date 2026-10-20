@@ -1,10 +1,13 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
-import { orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
+import { needsDeliveryAddress, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
 import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
+import { STANDARD_STORE_CATEGORIES } from '@/lib/store-categories';
 import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type {
+  SavedAddress,
+  AddressInput,
   AppNotification,
   Booking,
   NotificationKind,
@@ -76,6 +79,7 @@ const stores: StoreRecord[] = [
     isDarkStore: false,
     catalogType: 'service',
     serviceType: null,
+    storeCategory: null,
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -100,6 +104,7 @@ const stores: StoreRecord[] = [
     isDarkStore: false,
     catalogType: 'service',
     serviceType: 'Barber',
+    storeCategory: null,
     profile: {
       address: '45 Vijay Nagar',
       pin: '452010',
@@ -125,8 +130,10 @@ const stores: StoreRecord[] = [
     isDarkStore: true,
     catalogType: 'product',
     serviceType: null,
+    storeCategory: 'Fresh produce',
     profile: {
-      address: '8 Palasia Square',
+      // No address entered yet, so customers can't visit: only Porter.
+      address: '',
       pin: '452001',
       city: 'Indore',
       state: 'Madhya Pradesh',
@@ -165,15 +172,53 @@ function seedBookings(): Booking[] {
     services: [],
     // The oldest one predates order types.
     orderType: i === 0 ? null : 'appointment',
+    deliveryAddress: null,
   }));
 }
 
 const bookings: Booking[] = seedBookings();
 
+/** Customers' saved delivery addresses, newest first. */
+const addresses: (SavedAddress & { accountId: string })[] = [
+  { id: 'addr1', accountId: 'u1', label: 'Home', address: '21 Saket Nagar, Indore 452018' },
+];
+const MAX_ADDRESSES = 20;
+
+function readAddress(input: AddressInput): AddressInput {
+  const address = input.address.trim();
+  const label = input.label.trim();
+  if (!address || address.length > 500) throw new ApiError('address is required (at most 500 characters)', 400);
+  if (label.length > 40) throw new ApiError('label must be at most 40 characters', 400);
+  return { label, address };
+}
+
+function currentCustomer() {
+  const account = currentAccount();
+  if (account.role !== 'user') throw new ApiError('Forbidden: user login required', 403);
+  return account;
+}
+
 /** Types of service stores added through "Other"; every store can pick them. */
 const addedServiceTypes = new Set<string>(['Barber']);
 
 /** Validates a type of service and adds it to the list if new; returns the listed spelling. */
+/** Store categories stores added through "Other"; every store can pick them. */
+const addedStoreCategories = new Set<string>();
+/** Product types (the admin manages this list; web only). */
+const productTypes = ['Handmade', 'Organic food'];
+
+/** Validates a category and adds it to the list if new; returns the listed spelling. */
+function addStoreCategory(name: string): string {
+  const clean = cleanServiceType(name);
+  if (!clean || clean.length > MAX_SERVICE_TYPE_LENGTH) {
+    throw new ApiError('storeCategory must be 1 to 60 characters, or null', 400);
+  }
+  const listed = [...STANDARD_STORE_CATEGORIES, ...addedStoreCategories].find((c) => c.toLowerCase() === clean.toLowerCase());
+  if (listed) return listed;
+  addedStoreCategories.add(clean);
+  return clean;
+}
+
 function addServiceType(name: string): string {
   const clean = cleanServiceType(name);
   if (!clean || clean.length > MAX_SERVICE_TYPE_LENGTH) {
@@ -197,7 +242,9 @@ const services: StoredService[] = [
   ['s1', 'Express delivery', 'Ready the next day', 200, 1],
   ['s2', 'Haircut', 'Classic cut and wash', 200, null],
   ['s2', 'Beard trim', '', 100, null],
-].map(([storeId, name, description, price, maxQtyOverride], i) => ({
+  ['s3', 'Seasonal fruit box', 'Whatever is in season this week', 299, null, 'Organic food'],
+  ['s3', 'Vegetable basket', 'Fresh vegetables for the week', 249, null],
+].map(([storeId, name, description, price, maxQtyOverride, productType], i) => ({
   id: `svc${i + 1}`,
   storeId: storeId as string,
   name: name as string,
@@ -205,6 +252,7 @@ const services: StoredService[] = [
   price: price as number,
   imageUrl: '',
   maxQtyOverride: maxQtyOverride as number | null,
+  productType: (productType as string | undefined) ?? null,
 }));
 
 function withMaxQty({ storeId, ...service }: StoredService): StoreService {
@@ -221,7 +269,19 @@ function checkServiceInput(input: ServiceInput): ServiceInput {
   }
   const imageUrl = input.imageUrl.trim();
   if (imageUrl && !/^https?:\/\//.test(imageUrl)) throw new ApiError('imageUrl must start with http:// or https://', 400);
-  return { ...input, name, description: input.description.trim(), imageUrl, price: Math.round(input.price * 100) / 100 };
+  // A product type must be one of the admin's list (any case; saved with its listed spelling).
+  const productType = input.productType
+    ? productTypes.find((t) => t.toLowerCase() === input.productType!.trim().toLowerCase())
+    : null;
+  if (input.productType && !productType) throw new ApiError('productType must be one of the product types', 400);
+  return {
+    ...input,
+    name,
+    description: input.description.trim(),
+    imageUrl,
+    price: Math.round(input.price * 100) / 100,
+    productType: productType ?? null,
+  };
 }
 
 function findOwnService(storeId: string, serviceId: string): StoredService {
@@ -350,6 +410,7 @@ export const mockApi: Api = {
       isDarkStore: false,
       catalogType: 'product',
       serviceType: null,
+      storeCategory: null,
       profile: {
         address: '',
         pin: '',
@@ -438,6 +499,52 @@ export const mockApi: Api = {
     );
   },
 
+  async getAddresses() {
+    await delay();
+    const account = currentCustomer();
+    return clone(addresses.filter((a) => a.accountId === account.id).map(({ accountId: _owner, ...a }) => a));
+  },
+
+  async saveAddress(input, addressId) {
+    await delay();
+    const account = currentCustomer();
+    const clean = readAddress(input);
+    const own = addresses.filter((a) => a.accountId === account.id);
+    if (addressId) {
+      const existing = own.find((a) => a.id === addressId);
+      if (!existing) throw new ApiError('Address not found', 404);
+      Object.assign(existing, clean);
+      return clone({ id: existing.id, label: existing.label, address: existing.address });
+    }
+    // The same address text again returns the saved one instead of a copy.
+    const same = own.find((a) => a.address === clean.address);
+    if (same) return clone({ id: same.id, label: same.label, address: same.address });
+    if (own.length >= MAX_ADDRESSES) {
+      throw new ApiError(`You can save up to ${MAX_ADDRESSES} addresses. Delete one to add another.`, 400);
+    }
+    const saved = { id: newId('addr'), accountId: account.id, ...clean };
+    addresses.unshift(saved);
+    return clone({ id: saved.id, label: saved.label, address: saved.address });
+  },
+
+  async deleteAddress(addressId) {
+    await delay();
+    const account = currentCustomer();
+    const index = addresses.findIndex((a) => a.id === addressId && a.accountId === account.id);
+    if (index < 0) throw new ApiError('Address not found', 404);
+    addresses.splice(index, 1);
+  },
+
+  async getStoreCategories() {
+    await delay();
+    return [...STANDARD_STORE_CATEGORIES, ...[...addedStoreCategories].sort((a, b) => a.localeCompare(b))];
+  },
+
+  async getProductTypes() {
+    await delay();
+    return [...productTypes].sort((a, b) => a.localeCompare(b));
+  },
+
   async getServiceTypes() {
     await delay();
     return [...STANDARD_SERVICE_TYPES, ...[...addedServiceTypes].sort((a, b) => a.localeCompare(b))];
@@ -485,6 +592,7 @@ export const mockApi: Api = {
     if (people < 1 || people > store.maxPerBooking) {
       throw new ApiError(`${store.name} allows 1–${store.maxPerBooking} people per booking.`, 400);
     }
+    // Stores without an address only take Porter / home visits (orderTypeChoices checks the profile).
     const allowed = orderTypeChoices(store);
     if (!allowed.includes(input.orderType)) {
       const labels = allowed.map(orderTypeToApi);
@@ -503,8 +611,14 @@ export const mockApi: Api = {
       }
       return { serviceId, name: stored.name, price: stored.price, qty };
     });
+    // Porter and home visits go to the customer, so they need an address; store visits don't keep one.
+    const deliveryAddress = needsDeliveryAddress(input.orderType) ? (input.deliveryAddress ?? '').trim() : null;
+    if (deliveryAddress !== null && (!deliveryAddress || deliveryAddress.length > 500)) {
+      throw new ApiError('delivery_address is required for PORTER and HOME_VISIT bookings (at most 500 characters)', 400);
+    }
     const booking: Booking = {
       ...input,
+      deliveryAddress,
       people,
       services: booked,
       id: newId('b'),
@@ -682,7 +796,11 @@ export const mockApi: Api = {
     await delay();
     requireStoreOwner(storeId);
     const store = findStore(storeId);
-    Object.assign(store, settings, { serviceType: settings.serviceType && addServiceType(settings.serviceType) });
+    Object.assign(store, settings, {
+      serviceType: settings.serviceType && addServiceType(settings.serviceType),
+      storeCategory: settings.storeCategory && addStoreCategory(settings.storeCategory),
+      inactive: undefined,
+    });
     for (const b of bookings) if (b.storeId === storeId) b.storeName = store.name;
     return clone(withRating(store));
   },
@@ -698,6 +816,31 @@ export const mockApi: Api = {
   async getUserProfile() {
     await delay();
     return clone(currentAccount().profile);
+  },
+
+  async deleteAccount(password) {
+    await delay();
+    const account = currentAccount();
+    if (account.password !== password) throw new ApiError('Password is wrong', 403);
+    const today = todayKey();
+    for (const booking of bookings) {
+      const upcoming = booking.slotStart.slice(0, 10) >= today && booking.status !== 'rejected';
+      if (account.role === 'user' && booking.userId === account.id) {
+        // The store keeps its history without the customer's personal details.
+        Object.assign(booking, { name: 'Deleted user', mobile: '', deliveryAddress: null });
+        if (upcoming) booking.status = 'rejected';
+      }
+      if (account.role === 'store' && booking.storeId === account.id && upcoming) {
+        booking.status = 'rejected';
+        notify(booking.userId, booking.id, 'REJECTED', `${booking.storeName} closed its account, so your booking was cancelled`);
+      }
+    }
+    if (account.role === 'store') {
+      const store = stores.findIndex((s) => s.id === account.id);
+      if (store >= 0) stores.splice(store, 1);
+    }
+    for (let i = addresses.length - 1; i >= 0; i--) if (addresses[i].accountId === account.id) addresses.splice(i, 1);
+    accounts.splice(accounts.indexOf(account), 1);
   },
 
   async updateUserProfile(profile) {

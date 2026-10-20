@@ -11,7 +11,7 @@ import { Spacing } from '@/constants/theme';
 import { ServiceFormModal } from '@/features/settings/service-form-modal';
 import { useDeleteService, useStoreServices } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { catalogWords, serviceTypeLabel } from '@/lib/order-types';
+import { catalogWords, storeTypeLabel } from '@/lib/order-types';
 import { formatPrice } from '@/lib/services';
 import type { Store, StoreService } from '@/types/domain';
 
@@ -33,9 +33,10 @@ export function StoreServices({ store }: { store: Store }) {
           <ThemedText type="subtitle" style={styles.title}>
             {words.Items}
           </ThemedText>
-          {serviceTypeLabel(store) ? (
+          {storeTypeLabel(store) ? (
             <ThemedText type="small">
-              Type of service: <ThemedText type="smallBold">{serviceTypeLabel(store)}</ThemedText>
+              {store.catalogType === 'service' ? 'Type of service' : 'Category'}:{' '}
+              <ThemedText type="smallBold">{storeTypeLabel(store)}</ThemedText>
             </ThemedText>
           ) : null}
           <ThemedText type="small" themeColor="textSecondary">
@@ -75,6 +76,11 @@ export function StoreServices({ store }: { store: Store }) {
                 </ThemedText>
                 <ThemedText type="smallBold">{formatPrice(service.price)}</ThemedText>
               </View>
+              {service.productType ? (
+                <ThemedText type="smallBold" style={{ color: theme.primary }}>
+                  {service.productType}
+                </ThemedText>
+              ) : null}
               <ThemedText type="small" themeColor="textSecondary">
                 Up to {service.maxQty} per booking{service.maxQtyOverride == null ? ' (store default)' : ''}
               </ThemedText>
@@ -112,6 +118,7 @@ export function StoreServices({ store }: { store: Store }) {
           service={editing === 'new' ? undefined : editing}
           defaultMaxQty={store.maxServiceQty}
           item={words.item}
+          isProductStore={store.catalogType !== 'service'}
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
             setEditing(null);

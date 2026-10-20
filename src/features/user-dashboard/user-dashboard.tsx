@@ -15,10 +15,11 @@ import { Spacing } from '@/constants/theme';
 import { UserEventsTabs } from '@/features/events/user-events-tabs';
 import { ServicesModal } from '@/features/services/services-modal';
 import { SlotGrid } from '@/features/user-dashboard/slot-grid';
-import { useStores, useStoreSlots } from '@/hooks/queries';
+import { useMyProfile, useStores, useStoreSlots } from '@/hooks/queries';
+import { INACTIVE_USER_HINT } from '@/lib/account-status';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDayLong, formatSlotStart, makeDateKey, MONTHS, toDateKey } from '@/lib/date';
-import { catalogWords, serviceTypeLabel } from '@/lib/order-types';
+import { catalogWords, storeTypeLabel } from '@/lib/order-types';
 import { countServices, encodeServices } from '@/lib/services';
 import { daysInMonth, LIMIT_UNIT_LABEL } from '@/lib/slots';
 import type { ServicePicks, SlotStart } from '@/types/domain';
@@ -39,13 +40,22 @@ function nowSlotStart(now: Date): SlotStart {
 export function UserDashboard() {
   const theme = useTheme();
   const { session } = useSession();
-  const { booked, status: bookedStatus } = useLocalSearchParams<{
+  // The admin can make a customer inactive: they can look around but not submit requests.
+  const profile = useMyProfile();
+  const inactive = session?.role === 'user' && !!profile.data?.inactive;
+  const {
+    booked,
+    status: bookedStatus,
+    storeId: storeParam,
+  } = useLocalSearchParams<{
     booked?: string;
     status?: string;
+    /** From Home's Book button: start with this store selected. */
+    storeId?: string;
   }>();
   const [today] = useState(() => new Date());
 
-  const [storeId, setStoreId] = useState<string>();
+  const [storeId, setStoreId] = useState<string | undefined>(storeParam);
   const [monthKey, setMonthKey] = useState(`${today.getFullYear()}-${today.getMonth()}`);
   const [day, setDay] = useState(today.getDate());
   const [selectedSlot, setSelectedSlot] = useState<SlotStart | null>(null);
@@ -53,6 +63,17 @@ export function UserDashboard() {
   const [picks, setPicks] = useState<ServicePicks>({});
   const [servicesOpen, setServicesOpen] = useState(false);
   const serviceCount = countServices(picks);
+
+  // Home's Book button sends a store: select it (a new store starts with no slot or picks).
+  const [seenStoreParam, setSeenStoreParam] = useState(storeParam);
+  if (storeParam !== seenStoreParam) {
+    setSeenStoreParam(storeParam);
+    if (storeParam && storeParam !== storeId) {
+      setStoreId(storeParam);
+      setSelectedSlot(null);
+      setPicks({});
+    }
+  }
 
   // A finished booking comes back with a new `booked` param: start the next one without its services.
   const [seenBooked, setSeenBooked] = useState(booked);
@@ -130,7 +151,7 @@ export function UserDashboard() {
           value={storeId}
           options={(stores.data ?? []).map((s) => ({
             // Service stores show their type of service, e.g. "Raju Tailor · Plumber".
-            label: serviceTypeLabel(s) ? `${s.name} · ${serviceTypeLabel(s)}` : s.name,
+            label: storeTypeLabel(s) ? `${s.name} · ${storeTypeLabel(s)}` : s.name,
             value: s.id,
             // The rating opens the store's reviews; the name still selects the store.
             accessory: {
@@ -235,11 +256,16 @@ export function UserDashboard() {
         )}
       </View>
 
-      <Banner message={message ?? bookedMessage} />
+      <Banner message={inactive ? { type: 'error', text: INACTIVE_USER_HINT } : (message ?? bookedMessage)} />
 
       <View style={styles.actions}>
         <Button label="Reset" variant="danger" onPress={reset} />
-        <Button label={session ? 'Submit request' : 'Login to book'} variant="success" onPress={book} />
+        <Button
+          label={session ? 'Submit request' : 'Login to book'}
+          variant="success"
+          onPress={book}
+          disabled={inactive}
+        />
       </View>
 
       {servicesOpen && store ? (
@@ -247,7 +273,7 @@ export function UserDashboard() {
           storeId={store.id}
           storeName={store.name}
           catalogType={store.catalogType}
-          serviceType={serviceTypeLabel(store)}
+          typeLabel={storeTypeLabel(store)}
           initial={picks}
           onClose={() => setServicesOpen(false)}
           onSave={(next) => {

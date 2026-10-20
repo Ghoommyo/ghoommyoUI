@@ -10,7 +10,7 @@ Reference for building a UI against the Ghoomo backend (the `/apis/*` routes of 
 
 | Item           | Value                                                                                                                                                     |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Base URL       | `http://localhost:3000/apis` (note: `/apis`, not `/api`)                                                                                                  |
+| Base URL       | `https://ghoommyo-eight.vercel.app/apis` (deployed; production data). Local server: `http://localhost:3000/apis`. Note `/apis`, not `/api`              |
 | Body format    | JSON. Send `Content-Type: application/json` on POST/PUT                                                                                                   |
 | CORS           | Any origin is allowed (`Access-Control-Allow-Origin: *`). Preflight `OPTIONS` returns 204                                                                 |
 | Auth header    | `Authorization: Bearer <jwt>`. The sign-in responses return the token **already prefixed** with `Bearer `, so send the `token` string exactly as received |
@@ -47,7 +47,7 @@ Errors are JSON with **either** an `error` or a `message` key, so read both:
 ### Shell setup for the curl examples
 
 ```bash
-BASE=http://localhost:3000/apis
+BASE=https://ghoommyo-eight.vercel.app/apis   # or http://localhost:3000/apis for a local server
 # After signing in, store the token exactly as returned (it already includes "Bearer "):
 USER_TOKEN="Bearer eyJ..."   # from POST /signin
 LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
@@ -91,6 +91,13 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 | 30  | GET, POST | `/location/{locCode}/services` | Location (own)    | List / add services                                  |
 | 31  | PUT, DELETE | `/location/{locCode}/services/{serviceId}` | Location (own) | Replace / soft-delete a service          |
 | 32  | GET    | `/service-types`               | none                 | Types of service a SERVICE location can pick (§5.4a) |
+| 33  | GET, POST | `/traveller/addresses`      | User                 | Saved delivery addresses: list / add (§5.1)          |
+| 34  | PUT, DELETE | `/traveller/addresses/{addressId}` | User      | Edit / remove a saved address                        |
+| 37  | DELETE | `/account`                     | User or Location     | Delete the signed-in account (§5.1)                  |
+| 35  | GET    | `/store-categories`            | none                 | Categories a PRODUCT location can pick (§5.4a)       |
+| 36  | GET    | `/product-types`               | none                 | Types a location can give its products (§5.4a)       |
+
+The admin console's routes (`/admin/*`, admin token only) are web only and aren't used by this app; see the server's `docs/API.md` §5.8.
 
 **Do not use:** `GET /shop/{shopCode}`, `GET|PUT /shop/profile`, `GET|PUT /shop/settings`. These are broken legacy copies of the `/location/{locCode}/*` routes and respond 403 to location tokens. Use rows 9–13 instead.
 
@@ -209,6 +216,39 @@ curl "$BASE/traveller" -H "Authorization: $USER_TOKEN"
 
 - 200 `{"user":{"userId":"92177fd2-...","userName":"asha@example.com","userType":"CUSTOMER","userAccess":"LIMITED","iat":1791025490,"exp":1791111890}}`
 
+#### DELETE /account
+
+Deletes the signed-in customer's or location's account. Body `{"password":"…"}`, which must match.
+
+- **Customer:** can't sign in any more (the email can sign up again); name, mobile, saved addresses, reminder settings and notifications are removed; their bookings stay for the stores as "Deleted user" without mobile or delivery address, and upcoming pending/accepted ones become `REJECTED` ("Account deleted").
+- **Location:** hidden and can't sign in; items deactivated, profile address/bio cleared; upcoming pending/accepted bookings become `REJECTED` ("Store closed its account") and each customer is notified.
+- 200 `{"message":"Account deleted"}` · 400 `{"error":"password is required"}` · 401 · 403 `{"error":"Password is wrong"}` · 404 (already deleted)
+
+#### GET /traveller/addresses · POST /traveller/addresses
+
+The customer's saved delivery addresses, for Porter and home-visit bookings. User token only (403 for a location token).
+
+```bash
+curl "$BASE/traveller/addresses" -H "Authorization: $USER_TOKEN"
+curl -X POST "$BASE/traveller/addresses" -H "Authorization: $USER_TOKEN" -H "Content-Type: application/json" \
+  -d '{"label":"Home","address":"12 MG Road, Indore 452001"}'
+```
+
+| Field (POST/PUT) | Type   | Req | Notes                                                    |
+| ---------------- | ------ | --- | -------------------------------------------------------- |
+| address          | string | ✔   | 1–500 characters (trimmed)                               |
+| label            | string |     | up to 40 characters, e.g. `Home`; empty or missing = none |
+
+- GET 200 `{"addresses":[{"id":"c390f88b-...","label":"Home","address":"12 MG Road, Indore 452001"}]}`, newest first (`label` is `""` when unset)
+- POST 201 `{"address":{...}}`; the same address text again returns the saved one (200) instead of a copy
+- 400 `{"error":"address is required (at most 500 characters)"}` / `{"error":"label must be at most 40 characters"}` / `{"error":"You can save up to 20 addresses. Delete one to add another."}`
+
+#### PUT /traveller/addresses/{addressId} · DELETE …
+
+PUT replaces the label and address; DELETE removes it (soft delete; bookings keep their address).
+
+- PUT 200 `{"address":{...}}` · DELETE 200 `{"message":"Address deleted"}` · 404 `{"error":"Address not found"}` (unknown, deleted, or another customer's)
+
 ---
 
 ### 5.2 Location (owner) auth
@@ -278,13 +318,21 @@ curl "$BASE/location"
       "max_svc_qty": 1,
       "is_dark_store": 0,
       "catalog_type": "PRODUCT",
-      "svc_type": null
+      "svc_type": null,
+      "store_cat": "Bakery",
+      "loc_address": "12 MG Road",
+      "loc_city": "Indore",
+      "loc_pin_code": "452001",
+      "loc_country": "India",
+      "loc_nav": null
     }
   ]
 }
 ```
 
 - `user_id` is the **location id**. Pass it as `loc_id` when booking.
+- Locations the admin made inactive aren't listed (and can't take bookings).
+- `loc_address`, `loc_city`, `loc_pin_code`, `loc_country` and `loc_nav` (map link) come from the location's profile, so customers can be shown where to go; `null` when not filled in. A location without `loc_address` can't take store visits (see the appointment's `order_type`).
 - `max_limit` comes back as a string, so parse it.
 - 404 `{"error":"Locations not found"}` when the table is empty.
 
@@ -418,9 +466,11 @@ curl -X PUT "$BASE/location/raju_tailor/settings" -H "Authorization: $LOC_TOKEN"
 | isDarkStore      | 0 \| 1    | dark store: no dine-in, bookings are orders (column `is_dark_store`, default 0). Appointments then can't use `order_type: "TABLE"` and always count as 1 (`bokng_cnt = 1`) |
 | catalogType      | `PRODUCT` \| `SERVICE` | what the location sells (column `catalog_type`, default `PRODUCT`). Decides what its items are called (Products / Services) and which `order_type`s bookings may use (see §5.6) |
 | serviceType      | string (1–60) \| null | the location's type of service, e.g. `"Plumber"` (column `svc_type`, default `null`; also on `GET /location` rows). Spaces are trimmed. A name not in `GET /service-types` (any case) is **added to that list** for every location; an existing one is saved with its listed spelling (`"plumber"` → `"Plumber"`). `null` clears it. Apps show it for `SERVICE` locations only |
+| storeCategory    | string (1–60) \| null | the category of a `PRODUCT` location, e.g. `"Bakery"` (column `store_cat`; also on `GET /location` rows). Same rules as `serviceType`, against `GET /store-categories` |
 
 - 200 `{"settings":{ ...same fields as GET... }}`
-- 400 `{"error":"maxServiceQty must be a whole number of at least 1"}` / `{"error":"isDarkStore must be 0 or 1"}` / `{"error":"catalogType must be PRODUCT or SERVICE"}` / `{"error":"serviceType must be 1 to 60 characters, or null"}`
+- 400 `{"error":"maxServiceQty must be a whole number of at least 1"}` / `{"error":"isDarkStore must be 0 or 1"}` / `{"error":"catalogType must be PRODUCT or SERVICE"}` / `{"error":"serviceType must be 1 to 60 characters, or null"}` / `{"error":"storeCategory must be 1 to 60 characters, or null"}`
+- `GET` rows also carry `store_inactive`: 1 when the admin made the location inactive (it still works for its owner, but customers can't see or book it).
 - 404 `{"error":"Location settings not found, call GET first to create defaults"}`
 
 ### 5.4a Services (add-ons)
@@ -431,7 +481,7 @@ A location's priced services that a customer can add to an appointment (backend 
 
 ```json
 {"id":"c4753b3f-...","name":"Haircut","description":"Classic cut and wash","price":200,
- "imageUrl":"https://img.example/cut.jpg","maxQty":null,"effectiveMaxQty":2}
+ "imageUrl":"https://img.example/cut.jpg","maxQty":null,"effectiveMaxQty":2,"productType":null}
 ```
 
 - `maxQty` is the service's own per-booking limit, or `null` to use the location's `maxServiceQty` setting.
@@ -472,7 +522,11 @@ PUT takes the same body as POST and replaces all fields. DELETE is a soft delete
 
 Public. The types of service a `SERVICE` location can pick in its settings: 34 standard trades in a fixed order, then the ones locations added themselves (A–Z).
 
-- 200 `{"serviceTypes":["Electrician","Wireman","Lineman","Plumber", … ,"Cleaning Supervisor","Drone pilot"]}`
+- 200 `{"serviceTypes":["Electrician","Wireman","Lineman","Plumber", … ,"Cleaning Supervisor","Drone pilot"]}` (types the admin removed aren't listed)
+
+#### GET /store-categories · GET /product-types
+
+Public. `{"storeCategories":["Food","Beverages","Grocery", …]}` (44 standard categories, then ones locations added) and `{"productTypes":[…]}` (managed by the admin). A service's `productType` (POST/PUT) must be one of the product types (any case) or `null` → otherwise 400 `{"error":"productType must be one of the product types"}`.
 
 ---
 
@@ -561,8 +615,9 @@ curl -X POST "$BASE/appointment" -H "Authorization: $USER_TOKEN" -H "Content-Typ
 | cret_by        | string                |     | display name              |
 | bokng_name     | string                |     | stored as `user_name`     |
 | bokng_mobile   | string                |     | stored as `mobile_number` |
-| bokng_cnt      | number                |     | number of people; ignored (stored as 1) at dark stores |
-| order_type     | see below             |     | optional; defaults to the first allowed value. Send `count_of_ppl: 1` to `POST /calendar` for dark-store bookings |
+| bokng_cnt      | number                |     | number of people; ignored (stored as 1) at dark stores and for `HOME_VISIT` |
+| order_type     | see below             |     | optional; defaults to the first allowed value. Send `count_of_ppl: 1` to `POST /calendar` for dark-store bookings and home visits |
+| delivery_address | string              | for `PORTER`, `HOME_VISIT` | where the store goes, 1–500 characters; stored as `dlvry_addr`. Ignored (stored `null`) for the other types |
 | bokng_desc     | string                | ✔   | note for the store; must not be empty or only spaces |
 | services       | array of `{svc_id, qty}` | | add-ons (§5.4a); each one of the location's active services, listed once, with `1 ≤ qty ≤ effectiveMaxQty`. Saved as a snapshot of name and price |
 
@@ -575,8 +630,10 @@ Allowed `order_type` by location:
 | `SERVICE` | `APPOINTMENT`, `HOME_VISIT` | `APPOINTMENT` |
 | `SERVICE`, dark store | `HOME_VISIT` | `HOME_VISIT` |
 
+`TABLE`, `PICKUP` and `APPOINTMENT` mean the customer goes to the store, so they're only allowed when the location's profile has an address (`loc_address` not blank). Without one, product locations take `PORTER` only and service locations `HOME_VISIT` only.
+
 - 201 `{"message":"Appointment added successfully","appointmentId":"60834c7e-ca6b-4b13-a724-c27df35feec8","status":"ACCEPTED","orderType":"TABLE"}`
-- 400 `{"error":"Missing required fields"}` / `{"error":"bokng_desc is required"}` / `{"error":"Invalid apntmnt_time"}` / `{"error":"qty for Haircut must be between 1 and 2"}` / `{"error":"services contains a service this location doesn't offer"}` / `{"error":"This store takes APPOINTMENT or HOME_VISIT bookings"}` (any type the location doesn't allow) · 401
+- 400 `{"error":"Missing required fields"}` / `{"error":"bokng_desc is required"}` / `{"error":"Invalid apntmnt_time"}` / `{"error":"qty for Haircut must be between 1 and 2"}` / `{"error":"services contains a service this location doesn't offer"}` / `{"error":"This store takes APPOINTMENT or HOME_VISIT bookings"}` (any type the location doesn't allow) / `{"error":"delivery_address is required for PORTER and HOME_VISIT bookings (at most 500 characters)"}` · 401 · 403 `{"error":"Your account is inactive, so you can't submit requests. Contact support."}` / `{"error":"This store isn't taking bookings right now"}` (inactive customer or location; the customer's `GET /traveller/profile` has `"inactive": true`)
 
 **Appointment object** (returned by the list endpoints and the PUT):
 
@@ -603,11 +660,12 @@ Allowed `order_type` by location:
   "status_updt_on": null,
   "updt_reason": null,
   "services": [{ "svc_id": "c4753b3f-...", "name": "Haircut", "price": 200, "qty": 2 }],
-  "order_type": "TABLE"
+  "order_type": "TABLE",
+  "dlvry_addr": null
 }
 ```
 
-`bokng_cnt` comes back as a string. `services` is the snapshot of booked add-ons (name and price at booking time), or `null`. `order_type` is `null` for bookings made before order types existed.
+`bokng_cnt` comes back as a string. `services` is the snapshot of booked add-ons (name and price at booking time), or `null`. `order_type` is `null` for bookings made before order types existed. `dlvry_addr` is the delivery address of `PORTER` and `HOME_VISIT` bookings, otherwise `null`.
 
 #### PUT /appointment
 

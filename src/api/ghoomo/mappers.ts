@@ -1,4 +1,5 @@
 import type {
+  GhoomoAddress,
   GhoomoAppointment,
   GhoomoDayDetails,
   GhoomoLocation,
@@ -17,6 +18,7 @@ import type {
   DateKey,
   DaySummary,
   LimitUnit,
+  SavedAddress,
   ServiceInput,
   Slot,
   SlotStart,
@@ -139,7 +141,7 @@ export function daySummaryFromCalendar(
   }));
 }
 
-type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type'>;
+type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'store_inactive'>;
 /** Settings columns, which are null on browse rows for locations that never opened settings. */
 type SettingsInput = { [K in keyof SettingsFields]?: SettingsFields[K] | null };
 
@@ -156,6 +158,8 @@ export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'>
     maxServiceQty: Number(row.max_svc_qty) || d.maxServiceQty,
     catalogType: row.catalog_type === 'SERVICE' ? 'service' : 'product',
     serviceType: row.svc_type || null,
+    storeCategory: row.store_cat || null,
+    inactive: Number(row.store_inactive ?? 0) === 1,
   };
 }
 
@@ -170,6 +174,7 @@ export function settingsToRequest(settings: StoreSettings) {
     isDarkStore: settings.isDarkStore ? 1 : 0,
     catalogType: settings.catalogType === 'service' ? 'SERVICE' : 'PRODUCT',
     serviceType: settings.serviceType,
+    storeCategory: settings.storeCategory,
   };
 }
 
@@ -207,13 +212,14 @@ export function profileToRequest(profile: StoreProfile) {
   };
 }
 
-/** A browse-list row (location + settings) as a Store. The profile isn't part of this row. */
+/** A browse-list row (location + settings + the profile's address columns) as a Store. */
 export function locationToStore(row: GhoomoLocation, profile?: GhoomoProfile | null): Store {
   return {
     id: row.user_id,
     name: row.loc_name,
     ...settingsToStore(row),
-    profile: profileToStore(profile),
+    // List rows carry the address columns; the owner's own record passes the full profile row.
+    profile: profile ? profileToStore(profile) : addressFromRow(row),
     rating: {
       average: row.rating_avg == null ? null : Number(row.rating_avg),
       count: Number(row.rating_count ?? 0),
@@ -242,7 +248,24 @@ export function appointmentToBooking(row: GhoomoAppointment): Booking {
       qty: Number(s.qty) || 1,
     })),
     orderType: orderTypeFromApi(row.order_type),
+    deliveryAddress: row.dlvry_addr || null,
   };
+}
+
+/** The profile part of a list row: its address columns (no bio). */
+function addressFromRow(row: GhoomoLocation): StoreProfile {
+  return {
+    ...EMPTY_PROFILE,
+    address: row.loc_address ?? '',
+    city: row.loc_city ?? '',
+    pin: row.loc_pin_code ?? '',
+    country: row.loc_country ?? '',
+    mapUrl: row.loc_nav || undefined,
+  };
+}
+
+export function addressToSaved(row: GhoomoAddress): SavedAddress {
+  return { id: row.id, label: row.label ?? '', address: row.address ?? '' };
 }
 
 export function serviceToStore(row: GhoomoService): StoreService {
@@ -254,6 +277,7 @@ export function serviceToStore(row: GhoomoService): StoreService {
     imageUrl: row.imageUrl ?? '',
     maxQtyOverride: row.maxQty ?? null,
     maxQty: Number(row.effectiveMaxQty) || 1,
+    productType: row.productType ?? null,
   };
 }
 
@@ -265,5 +289,6 @@ export function serviceToRequest(input: ServiceInput) {
     price: input.price,
     imageUrl: input.imageUrl,
     maxQty: input.maxQty,
+    productType: input.productType,
   };
 }

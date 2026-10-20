@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * In-memory stand-in for the Ghoomo backend (Api.md), for developing and testing with
- * EXPO_PUBLIC_USE_REAL_API=true when the real server isn't available.
+ * In-memory stand-in for the Ghoomo backend (Api.md), for developing and testing without the
+ * real server. Point the app at it with EXPO_PUBLIC_API_URL=http://localhost:3000/apis
+ * (the app defaults to the Vercel deployment).
  *
  *   npm run stub:api            # http://localhost:3000/apis
  *   PORT=4000 npm run stub:api
@@ -55,6 +56,10 @@ const reminderSettings = []; // append-only audit trail: { acct_id, enabled, hou
 // Types of service (svc_type_tbl): the standard trades, then ones locations added through "Other".
 const STANDARD_SERVICE_TYPES = ['Electrician', 'Wireman', 'Lineman', 'Plumber', 'Pipefitter', 'Carpenter', 'Welder', 'Fabricator', 'Bricklayer', 'Mason', 'Roofer', 'Scaffolder', 'General Contractor', 'Automotive Mechanic', 'Diesel Mechanic', 'Auto Electrician', 'Truck Driver', 'Delivery Driver', 'Forklift Operator', 'Heavy Equipment Operator', 'Aircraft Maintenance Technician', 'Assembly Line Worker', 'Machinist', 'Warehouse Worker', 'Sorter', 'Power Plant Operator', 'Sandblaster', 'Industrial Cleaner', 'HVAC Technician', 'Elevator Installer', 'Solar Panel Installer', 'Pest Control Technician', 'Security Guard', 'Cleaning Supervisor'];
 const addedServiceTypes = [];
+// Store categories (option_tbl STORE_CATEGORY) and product types (PRODUCT_TYPE; the admin manages them).
+const STANDARD_STORE_CATEGORIES = ['Food', 'Beverages', 'Grocery', 'Fresh produce', 'Dairy', 'Meat & seafood', 'Bakery', 'Snacks', 'Clothing', 'Footwear', 'Accessories', 'Jewelry', 'Watches', 'Bags & luggage', 'Electronics', 'Mobile phones', 'Computers', 'Appliances', 'Home furniture', 'Home decor', 'Kitchenware', 'Bedding & linen', 'Beauty & cosmetics', 'Personal care', 'Health & wellness', 'Pharmacy', 'Baby products', 'Toys & games', 'Sports & fitness', 'Outdoor', 'Books', 'Stationery', 'Office supplies', 'Music instruments', 'Movies & media', 'Pet supplies', 'Automotive', 'Hardware & tools', 'Garden', 'Cleaning supplies', 'Gifts', 'Art & crafts', 'Digital products', 'Services'];
+const addedStoreCategories = [];
+const productTypes = ['Handmade', 'Organic food'];
 const services = []; // { svc_id, loc_id, svc_name, svc_desc, svc_price, svc_img_url, max_qty, active, created_on }
 function notify(rcptId, apptId, kind, text) {
   notifications.push({ ntfy_id: randomUUID(), rcpt_id: rcptId, apntmnt_id: apptId, kind, text, cret_on: now(), read_on: null });
@@ -75,7 +80,7 @@ function ensureSettings(loc) {
   if (!settings.has(loc.user_id)) {
     settings.set(loc.user_id, {
       stng_id: randomUUID(), loc_id: loc.user_id, max_limit: '100', unit: 'DAY', is_auto_approval: 1,
-      open_at: '09:00', close_at: '21:00', max_svc_qty: 1, is_dark_store: 0, catalog_type: 'PRODUCT', svc_type: null, created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
+      open_at: '09:00', close_at: '21:00', max_svc_qty: 1, is_dark_store: 0, catalog_type: 'PRODUCT', svc_type: null, store_cat: null, created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
     });
   }
   return settings.get(loc.user_id);
@@ -91,9 +96,20 @@ function ensureProfile(loc) {
   return profiles.get(loc.user_id);
 }
 /** Order types a location takes, the first being the default (docs/API.md). */
-function allowedOrderTypes(catalogType, dark) {
-  if (catalogType === 'SERVICE') return dark ? ['HOME_VISIT'] : ['APPOINTMENT', 'HOME_VISIT'];
-  return dark ? ['PORTER', 'PICKUP'] : ['TABLE', 'PICKUP', 'PORTER'];
+// Without an address a location can't be visited, so only PORTER / HOME_VISIT remain.
+function allowedOrderTypes(catalogType, dark, hasAddress = true) {
+  const all = catalogType === 'SERVICE' ? (dark ? ['HOME_VISIT'] : ['APPOINTMENT', 'HOME_VISIT']) : dark ? ['PORTER', 'PICKUP'] : ['TABLE', 'PICKUP', 'PORTER'];
+  return hasAddress ? all : all.filter((t) => !['TABLE', 'PICKUP', 'APPOINTMENT'].includes(t));
+}
+const hasAddress = (locId) => !!profiles.get(locId)?.loc_address?.trim();
+const addresses = []; // { addr_id, user_id, addr_label, addr_text, cret_on, active }
+const addressJson = (a) => ({ id: a.addr_id, label: a.addr_label ?? '', address: a.addr_text });
+function readAddress(body) {
+  const address = typeof body?.address === 'string' ? body.address.trim() : '';
+  const label = body?.label == null ? '' : body.label;
+  if (!address || address.length > 500) return { error: 'address is required (at most 500 characters)' };
+  if (typeof label !== 'string' || label.trim().length > 40) return { error: 'label must be at most 40 characters' };
+  return { address, label: label.trim() || null };
 }
 const PERIOD_MS = { HOUR: 3600e3, DAY: 86400e3, WEEK: 7 * 86400e3 };
 function addAppointment(body, userId) {
@@ -108,6 +124,7 @@ function addAppointment(body, userId) {
     status: 'PENDING', status_updt_by: null, status_updt_on: null, updt_reason: null,
     services: body.services ?? null,
     order_type: body.order_type ?? null,
+    dlvry_addr: body.dlvry_addr ?? null,
   };
   appointments.push(row);
   return row;
@@ -184,11 +201,13 @@ function addToCalendar({ plan_id, count_of_ppl, type, details }) {
 const browseRow = (loc) => {
   const { password: _pw, email: _email, ...row } = loc;
   const s = settings.get(loc.user_id);
+  const p = profiles.get(loc.user_id);
   const rated = ratings.filter((r) => r.loc_id === loc.user_id);
   const avg = rated.length ? (rated.reduce((sum, r) => sum + r.stars, 0) / rated.length).toFixed(1) : null;
   return {
     ...row, max_limit: s?.max_limit ?? null, unit: s?.unit ?? null, is_auto_approval: s?.is_auto_approval ?? null, open_at: s?.open_at ?? null, close_at: s?.close_at ?? null,
-    max_svc_qty: s?.max_svc_qty ?? null, is_dark_store: s?.is_dark_store ?? null, catalog_type: s?.catalog_type ?? null, svc_type: s?.svc_type ?? null,
+    max_svc_qty: s?.max_svc_qty ?? null, is_dark_store: s?.is_dark_store ?? null, catalog_type: s?.catalog_type ?? null, svc_type: s?.svc_type ?? null, store_cat: s?.store_cat ?? null,
+    loc_address: p?.loc_address ?? null, loc_city: p?.loc_city ?? null, loc_pin_code: p?.loc_pin_code ?? null, loc_country: p?.loc_country ?? null, loc_nav: p?.loc_nav ?? null,
     rating_avg: avg, rating_count: rated.length ? String(rated.length) : null,
   };
 };
@@ -200,7 +219,7 @@ const today = () => localDay(new Date().toISOString());
 /** Service row → the API's service object, with the limit that applies. */
 const serviceJson = (svc) => ({
   id: svc.svc_id, name: svc.svc_name, description: svc.svc_desc ?? '', price: svc.svc_price, imageUrl: svc.svc_img_url ?? '',
-  maxQty: svc.max_qty, effectiveMaxQty: svc.max_qty ?? settings.get(svc.loc_id)?.max_svc_qty ?? 1,
+  maxQty: svc.max_qty, effectiveMaxQty: svc.max_qty ?? settings.get(svc.loc_id)?.max_svc_qty ?? 1, productType: svc.prod_type ?? null,
 });
 const activeServices = (locId) => services.filter((svc) => svc.loc_id === locId && svc.active);
 function serviceFields(body) {
@@ -211,7 +230,10 @@ function serviceFields(body) {
   if (maxQty !== null && (!Number.isInteger(maxQty) || maxQty < 1)) return [null, 'maxQty must be empty or a whole number of at least 1'];
   const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl.trim() : '';
   if (imageUrl && !/^https?:\/\//.test(imageUrl)) return [null, 'imageUrl must start with http:// or https://'];
-  return [{ svc_name: body.name.trim(), svc_desc: typeof body.description === 'string' ? body.description.trim() : '', svc_price: Math.round(price * 100) / 100, svc_img_url: imageUrl, max_qty: maxQty }, null];
+  const wanted = typeof body.productType === 'string' && body.productType.trim() ? body.productType.trim().toLowerCase() : null;
+  const prodType = wanted ? productTypes.find((t) => t.toLowerCase() === wanted) : null;
+  if (wanted && !prodType) return [null, 'productType must be one of the product types'];
+  return [{ svc_name: body.name.trim(), svc_desc: typeof body.description === 'string' ? body.description.trim() : '', svc_price: Math.round(price * 100) / 100, svc_img_url: imageUrl, max_qty: maxQty, prod_type: prodType ?? null }, null];
 }
 const isLocToken = (c) => c && 'locCode' in c;
 
@@ -222,13 +244,13 @@ const UNAUTH = [401, { message: 'Authentication token is missing or invalid' }];
 
 route('POST', /^\/signup$/, 'none', ({ body }) => {
   if (!body?.user_name || !body.password || body.password !== body.confirmPassword) return [400, { message: 'Invalid sign-up data' }];
-  if (users.some((u) => u.user_name === body.user_name)) return [409, { error: 'User name already exists' }];
+  if (users.some((u) => u.user_name === body.user_name && u.active !== 0)) return [409, { error: 'User name already exists' }];
   users.push({ user_id: randomUUID(), user_name: body.user_name, password: body.password });
   return [201, { message: 'Sign-up successful' }];
 });
 route('POST', /^\/signin$/, 'none', ({ body }) => {
   if (!body?.user_name || !body.password) return [400, { message: 'Invalid sign-in data' }];
-  const user = users.find((u) => u.user_name === body.user_name);
+  const user = users.find((u) => u.user_name === body.user_name && u.active !== 0);
   if (!user) return [404, { error: 'User not found' }];
   if (user.password !== body.password) return [401, { error: 'Invalid credentials' }];
   const token = signJwt({ userId: user.user_id, userName: user.user_name, userType: 'CUSTOMER', userAccess: 'LIMITED' });
@@ -248,7 +270,7 @@ route('POST', /^\/location\/signup$/, 'none', ({ body }) => {
 });
 route('POST', /^\/location\/signin$/, 'none', ({ body }) => {
   if (!body?.location_code || !body.password) return [400, { message: 'Invalid sign-in data' }];
-  const loc = locations.find((l) => l.loc_code === body.location_code);
+  const loc = locations.find((l) => l.loc_code === body.location_code && l.active);
   if (!loc) return [404, { error: 'User not found' }];
   if (loc.password !== body.password) return [401, { error: 'Invalid credentials' }];
   const token = signJwt({ userId: loc.user_id, locName: loc.loc_name, locType: loc.loc_type, locAccess: loc.loc_access, locCode: loc.loc_code });
@@ -314,6 +336,13 @@ route('PUT', /^\/location\/([^/]+)\/settings$/, 'any', ({ claims, params, body }
     if (name && !listed) addedServiceTypes.push(name);
     row.svc_type = listed || name;
   }
+  if (body?.storeCategory !== undefined) {
+    const name = typeof body.storeCategory === 'string' ? body.storeCategory.trim().replace(/\s+/g, ' ') : body.storeCategory;
+    if (name !== null && (typeof name !== 'string' || !name || name.length > 60)) return [400, { error: 'storeCategory must be 1 to 60 characters, or null' }];
+    const listed = name && [...STANDARD_STORE_CATEGORIES, ...addedStoreCategories].find((c) => c.toLowerCase() === name.toLowerCase());
+    if (name && !listed) addedStoreCategories.push(name);
+    row.store_cat = listed || name;
+  }
   if (body?.catalogType !== undefined) {
     if (!['PRODUCT', 'SERVICE'].includes(body.catalogType)) return [400, { error: 'catalogType must be PRODUCT or SERVICE' }];
     row.catalog_type = body.catalogType;
@@ -322,6 +351,8 @@ route('PUT', /^\/location\/([^/]+)\/settings$/, 'any', ({ claims, params, body }
   return [200, { settings: row }];
 });
 
+route('GET', /^\/store-categories$/, 'none', () => [200, { storeCategories: [...STANDARD_STORE_CATEGORIES, ...[...addedStoreCategories].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))] }]);
+route('GET', /^\/product-types$/, 'none', () => [200, { productTypes: [...productTypes].sort((a, b) => a.localeCompare(b)) }]);
 route('GET', /^\/service-types$/, 'none', () => [200, { serviceTypes: [...STANDARD_SERVICE_TYPES, ...[...addedServiceTypes].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))] }]);
 route('GET', /^\/services\/([^/]+)$/, 'none', ({ params }) => [200, { services: activeServices(params[0]).map(serviceJson) }]);
 route('GET', /^\/location\/([^/]+)\/services$/, 'any', ({ claims, params }) => {
@@ -391,12 +422,16 @@ route('POST', /^\/appointment$/, 'any', ({ claims, body }) => {
   // Dark stores take orders (each counts as one); the order types depend on the store type.
   const stng = settings.get(body.loc_id);
   const dark = Number(stng?.is_dark_store ?? 0) === 1;
-  const allowed = allowedOrderTypes(stng?.catalog_type, dark);
+  const allowed = allowedOrderTypes(stng?.catalog_type, dark, hasAddress(body.loc_id));
   const orderType = body.order_type ?? allowed[0];
   if (!allowed.includes(orderType)) {
     return [400, { error: `This store takes ${allowed.length > 1 ? `${allowed.slice(0, -1).join(', ')} or ${allowed.at(-1)}` : allowed[0]} bookings` }];
   }
-  const appt = addAppointment({ ...body, services: booked, order_type: orderType, bokng_cnt: dark || orderType === 'HOME_VISIT' ? 1 : body.bokng_cnt }, claims.userId);
+  // Porter and home visits go to the customer, so they need an address.
+  const delivery = ['PORTER', 'HOME_VISIT'].includes(orderType);
+  const dlvry = typeof body.delivery_address === 'string' ? body.delivery_address.trim() : '';
+  if (delivery && (!dlvry || dlvry.length > 500)) return [400, { error: 'delivery_address is required for PORTER and HOME_VISIT bookings (at most 500 characters)' }];
+  const appt = addAppointment({ ...body, services: booked, order_type: orderType, bokng_cnt: dark || orderType === 'HOME_VISIT' ? 1 : body.bokng_cnt, dlvry_addr: delivery ? dlvry : null }, claims.userId);
   // Auto-approving locations (the default for new settings) accept on creation.
   const auto = Number(stng?.is_auto_approval ?? 1) === 1;
   if (auto) Object.assign(appt, { status: 'ACCEPTED', status_updt_by: 'SYSTEM', status_updt_on: now() });
@@ -469,6 +504,63 @@ route('POST', /^\/notifications\/read$/, 'any', ({ claims, body }) => {
   let updated = 0;
   for (const n of notifications) if (n.rcpt_id === claims.userId && body.ids.includes(n.ntfy_id) && !n.read_on) { n.read_on = now(); updated++; }
   return [200, { updated }];
+});
+// Account deletion (user or location token; the password must match).
+route('DELETE', /^\/account$/, 'any', ({ claims, body }) => {
+  if (typeof body?.password !== 'string' || !body.password) return [400, { error: 'password is required' }];
+  if (body.password !== PASSWORD) return [403, { error: 'Password is wrong' }];
+  const upcoming = (a) => ['PENDING', 'ACCEPTED'].includes(a.status) && new Date(a.start_time) > new Date();
+  if (isLocToken(claims)) {
+    const loc = locations.find((l) => l.user_id === claims.userId && l.active);
+    if (!loc) return [404, { error: 'Account not found' }];
+    for (const a of appointments.filter((a) => a.loc_id === loc.user_id && upcoming(a))) {
+      Object.assign(a, { status: 'REJECTED', updt_reason: 'Store closed its account' });
+      notify(a.user_id, a.apntmnt_id, 'REJECTED', `${loc.loc_name} closed its account, so your booking was cancelled`);
+    }
+    loc.active = 0;
+    return [200, { message: 'Account deleted' }];
+  }
+  for (const a of appointments.filter((a) => a.user_id === claims.userId)) {
+    if (upcoming(a)) Object.assign(a, { status: 'REJECTED', updt_reason: 'Account deleted' });
+    Object.assign(a, { user_name: 'Deleted user', mobile_number: '', dlvry_addr: null });
+  }
+  for (const a of addresses.filter((a) => a.user_id === claims.userId)) a.active = 0;
+  const user = users.find((u) => u.user_id === claims.userId);
+  if (user) user.active = 0;
+  return [200, { message: 'Account deleted' }];
+});
+// Saved delivery addresses (user token; own rows only).
+route('GET', /^\/traveller\/addresses$/, 'any', ({ claims }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  return [200, { addresses: addresses.filter((a) => a.user_id === claims.userId && a.active).sort((a, b) => b.cret_on.localeCompare(a.cret_on)).map(addressJson) }];
+});
+route('POST', /^\/traveller\/addresses$/, 'any', ({ claims, body }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const input = readAddress(body);
+  if (input.error) return [400, { error: input.error }];
+  const own = addresses.filter((a) => a.user_id === claims.userId && a.active);
+  const same = own.find((a) => a.addr_text === input.address);
+  if (same) return [200, { address: addressJson(same) }];
+  if (own.length >= 20) return [400, { error: 'You can save up to 20 addresses. Delete one to add another.' }];
+  const row = { addr_id: randomUUID(), user_id: claims.userId, addr_label: input.label, addr_text: input.address, cret_on: now(), active: 1 };
+  addresses.push(row);
+  return [201, { address: addressJson(row) }];
+});
+route('PUT', /^\/traveller\/addresses\/([^/]+)$/, 'any', ({ claims, params, body }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const input = readAddress(body);
+  if (input.error) return [400, { error: input.error }];
+  const row = addresses.find((a) => a.addr_id === params[0] && a.user_id === claims.userId && a.active);
+  if (!row) return [404, { error: 'Address not found' }];
+  Object.assign(row, { addr_label: input.label, addr_text: input.address });
+  return [200, { address: addressJson(row) }];
+});
+route('DELETE', /^\/traveller\/addresses\/([^/]+)$/, 'any', ({ claims, params }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const row = addresses.find((a) => a.addr_id === params[0] && a.user_id === claims.userId && a.active);
+  if (!row) return [404, { error: 'Address not found' }];
+  row.active = 0;
+  return [200, { message: 'Address deleted' }];
 });
 route('GET', /^\/reminder-settings$/, 'any', ({ claims }) => {
   const latest = reminderSettings.filter((r) => r.acct_id === claims.userId).at(-1);

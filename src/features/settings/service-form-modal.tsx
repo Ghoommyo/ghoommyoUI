@@ -5,10 +5,11 @@ import { errorMessage } from '@/api';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { ServiceImage } from '@/components/ui/service-image';
+import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
-import { useCreateService, useUpdateService } from '@/hooks/queries';
+import { useCreateService, useProductTypes, useUpdateService } from '@/hooks/queries';
 import { validateService } from '@/lib/services';
 import type { StoreService } from '@/types/domain';
 
@@ -20,6 +21,8 @@ type ServiceFormModalProps = {
   defaultMaxQty: number;
   /** `product` or `service`, by the store type. */
   item: string;
+  /** Product stores can tag items with a product type. */
+  isProductStore: boolean;
   onClose(): void;
   onSaved(service: StoreService): void;
 };
@@ -27,7 +30,22 @@ type ServiceFormModalProps = {
 type FieldErrors = ReturnType<typeof validateService>;
 
 /** Add or edit a store's product or service. Mount it only while open. */
-export function ServiceFormModal({ storeId, service, defaultMaxQty, item, onClose, onSaved }: ServiceFormModalProps) {
+export function ServiceFormModal({
+  storeId,
+  service,
+  defaultMaxQty,
+  item,
+  isProductStore,
+  onClose,
+  onSaved,
+}: ServiceFormModalProps) {
+  const productTypes = useProductTypes();
+  const [productType, setProductType] = useState<string | null>(service?.productType ?? null);
+  // A removed type the item still uses stays selectable.
+  const typeNames = [
+    ...(productType && !(productTypes.data ?? []).includes(productType) ? [productType] : []),
+    ...(productTypes.data ?? []),
+  ];
   const create = useCreateService(storeId);
   const update = useUpdateService(storeId);
   const mutation = service ? update : create;
@@ -55,6 +73,7 @@ export function ServiceFormModal({ storeId, service, defaultMaxQty, item, onClos
       price: Number(draft.price),
       imageUrl: draft.imageUrl.trim(),
       maxQty: draft.maxQty.trim() ? Number(draft.maxQty) : null,
+      productType: isProductStore ? productType : null,
     };
     if (service) update.mutate({ serviceId: service.id, input }, { onSuccess: onSaved });
     else create.mutate(input, { onSuccess: onSaved });
@@ -80,6 +99,14 @@ export function ServiceFormModal({ storeId, service, defaultMaxQty, item, onClos
         placeholder="Shown under the name"
         multiline
       />
+      {isProductStore && typeNames.length ? (
+        <Select
+          label="Product type"
+          value={productType ?? ''}
+          options={[{ label: 'None', value: '' }, ...typeNames.map((name) => ({ label: name, value: name }))]}
+          onChange={(value) => setProductType(value || null)}
+        />
+      ) : null}
       <TextField
         label="Price (₹)"
         value={draft.price}

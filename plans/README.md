@@ -62,6 +62,7 @@ Decisions:
 - **SHOP locations only.** PLACE locations, which are booked by whole day through `/event` and `/traveller/*`, are hidden for now.
 - **Hardcoded values for missing fields.** The API has nowhere to store some fields, so in API mode they get hardcoded values from `API_DEFAULTS` until the API supports them: max people per booking, store-name edits, state, map coordinates, and the user's name and mobile.
 - **Verification uses a stub server** (`scripts/ghoomo-stub.mjs`) built from Api.md, because the real backend can't be run here.
+- **Vercel by default (2026-10-17).** The API is deployed at `https://ghoommyo-eight.vercel.app/apis`, so the real API is now on unless `EXPO_PUBLIC_USE_REAL_API=false`, and `EXPO_PUBLIC_API_URL` defaults to Vercel. Local servers and the stub are opt-in via `EXPO_PUBLIC_API_URL`.
 
 - [x] [API phase 1: Branch, flag and plan docs](api-phase-1-flag.md)
 - [x] [API phase 2: Ghoomo client foundation and stub server](api-phase-2-client.md)
@@ -106,3 +107,21 @@ The web app's phase 6 (dark stores, order types) and phase 16 (Product or Servic
 Notifications fetched on app start with an unseen count, New/Earlier sections; a service store's type of service.
 
 - [x] [Unseen notifications on load, service types](notifications-service-types.md)
+
+## Store address for visits, saved delivery addresses (branch `delivery_addresses`)
+
+Book table / Pickup / Book appointment show the store's address (and need one); Porter / Book home visit pick a saved delivery address or a new one; users manage addresses from the menu.
+
+- [x] [Store address for visits, saved delivery addresses](addresses.md)
+
+## Store categories, product types, inactive accounts (branch `admin_console`)
+
+Product stores pick a category; products can carry a product type; stores/customers the admin made inactive see a notice (and customers can't book). The admin console itself is web only.
+
+- [x] [Store categories, product types, inactive accounts](admin-categories.md)
+
+## Home page and information pages (branch `info_pages`)
+
+A Home screen (store types with their best rated stores), About with screenshots, Contact, Delete account, and links to the website's Privacy policy, Terms of service and Help & FAQ.
+
+- [x] [Home page and information pages](info-pages.md)

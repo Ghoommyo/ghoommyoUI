@@ -32,17 +32,18 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
 ### Backend
 
 - Screens call the `Api` interface (`src/api/client.ts`) through `api` from `@/api`. Which backend that is depends on a flag in `src/api/config.ts`, set in `.env.local` (see `.env.example`). Restart `expo start` after changing it; `--clear` is safest.
-- **Flag off (default):** `api` is the in-memory dummy backend (`src/api/mock.ts`), which resets on every reload.
+- **Default:** `api` is the Ghoomo client (below), pointed at the Vercel deployment `https://ghoommyo-eight.vercel.app/apis`. That's the production database: test against it read-only, or with your own accounts.
+- **`EXPO_PUBLIC_USE_REAL_API=false`:** `api` is the in-memory dummy backend (`src/api/mock.ts`), which resets on every reload.
   - Seeded logins (password `password123`): user `user@ghoomyo.app`; store `store@ghoomyo.app`, which also accepts the store name `Raju Tailor` or `raju_tailor`.
   - Seeded bookings are dated relative to today.
-- **`EXPO_PUBLIC_USE_REAL_API=true`:** `api` is the Ghoomo client (`src/api/ghoomo/`), pointed at `EXPO_PUBLIC_API_URL` (default `http://localhost:3000/apis`). `Api.md` is the API reference.
+- **The Ghoomo client** (`src/api/ghoomo/`) talks to `EXPO_PUBLIC_API_URL`, defaulting to Vercel. Set it to `http://localhost:3000/apis` for a local Next.js server or the stub (`http://10.0.2.2:3000/apis` from the Android emulator). `Api.md` is the API reference.
   - `types.ts` holds the wire types.
   - `mappers.ts` holds the pure conversions:
     - units, statuses, and local time ↔ UTC ISO;
     - calendar ids (`october2026_<locId>_SHOP`) and unpadded `"H:M"` slot keys;
     - `API_DEFAULTS`.
   - `client.ts` implements `Api`.
-- **Without the real backend,** `npm run stub:api` serves the documented routes in memory and logs each request. Seeded logins (password `Secret@123`): user `asha@example.com`, stores `raju_tailor` and `city_salon` (City Salon has no settings yet). There's also a PLACE location, `taj_mahal`.
+- **Without a real backend,** `npm run stub:api` (with `EXPO_PUBLIC_API_URL=http://localhost:3000/apis`) serves the documented routes in memory and logs each request. Seeded logins (password `Secret@123`): user `asha@example.com`, stores `raju_tailor` and `city_salon` (City Salon has no settings yet). There's also a PLACE location, `taj_mahal`.
 - **A new endpoint** needs adding in three places: the `Api` interface, `mock.ts` and `ghoomo/client.ts`. Also add it to `scripts/ghoomo-stub.mjs` to test it.
 - **How the Ghoomo API shapes the app:**
   - Only SHOP locations are supported; PLACE locations are filtered out.
@@ -58,7 +59,7 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
 - **Bookings, notifications, ratings, reminders** (branch `booking_features`, plan `plans/features-bookings-notifications-ratings-reminders.md`):
   - **Endpoints:** `PUT /appointment/{id}` (customer edit: message appended below `=====`, people, mobile), `PUT /appointment/{id}/rating`, `GET /reviews/{locId}` (10 per page, `nextCursor`), `GET /notifications` + `POST /notifications/read`, and `GET/PUT /reminder-settings` (append-only server audit copy).
   - **Server-driven behaviour:** new bookings take their status from the server (auto-approve), and the server rejects bookings without a description.
-  - **Real backend:** the Next.js `ghoomo` repo (`improved_screens`) serves all of these. Its `docs/API.md` §5.6–5.6b is the reference, and it runs locally on :3000 (`npm run dev` there).
+  - **Real backend:** the Next.js `ghoomo` repo (`improved_screens`) serves all of these. Its `docs/API.md` §5.6–5.6b is the reference. It's deployed on Vercel (the app's default), and runs locally on :3000 (`npm run dev` there) for testing backend changes.
 - **Store services** (branch `store_services`, plan `plans/store-services.md`):
   - **Endpoints:** public `GET /services/{locId}`; owner `GET/POST /location/{locCode}/services` and `PUT/DELETE …/{svcId}`; the `maxServiceQty` setting (`max_svc_qty`); `services: [{svc_id, qty}]` on `POST /appointment`, snapshotted on booking rows (`Api.md` §5.4a).
   - **Limit per booking:** `service.maxQty ?? store.maxServiceQty` (both default 1); no cap on the total.
@@ -97,7 +98,7 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
   - **Android:** an alarm-usage channel with the bundled `assets/sounds/reminder.wav`, exact alarms via `SCHEDULE_EXACT_ALARM` in `app.json`.
   - **Both:** **Snooze (5 min)** / **Close** actions.
 - **Where the setting lives:** SecureStore per account (what scheduling uses), seeded from the server on a new device. Every save also goes to `PUT /reminder-settings` for auditing (best-effort).
-- **Builds:** the custom sound and exact alarms need a **development build** (`npx expo run:android`), not Expo Go. In the Android emulator the backend is `http://10.0.2.2:3000/apis`.
+- **Builds:** the custom sound and exact alarms need a **development build** (`npx expo run:android`), not Expo Go. The emulator reaches the Vercel API directly; a local server is `http://10.0.2.2:3000/apis` from it.
 - **iOS:** not verified here (no Xcode). Use Xcode or an EAS development build.
 
 ### Cross-platform rules

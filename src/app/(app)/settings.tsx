@@ -13,6 +13,7 @@ import { ReminderSettingsSection } from '@/features/reminders/reminder-settings-
 import { StoreServices } from '@/features/settings/store-services';
 import { StoreSettingsForm } from '@/features/settings/store-settings-form';
 import { useStore } from '@/hooks/queries';
+import { INACTIVE_STORE_HINT } from '@/lib/account-status';
 
 export default function SettingsScreen() {
   const { session } = useSession();
@@ -33,6 +34,7 @@ function StoreSettings({ storeId }: { storeId: string }) {
   if (!store.data) return <Banner message={{ type: 'error', text: errorMessage(store.error) }} />;
   return (
     <>
+      {store.data.inactive ? <Banner message={{ type: 'error', text: INACTIVE_STORE_HINT }} /> : null}
       <StoreSettingsForm store={store.data} />
       <StoreServices store={store.data} />
     </>

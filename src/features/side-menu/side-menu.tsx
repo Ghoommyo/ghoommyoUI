@@ -1,7 +1,7 @@
 import { router, type Href } from 'expo-router';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useSession } from '@/auth/session';
@@ -12,8 +12,19 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Spacing } from '@/constants/theme';
 import { useMyProfile, useStore } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
+import { openSitePage } from '@/lib/site';
 
 type Item = { label: string; href: Href; route?: string };
+
+/** Information pages: native screens, or website pages opened in the in-app browser. */
+const MORE: ({ label: string; href: Href; route: string } | { label: string; site: string })[] = [
+  { label: 'About', href: '/about', route: 'about' },
+  { label: 'Help & FAQ', site: '/help' },
+  { label: 'Contact us', href: '/contact', route: 'contact' },
+  { label: 'Privacy policy', site: '/privacy' },
+  { label: 'Terms of service', site: '/terms' },
+  { label: 'Delete account', href: '/delete-account', route: 'delete-account' },
+];
 
 export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
   const theme = useTheme();
@@ -30,9 +41,13 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
 
   const items: Item[] = session
     ? [
+        { label: 'Home', href: '/home', route: 'home' },
         { label: 'Dashboard', href: '/dashboard', route: 'dashboard' },
         ...(session.role === 'user'
-          ? [{ label: 'Events', href: '/events' as const, route: 'events' }]
+          ? [
+              { label: 'Events', href: '/events' as const, route: 'events' },
+              { label: 'Addresses', href: '/addresses' as const, route: 'addresses' },
+            ]
           : []),
         ...(session.role === 'store'
           ? [{ label: 'Reviews', href: '/reviews' as const, route: 'reviews' }]
@@ -41,6 +56,7 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
         { label: 'Settings', href: '/settings', route: 'settings' },
       ]
     : [
+        { label: 'Home', href: '/home', route: 'home' },
         { label: 'Dashboard', href: '/dashboard', route: 'dashboard' },
         { label: 'Login', href: '/login' },
         { label: 'Sign up', href: '/signup' },
@@ -70,7 +86,7 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
           </View>
         </View>
 
-        <View style={styles.items}>
+        <ScrollView contentContainerStyle={styles.items}>
           {items.map((item) => {
             const active = item.route === activeRoute;
             return (
@@ -85,7 +101,28 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
           {session ? (
             <MenuItem label="Logout" danger onPress={() => setConfirmLogout(true)} />
           ) : null}
-        </View>
+          <ThemedText
+            type="smallBold"
+            themeColor="textSecondary"
+            style={[styles.moreTitle, { borderTopColor: theme.border }]}
+            accessibilityRole="header">
+            MORE
+          </ThemedText>
+          {MORE.map((item) => (
+            <MenuItem
+              key={item.label}
+              label={item.label}
+              small
+              active={'route' in item && item.route === activeRoute}
+              onPress={() => {
+                if ('site' in item) {
+                  navigation.closeDrawer();
+                  openSitePage(item.site);
+                } else go(item.href);
+              }}
+            />
+          ))}
+        </ScrollView>
       </SafeAreaView>
 
       <ConfirmModal
@@ -106,9 +143,9 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
   );
 }
 
-type MenuItemProps = { label: string; active?: boolean; danger?: boolean; onPress(): void };
+type MenuItemProps = { label: string; active?: boolean; danger?: boolean; small?: boolean; onPress(): void };
 
-function MenuItem({ label, active = false, danger = false, onPress }: MenuItemProps) {
+function MenuItem({ label, active = false, danger = false, small = false, onPress }: MenuItemProps) {
   const theme = useTheme();
   return (
     <Pressable
@@ -117,11 +154,15 @@ function MenuItem({ label, active = false, danger = false, onPress }: MenuItemPr
       onPress={onPress}
       style={({ pressed }) => [
         styles.item,
+        small && styles.itemSmall,
         (active || pressed) && { backgroundColor: theme.backgroundSelected },
       ]}>
       <ThemedText
         type={active ? 'smallBold' : 'small'}
-        style={[styles.itemText, { color: danger ? theme.danger : active ? theme.primary : theme.text }]}>
+        style={[
+          small ? undefined : styles.itemText,
+          { color: danger ? theme.danger : active ? theme.primary : small ? theme.textSecondary : theme.text },
+        ]}>
         {label}
       </ThemedText>
     </Pressable>
@@ -154,7 +195,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
   },
+  itemSmall: {
+    paddingVertical: Spacing.two,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
   itemText: {
     fontSize: 16,
+  },
+  moreTitle: {
+    marginTop: Spacing.two,
+    paddingTop: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    fontSize: 12,
+    letterSpacing: 1,
   },
 });

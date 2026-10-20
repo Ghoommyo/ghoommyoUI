@@ -1,4 +1,5 @@
 import type {
+  AddressInput,
   AppNotification,
   Booking,
   BookingChanges,
@@ -20,6 +21,7 @@ import type {
   StoreService,
   StoreSettings,
   UserProfile,
+  SavedAddress,
 } from '@/types/domain';
 
 export class ApiError extends Error {
@@ -47,6 +49,15 @@ export interface Api {
   getStoreServices(storeId: string): Promise<StoreService[]>;
   /** Types of service a service store can pick: the standard trades, then ones stores added (A–Z). Public. */
   getServiceTypes(): Promise<string[]>;
+  /** Categories a product store can pick: the standard ones, then ones stores added (A–Z). Public. */
+  getStoreCategories(): Promise<string[]>;
+  /** Types a store can give its products (the admin manages the list). Public. */
+  getProductTypes(): Promise<string[]>;
+  /** The signed-in customer's saved delivery addresses, newest first. */
+  getAddresses(): Promise<SavedAddress[]>;
+  /** Adds an address, or edits `addressId`. Saving the same text twice returns the existing one. */
+  saveAddress(input: AddressInput, addressId?: string): Promise<SavedAddress>;
+  deleteAddress(addressId: string): Promise<void>;
   /** Owner only, like the other store updates. */
   createService(storeId: string, input: ServiceInput): Promise<StoreService>;
   updateService(storeId: string, serviceId: string, input: ServiceInput): Promise<StoreService>;
@@ -76,6 +87,11 @@ export interface Api {
   updateStoreProfile(storeId: string, profile: StoreProfile): Promise<Store>;
   getUserProfile(): Promise<UserProfile>;
   updateUserProfile(profile: UserProfile): Promise<UserProfile>;
+  /**
+   * Deletes the signed-in customer's or store's account; the password must match. Bookings stay
+   * for the other side without personal details, and upcoming ones are cancelled.
+   */
+  deleteAccount(password: string): Promise<void>;
 }
 
 let authToken: string | null = null;
