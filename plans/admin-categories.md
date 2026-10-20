@@ -135,3 +135,25 @@ Plan → migration + admin auth → admin API → category/product-type/suspensi
 - **Expo:** the web build (real backend and dummy) and Android: Category in Settings, product type, the category shown to customers, the inactive banners.
 - `tsc`, lint and `next build`; `tsc` and `expo lint`.
 - **Production:** migration 010 only after the owner says so. It creates the default admin login, so change it right after merging.
+
+## Done notes (2026-10-20, app)
+- **API layer:**
+  - `getStoreCategories` / `getProductTypes`; `storeCategory` and `inactive` on store settings; `productType` on items
+  - `getUserProfile` now reads `GET /traveller/profile` for the `inactive` flag. A name or mobile saved in the app session still wins. Store sessions skip the call (it's customers only).
+- **Dummy backend:** the 44 categories, product types Handmade / Organic food, Green Grocers as "Fresh produce" with two products (one typed).
+- **Stub:** `/store-categories`, `/product-types`, `storeCategory` and `productType` with the server's rules.
+- **Store Settings:**
+  - Product stores pick a **Category** (list + Other… → text field), as Service stores pick a Type of service
+  - the product form has **Product type** when the list isn't empty
+- **Customers:**
+  - the store dropdown, picker title and booking card show the category (product stores) or the type of service
+  - the picker shows each product's type
+- **Inactive accounts:**
+  - an inactive store sees a notice on its dashboard and in Settings
+  - an inactive customer sees a notice on the dashboard and booking form, and Submit request / Confirm are disabled
+- **Verified:**
+  - **Web build, real backend:** Category with Other ("bakery" → Bakery), Grocery, product type on an item; customer views; inactive notices (store and customer, via the admin API)
+  - **Dummy backend:** Green Grocers · Fresh produce with the product type in the picker
+  - **Stub (curl):** the rules above
+  - **Android (Pixel_9a):** dropdown "Claude Web Shop · Grocery", picker with Handmade / Organic food
+- **Not verified on iOS** (no Xcode).

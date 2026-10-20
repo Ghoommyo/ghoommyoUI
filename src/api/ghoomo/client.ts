@@ -479,9 +479,13 @@ export function createGhoomoApi(baseUrl: string): Api {
       const local = userProfiles.get(userId);
       // The server knows whether the admin made the account inactive; name and mobile edited in
       // this app session win over the server's copy.
-      const res = await request<{ profile: { name?: string; mobile?: string; inactive?: boolean } }>(
-        '/traveller/profile',
-      ).catch(() => null);
+      // Only customer tokens may read it (a store gets 403), so stores skip the call.
+      const isStore = 'locCode' in claims<GhoomoUserClaims | GhoomoLocationClaims>();
+      const res = isStore
+        ? null
+        : await request<{ profile: { name?: string; mobile?: string; inactive?: boolean } }>(
+            '/traveller/profile',
+          ).catch(() => null);
       const server = res?.profile;
       return {
         name: local?.name ?? (server?.name || (userName ? displayName(userName) : '')),
