@@ -87,6 +87,11 @@ export interface Api {
   updateStoreProfile(storeId: string, profile: StoreProfile): Promise<Store>;
   getUserProfile(): Promise<UserProfile>;
   updateUserProfile(profile: UserProfile): Promise<UserProfile>;
+  /**
+   * Deletes the signed-in customer's or store's account; the password must match. Bookings stay
+   * for the other side without personal details, and upcoming ones are cancelled.
+   */
+  deleteAccount(password: string): Promise<void>;
 }
 
 let authToken: string | null = null;

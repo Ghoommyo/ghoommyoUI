@@ -244,13 +244,13 @@ const UNAUTH = [401, { message: 'Authentication token is missing or invalid' }];
 
 route('POST', /^\/signup$/, 'none', ({ body }) => {
   if (!body?.user_name || !body.password || body.password !== body.confirmPassword) return [400, { message: 'Invalid sign-up data' }];
-  if (users.some((u) => u.user_name === body.user_name)) return [409, { error: 'User name already exists' }];
+  if (users.some((u) => u.user_name === body.user_name && u.active !== 0)) return [409, { error: 'User name already exists' }];
   users.push({ user_id: randomUUID(), user_name: body.user_name, password: body.password });
   return [201, { message: 'Sign-up successful' }];
 });
 route('POST', /^\/signin$/, 'none', ({ body }) => {
   if (!body?.user_name || !body.password) return [400, { message: 'Invalid sign-in data' }];
-  const user = users.find((u) => u.user_name === body.user_name);
+  const user = users.find((u) => u.user_name === body.user_name && u.active !== 0);
   if (!user) return [404, { error: 'User not found' }];
   if (user.password !== body.password) return [401, { error: 'Invalid credentials' }];
   const token = signJwt({ userId: user.user_id, userName: user.user_name, userType: 'CUSTOMER', userAccess: 'LIMITED' });
@@ -270,7 +270,7 @@ route('POST', /^\/location\/signup$/, 'none', ({ body }) => {
 });
 route('POST', /^\/location\/signin$/, 'none', ({ body }) => {
   if (!body?.location_code || !body.password) return [400, { message: 'Invalid sign-in data' }];
-  const loc = locations.find((l) => l.loc_code === body.location_code);
+  const loc = locations.find((l) => l.loc_code === body.location_code && l.active);
   if (!loc) return [404, { error: 'User not found' }];
   if (loc.password !== body.password) return [401, { error: 'Invalid credentials' }];
   const token = signJwt({ userId: loc.user_id, locName: loc.loc_name, locType: loc.loc_type, locAccess: loc.loc_access, locCode: loc.loc_code });
@@ -504,6 +504,30 @@ route('POST', /^\/notifications\/read$/, 'any', ({ claims, body }) => {
   let updated = 0;
   for (const n of notifications) if (n.rcpt_id === claims.userId && body.ids.includes(n.ntfy_id) && !n.read_on) { n.read_on = now(); updated++; }
   return [200, { updated }];
+});
+// Account deletion (user or location token; the password must match).
+route('DELETE', /^\/account$/, 'any', ({ claims, body }) => {
+  if (typeof body?.password !== 'string' || !body.password) return [400, { error: 'password is required' }];
+  if (body.password !== PASSWORD) return [403, { error: 'Password is wrong' }];
+  const upcoming = (a) => ['PENDING', 'ACCEPTED'].includes(a.status) && new Date(a.start_time) > new Date();
+  if (isLocToken(claims)) {
+    const loc = locations.find((l) => l.user_id === claims.userId && l.active);
+    if (!loc) return [404, { error: 'Account not found' }];
+    for (const a of appointments.filter((a) => a.loc_id === loc.user_id && upcoming(a))) {
+      Object.assign(a, { status: 'REJECTED', updt_reason: 'Store closed its account' });
+      notify(a.user_id, a.apntmnt_id, 'REJECTED', `${loc.loc_name} closed its account, so your booking was cancelled`);
+    }
+    loc.active = 0;
+    return [200, { message: 'Account deleted' }];
+  }
+  for (const a of appointments.filter((a) => a.user_id === claims.userId)) {
+    if (upcoming(a)) Object.assign(a, { status: 'REJECTED', updt_reason: 'Account deleted' });
+    Object.assign(a, { user_name: 'Deleted user', mobile_number: '', dlvry_addr: null });
+  }
+  for (const a of addresses.filter((a) => a.user_id === claims.userId)) a.active = 0;
+  const user = users.find((u) => u.user_id === claims.userId);
+  if (user) user.active = 0;
+  return [200, { message: 'Account deleted' }];
 });
 // Saved delivery addresses (user token; own rows only).
 route('GET', /^\/traveller\/addresses$/, 'any', ({ claims }) => {

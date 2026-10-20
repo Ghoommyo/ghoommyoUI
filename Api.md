@@ -93,6 +93,7 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 | 32  | GET    | `/service-types`               | none                 | Types of service a SERVICE location can pick (§5.4a) |
 | 33  | GET, POST | `/traveller/addresses`      | User                 | Saved delivery addresses: list / add (§5.1)          |
 | 34  | PUT, DELETE | `/traveller/addresses/{addressId}` | User      | Edit / remove a saved address                        |
+| 37  | DELETE | `/account`                     | User or Location     | Delete the signed-in account (§5.1)                  |
 | 35  | GET    | `/store-categories`            | none                 | Categories a PRODUCT location can pick (§5.4a)       |
 | 36  | GET    | `/product-types`               | none                 | Types a location can give its products (§5.4a)       |
 
@@ -214,6 +215,14 @@ curl "$BASE/traveller" -H "Authorization: $USER_TOKEN"
 ```
 
 - 200 `{"user":{"userId":"92177fd2-...","userName":"asha@example.com","userType":"CUSTOMER","userAccess":"LIMITED","iat":1791025490,"exp":1791111890}}`
+
+#### DELETE /account
+
+Deletes the signed-in customer's or location's account. Body `{"password":"…"}`, which must match.
+
+- **Customer:** can't sign in any more (the email can sign up again); name, mobile, saved addresses, reminder settings and notifications are removed; their bookings stay for the stores as "Deleted user" without mobile or delivery address, and upcoming pending/accepted ones become `REJECTED` ("Account deleted").
+- **Location:** hidden and can't sign in; items deactivated, profile address/bio cleared; upcoming pending/accepted bookings become `REJECTED` ("Store closed its account") and each customer is notified.
+- 200 `{"message":"Account deleted"}` · 400 `{"error":"password is required"}` · 401 · 403 `{"error":"Password is wrong"}` · 404 (already deleted)
 
 #### GET /traveller/addresses · POST /traveller/addresses
 

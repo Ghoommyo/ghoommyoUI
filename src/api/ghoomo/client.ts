@@ -494,6 +494,11 @@ export function createGhoomoApi(baseUrl: string): Api {
       };
     },
 
+    async deleteAccount(password) {
+      await request('/account', { method: 'DELETE', body: { password } });
+      userProfiles.delete(claims<GhoomoUserClaims>().userId);
+    },
+
     async updateUserProfile(profile) {
       userProfiles.set(claims<GhoomoUserClaims>().userId, profile);
       return profile;

@@ -818,6 +818,31 @@ export const mockApi: Api = {
     return clone(currentAccount().profile);
   },
 
+  async deleteAccount(password) {
+    await delay();
+    const account = currentAccount();
+    if (account.password !== password) throw new ApiError('Password is wrong', 403);
+    const today = todayKey();
+    for (const booking of bookings) {
+      const upcoming = booking.slotStart.slice(0, 10) >= today && booking.status !== 'rejected';
+      if (account.role === 'user' && booking.userId === account.id) {
+        // The store keeps its history without the customer's personal details.
+        Object.assign(booking, { name: 'Deleted user', mobile: '', deliveryAddress: null });
+        if (upcoming) booking.status = 'rejected';
+      }
+      if (account.role === 'store' && booking.storeId === account.id && upcoming) {
+        booking.status = 'rejected';
+        notify(booking.userId, booking.id, 'REJECTED', `${booking.storeName} closed its account, so your booking was cancelled`);
+      }
+    }
+    if (account.role === 'store') {
+      const store = stores.findIndex((s) => s.id === account.id);
+      if (store >= 0) stores.splice(store, 1);
+    }
+    for (let i = addresses.length - 1; i >= 0; i--) if (addresses[i].accountId === account.id) addresses.splice(i, 1);
+    accounts.splice(accounts.indexOf(account), 1);
+  },
+
   async updateUserProfile(profile) {
     await delay();
     const account = currentAccount();

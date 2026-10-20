@@ -74,6 +74,11 @@ export function useStoreBookings(storeId: string | undefined, dates: DateKey[] |
   });
 }
 
+/** Deletes the signed-in account; the caller signs out afterwards. */
+export function useDeleteAccount() {
+  return useMutation({ mutationFn: (password: string) => api.deleteAccount(password) });
+}
+
 /** The customer's saved delivery addresses (users only). */
 export function useAddresses() {
   const { session } = useSession();
