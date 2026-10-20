@@ -113,3 +113,9 @@ Notifications fetched on app start with an unseen count, New/Earlier sections; a
 Book table / Pickup / Book appointment show the store's address (and need one); Porter / Book home visit pick a saved delivery address or a new one; users manage addresses from the menu.
 
 - [x] [Store address for visits, saved delivery addresses](addresses.md)
+
+## Store categories, product types, inactive accounts (branch `admin_console`)
+
+Product stores pick a category; products can carry a product type; stores/customers the admin made inactive see a notice (and customers can't book). The admin console itself is web only.
+
+- [ ] [Store categories, product types, inactive accounts](admin-categories.md)
