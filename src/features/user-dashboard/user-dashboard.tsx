@@ -43,13 +43,19 @@ export function UserDashboard() {
   // The admin can make a customer inactive: they can look around but not submit requests.
   const profile = useMyProfile();
   const inactive = session?.role === 'user' && !!profile.data?.inactive;
-  const { booked, status: bookedStatus } = useLocalSearchParams<{
+  const {
+    booked,
+    status: bookedStatus,
+    storeId: storeParam,
+  } = useLocalSearchParams<{
     booked?: string;
     status?: string;
+    /** From Home's Book button: start with this store selected. */
+    storeId?: string;
   }>();
   const [today] = useState(() => new Date());
 
-  const [storeId, setStoreId] = useState<string>();
+  const [storeId, setStoreId] = useState<string | undefined>(storeParam);
   const [monthKey, setMonthKey] = useState(`${today.getFullYear()}-${today.getMonth()}`);
   const [day, setDay] = useState(today.getDate());
   const [selectedSlot, setSelectedSlot] = useState<SlotStart | null>(null);
@@ -57,6 +63,17 @@ export function UserDashboard() {
   const [picks, setPicks] = useState<ServicePicks>({});
   const [servicesOpen, setServicesOpen] = useState(false);
   const serviceCount = countServices(picks);
+
+  // Home's Book button sends a store: select it (a new store starts with no slot or picks).
+  const [seenStoreParam, setSeenStoreParam] = useState(storeParam);
+  if (storeParam !== seenStoreParam) {
+    setSeenStoreParam(storeParam);
+    if (storeParam && storeParam !== storeId) {
+      setStoreId(storeParam);
+      setSelectedSlot(null);
+      setPicks({});
+    }
+  }
 
   // A finished booking comes back with a new `booked` param: start the next one without its services.
   const [seenBooked, setSeenBooked] = useState(booked);

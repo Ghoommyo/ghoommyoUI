@@ -73,3 +73,21 @@ On the web these are pages; in the app they go in the menu.
 - **Headless Chrome (390/1280, light/dark):** Home groups and sorting, chips, Book → dashboard preselected; every page renders; menu links; the delete flow for a throwaway account.
 - **Expo:** the web build (real backend and dummy) and Android: the drawer entries, Home → Book, About images, links opening the website, the delete flow.
 - `tsc`, lint and `next build`; `tsc` and `expo lint`. Commit each step; push both branches.
+
+## Done notes (2026-10-20, app)
+- **Drawer:**
+  - **Home** first (everyone)
+  - a **MORE** section with About, Help & FAQ, Contact us, Privacy policy, Terms of service and Delete account; the menu now scrolls
+  - Help, Privacy and Terms open the website (`SITE_URL`, derived from the API URL or `EXPO_PUBLIC_SITE_URL`) in the in-app browser
+- **Home:** store-type chips and groups sorted by rating. **Book** opens the dashboard with that store selected (new `storeId` param); **Reviews** opens its reviews.
+- **About:** the 8 website screenshots bundled in `assets/images/about/` (about 1.2 MB), with the same captions.
+- **Contact:** email button and what to include.
+- **Delete account:**
+  - signed in: confirm with the password, then sign out and go to the login screen
+  - signed out: what deletion does, a log-in button and the email option
+- **API layer:** `deleteAccount` in the Ghoomo client, the dummy backend (cancels upcoming bookings, anonymises the customer's, removes the account) and the stub (which now refuses sign-in for deleted accounts).
+- **Verified:**
+  - **Web build, real backend:** the menu (main + MORE); Home chips; Book → "Claude Web Shop · Bakery" selected; About shows 8/8 images after scrolling; the Contact button; Privacy opens `/privacy`; the delete flow (empty password, wrong password, then deleted → login; the account can no longer sign in)
+  - **Stub (curl):** delete, then sign-in 404; the same email can sign up again; store deletion
+  - **Android (Pixel_9a):** the drawer entries as a guest, Home, About with images, Privacy opening Chrome (custom tab)
+- **Not verified on iOS** (no Xcode).

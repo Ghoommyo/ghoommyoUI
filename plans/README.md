@@ -124,4 +124,4 @@ Product stores pick a category; products can carry a product type; stores/custom
 
 A Home screen (store types with their best rated stores), About with screenshots, Contact, Delete account, and links to the website's Privacy policy, Terms of service and Help & FAQ.
 
-- [ ] [Home page and information pages](info-pages.md)
+- [x] [Home page and information pages](info-pages.md)
