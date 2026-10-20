@@ -119,3 +119,9 @@ Book table / Pickup / Book appointment show the store's address (and need one); 
 Product stores pick a category; products can carry a product type; stores/customers the admin made inactive see a notice (and customers can't book). The admin console itself is web only.
 
 - [x] [Store categories, product types, inactive accounts](admin-categories.md)
+
+## Home page and information pages (branch `info_pages`)
+
+A Home screen (store types with their best rated stores), About with screenshots, Contact, Delete account, and links to the website's Privacy policy, Terms of service and Help & FAQ.
+
+- [ ] [Home page and information pages](info-pages.md)
