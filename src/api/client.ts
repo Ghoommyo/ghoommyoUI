@@ -49,6 +49,10 @@ export interface Api {
   getStoreServices(storeId: string): Promise<StoreService[]>;
   /** Types of service a service store can pick: the standard trades, then ones stores added (A–Z). Public. */
   getServiceTypes(): Promise<string[]>;
+  /** Categories a product store can pick: the standard ones, then ones stores added (A–Z). Public. */
+  getStoreCategories(): Promise<string[]>;
+  /** Types a store can give its products (the admin manages the list). Public. */
+  getProductTypes(): Promise<string[]>;
   /** The signed-in customer's saved delivery addresses, newest first. */
   getAddresses(): Promise<SavedAddress[]>;
   /** Adds an address, or edits `addressId`. Saving the same text twice returns the existing one. */

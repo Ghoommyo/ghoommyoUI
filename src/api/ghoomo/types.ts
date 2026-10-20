@@ -24,6 +24,8 @@ export interface GhoomoLocation {
   catalog_type?: string | null;
   /** Type of service, e.g. `Plumber`; null = not set. */
   svc_type?: string | null;
+  /** Category of a PRODUCT location, e.g. `Bakery`; null = not set. */
+  store_cat?: string | null;
   /** From the location's profile, so customers know where to go; null when not filled in. */
   loc_address?: string | null;
   loc_city?: string | null;
@@ -49,6 +51,9 @@ export interface GhoomoSettings {
   /** `PRODUCT` (default) or `SERVICE`. */
   catalog_type?: string;
   svc_type?: string | null;
+  store_cat?: string | null;
+  /** 1 when the admin made the location inactive (GET settings only). */
+  store_inactive?: number;
 }
 
 /** A location's service (Api.md §5.4a). Already camelCase on the wire. */
@@ -61,6 +66,7 @@ export interface GhoomoService {
   /** The service's own limit; null = the location's `max_svc_qty`. */
   maxQty: number | null;
   effectiveMaxQty: number;
+  productType?: string | null;
 }
 
 /** Snapshot of a booked service on an appointment row. */

@@ -56,6 +56,10 @@ const reminderSettings = []; // append-only audit trail: { acct_id, enabled, hou
 // Types of service (svc_type_tbl): the standard trades, then ones locations added through "Other".
 const STANDARD_SERVICE_TYPES = ['Electrician', 'Wireman', 'Lineman', 'Plumber', 'Pipefitter', 'Carpenter', 'Welder', 'Fabricator', 'Bricklayer', 'Mason', 'Roofer', 'Scaffolder', 'General Contractor', 'Automotive Mechanic', 'Diesel Mechanic', 'Auto Electrician', 'Truck Driver', 'Delivery Driver', 'Forklift Operator', 'Heavy Equipment Operator', 'Aircraft Maintenance Technician', 'Assembly Line Worker', 'Machinist', 'Warehouse Worker', 'Sorter', 'Power Plant Operator', 'Sandblaster', 'Industrial Cleaner', 'HVAC Technician', 'Elevator Installer', 'Solar Panel Installer', 'Pest Control Technician', 'Security Guard', 'Cleaning Supervisor'];
 const addedServiceTypes = [];
+// Store categories (option_tbl STORE_CATEGORY) and product types (PRODUCT_TYPE; the admin manages them).
+const STANDARD_STORE_CATEGORIES = ['Food', 'Beverages', 'Grocery', 'Fresh produce', 'Dairy', 'Meat & seafood', 'Bakery', 'Snacks', 'Clothing', 'Footwear', 'Accessories', 'Jewelry', 'Watches', 'Bags & luggage', 'Electronics', 'Mobile phones', 'Computers', 'Appliances', 'Home furniture', 'Home decor', 'Kitchenware', 'Bedding & linen', 'Beauty & cosmetics', 'Personal care', 'Health & wellness', 'Pharmacy', 'Baby products', 'Toys & games', 'Sports & fitness', 'Outdoor', 'Books', 'Stationery', 'Office supplies', 'Music instruments', 'Movies & media', 'Pet supplies', 'Automotive', 'Hardware & tools', 'Garden', 'Cleaning supplies', 'Gifts', 'Art & crafts', 'Digital products', 'Services'];
+const addedStoreCategories = [];
+const productTypes = ['Handmade', 'Organic food'];
 const services = []; // { svc_id, loc_id, svc_name, svc_desc, svc_price, svc_img_url, max_qty, active, created_on }
 function notify(rcptId, apptId, kind, text) {
   notifications.push({ ntfy_id: randomUUID(), rcpt_id: rcptId, apntmnt_id: apptId, kind, text, cret_on: now(), read_on: null });
@@ -76,7 +80,7 @@ function ensureSettings(loc) {
   if (!settings.has(loc.user_id)) {
     settings.set(loc.user_id, {
       stng_id: randomUUID(), loc_id: loc.user_id, max_limit: '100', unit: 'DAY', is_auto_approval: 1,
-      open_at: '09:00', close_at: '21:00', max_svc_qty: 1, is_dark_store: 0, catalog_type: 'PRODUCT', svc_type: null, created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
+      open_at: '09:00', close_at: '21:00', max_svc_qty: 1, is_dark_store: 0, catalog_type: 'PRODUCT', svc_type: null, store_cat: null, created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
     });
   }
   return settings.get(loc.user_id);
@@ -202,7 +206,7 @@ const browseRow = (loc) => {
   const avg = rated.length ? (rated.reduce((sum, r) => sum + r.stars, 0) / rated.length).toFixed(1) : null;
   return {
     ...row, max_limit: s?.max_limit ?? null, unit: s?.unit ?? null, is_auto_approval: s?.is_auto_approval ?? null, open_at: s?.open_at ?? null, close_at: s?.close_at ?? null,
-    max_svc_qty: s?.max_svc_qty ?? null, is_dark_store: s?.is_dark_store ?? null, catalog_type: s?.catalog_type ?? null, svc_type: s?.svc_type ?? null,
+    max_svc_qty: s?.max_svc_qty ?? null, is_dark_store: s?.is_dark_store ?? null, catalog_type: s?.catalog_type ?? null, svc_type: s?.svc_type ?? null, store_cat: s?.store_cat ?? null,
     loc_address: p?.loc_address ?? null, loc_city: p?.loc_city ?? null, loc_pin_code: p?.loc_pin_code ?? null, loc_country: p?.loc_country ?? null, loc_nav: p?.loc_nav ?? null,
     rating_avg: avg, rating_count: rated.length ? String(rated.length) : null,
   };
@@ -215,7 +219,7 @@ const today = () => localDay(new Date().toISOString());
 /** Service row → the API's service object, with the limit that applies. */
 const serviceJson = (svc) => ({
   id: svc.svc_id, name: svc.svc_name, description: svc.svc_desc ?? '', price: svc.svc_price, imageUrl: svc.svc_img_url ?? '',
-  maxQty: svc.max_qty, effectiveMaxQty: svc.max_qty ?? settings.get(svc.loc_id)?.max_svc_qty ?? 1,
+  maxQty: svc.max_qty, effectiveMaxQty: svc.max_qty ?? settings.get(svc.loc_id)?.max_svc_qty ?? 1, productType: svc.prod_type ?? null,
 });
 const activeServices = (locId) => services.filter((svc) => svc.loc_id === locId && svc.active);
 function serviceFields(body) {
@@ -226,7 +230,10 @@ function serviceFields(body) {
   if (maxQty !== null && (!Number.isInteger(maxQty) || maxQty < 1)) return [null, 'maxQty must be empty or a whole number of at least 1'];
   const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl.trim() : '';
   if (imageUrl && !/^https?:\/\//.test(imageUrl)) return [null, 'imageUrl must start with http:// or https://'];
-  return [{ svc_name: body.name.trim(), svc_desc: typeof body.description === 'string' ? body.description.trim() : '', svc_price: Math.round(price * 100) / 100, svc_img_url: imageUrl, max_qty: maxQty }, null];
+  const wanted = typeof body.productType === 'string' && body.productType.trim() ? body.productType.trim().toLowerCase() : null;
+  const prodType = wanted ? productTypes.find((t) => t.toLowerCase() === wanted) : null;
+  if (wanted && !prodType) return [null, 'productType must be one of the product types'];
+  return [{ svc_name: body.name.trim(), svc_desc: typeof body.description === 'string' ? body.description.trim() : '', svc_price: Math.round(price * 100) / 100, svc_img_url: imageUrl, max_qty: maxQty, prod_type: prodType ?? null }, null];
 }
 const isLocToken = (c) => c && 'locCode' in c;
 
@@ -329,6 +336,13 @@ route('PUT', /^\/location\/([^/]+)\/settings$/, 'any', ({ claims, params, body }
     if (name && !listed) addedServiceTypes.push(name);
     row.svc_type = listed || name;
   }
+  if (body?.storeCategory !== undefined) {
+    const name = typeof body.storeCategory === 'string' ? body.storeCategory.trim().replace(/\s+/g, ' ') : body.storeCategory;
+    if (name !== null && (typeof name !== 'string' || !name || name.length > 60)) return [400, { error: 'storeCategory must be 1 to 60 characters, or null' }];
+    const listed = name && [...STANDARD_STORE_CATEGORIES, ...addedStoreCategories].find((c) => c.toLowerCase() === name.toLowerCase());
+    if (name && !listed) addedStoreCategories.push(name);
+    row.store_cat = listed || name;
+  }
   if (body?.catalogType !== undefined) {
     if (!['PRODUCT', 'SERVICE'].includes(body.catalogType)) return [400, { error: 'catalogType must be PRODUCT or SERVICE' }];
     row.catalog_type = body.catalogType;
@@ -337,6 +351,8 @@ route('PUT', /^\/location\/([^/]+)\/settings$/, 'any', ({ claims, params, body }
   return [200, { settings: row }];
 });
 
+route('GET', /^\/store-categories$/, 'none', () => [200, { storeCategories: [...STANDARD_STORE_CATEGORIES, ...[...addedStoreCategories].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))] }]);
+route('GET', /^\/product-types$/, 'none', () => [200, { productTypes: [...productTypes].sort((a, b) => a.localeCompare(b)) }]);
 route('GET', /^\/service-types$/, 'none', () => [200, { serviceTypes: [...STANDARD_SERVICE_TYPES, ...[...addedServiceTypes].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))] }]);
 route('GET', /^\/services\/([^/]+)$/, 'none', ({ params }) => [200, { services: activeServices(params[0]).map(serviceJson) }]);
 route('GET', /^\/location\/([^/]+)\/services$/, 'any', ({ claims, params }) => {

@@ -2,6 +2,7 @@ import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
 import { needsDeliveryAddress, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
 import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
+import { STANDARD_STORE_CATEGORIES } from '@/lib/store-categories';
 import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type {
@@ -78,6 +79,7 @@ const stores: StoreRecord[] = [
     isDarkStore: false,
     catalogType: 'service',
     serviceType: null,
+    storeCategory: null,
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -102,6 +104,7 @@ const stores: StoreRecord[] = [
     isDarkStore: false,
     catalogType: 'service',
     serviceType: 'Barber',
+    storeCategory: null,
     profile: {
       address: '45 Vijay Nagar',
       pin: '452010',
@@ -127,6 +130,7 @@ const stores: StoreRecord[] = [
     isDarkStore: true,
     catalogType: 'product',
     serviceType: null,
+    storeCategory: 'Fresh produce',
     profile: {
       // No address entered yet, so customers can't visit: only Porter.
       address: '',
@@ -198,6 +202,23 @@ function currentCustomer() {
 const addedServiceTypes = new Set<string>(['Barber']);
 
 /** Validates a type of service and adds it to the list if new; returns the listed spelling. */
+/** Store categories stores added through "Other"; every store can pick them. */
+const addedStoreCategories = new Set<string>();
+/** Product types (the admin manages this list; web only). */
+const productTypes = ['Handmade', 'Organic food'];
+
+/** Validates a category and adds it to the list if new; returns the listed spelling. */
+function addStoreCategory(name: string): string {
+  const clean = cleanServiceType(name);
+  if (!clean || clean.length > MAX_SERVICE_TYPE_LENGTH) {
+    throw new ApiError('storeCategory must be 1 to 60 characters, or null', 400);
+  }
+  const listed = [...STANDARD_STORE_CATEGORIES, ...addedStoreCategories].find((c) => c.toLowerCase() === clean.toLowerCase());
+  if (listed) return listed;
+  addedStoreCategories.add(clean);
+  return clean;
+}
+
 function addServiceType(name: string): string {
   const clean = cleanServiceType(name);
   if (!clean || clean.length > MAX_SERVICE_TYPE_LENGTH) {
@@ -221,7 +242,9 @@ const services: StoredService[] = [
   ['s1', 'Express delivery', 'Ready the next day', 200, 1],
   ['s2', 'Haircut', 'Classic cut and wash', 200, null],
   ['s2', 'Beard trim', '', 100, null],
-].map(([storeId, name, description, price, maxQtyOverride], i) => ({
+  ['s3', 'Seasonal fruit box', 'Whatever is in season this week', 299, null, 'Organic food'],
+  ['s3', 'Vegetable basket', 'Fresh vegetables for the week', 249, null],
+].map(([storeId, name, description, price, maxQtyOverride, productType], i) => ({
   id: `svc${i + 1}`,
   storeId: storeId as string,
   name: name as string,
@@ -229,6 +252,7 @@ const services: StoredService[] = [
   price: price as number,
   imageUrl: '',
   maxQtyOverride: maxQtyOverride as number | null,
+  productType: (productType as string | undefined) ?? null,
 }));
 
 function withMaxQty({ storeId, ...service }: StoredService): StoreService {
@@ -245,7 +269,19 @@ function checkServiceInput(input: ServiceInput): ServiceInput {
   }
   const imageUrl = input.imageUrl.trim();
   if (imageUrl && !/^https?:\/\//.test(imageUrl)) throw new ApiError('imageUrl must start with http:// or https://', 400);
-  return { ...input, name, description: input.description.trim(), imageUrl, price: Math.round(input.price * 100) / 100 };
+  // A product type must be one of the admin's list (any case; saved with its listed spelling).
+  const productType = input.productType
+    ? productTypes.find((t) => t.toLowerCase() === input.productType!.trim().toLowerCase())
+    : null;
+  if (input.productType && !productType) throw new ApiError('productType must be one of the product types', 400);
+  return {
+    ...input,
+    name,
+    description: input.description.trim(),
+    imageUrl,
+    price: Math.round(input.price * 100) / 100,
+    productType: productType ?? null,
+  };
 }
 
 function findOwnService(storeId: string, serviceId: string): StoredService {
@@ -374,6 +410,7 @@ export const mockApi: Api = {
       isDarkStore: false,
       catalogType: 'product',
       serviceType: null,
+      storeCategory: null,
       profile: {
         address: '',
         pin: '',
@@ -496,6 +533,16 @@ export const mockApi: Api = {
     const index = addresses.findIndex((a) => a.id === addressId && a.accountId === account.id);
     if (index < 0) throw new ApiError('Address not found', 404);
     addresses.splice(index, 1);
+  },
+
+  async getStoreCategories() {
+    await delay();
+    return [...STANDARD_STORE_CATEGORIES, ...[...addedStoreCategories].sort((a, b) => a.localeCompare(b))];
+  },
+
+  async getProductTypes() {
+    await delay();
+    return [...productTypes].sort((a, b) => a.localeCompare(b));
   },
 
   async getServiceTypes() {
@@ -749,7 +796,11 @@ export const mockApi: Api = {
     await delay();
     requireStoreOwner(storeId);
     const store = findStore(storeId);
-    Object.assign(store, settings, { serviceType: settings.serviceType && addServiceType(settings.serviceType) });
+    Object.assign(store, settings, {
+      serviceType: settings.serviceType && addServiceType(settings.serviceType),
+      storeCategory: settings.storeCategory && addStoreCategory(settings.storeCategory),
+      inactive: undefined,
+    });
     for (const b of bookings) if (b.storeId === storeId) b.storeName = store.name;
     return clone(withRating(store));
   },

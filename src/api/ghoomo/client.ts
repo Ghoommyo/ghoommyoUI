@@ -268,6 +268,16 @@ export function createGhoomoApi(baseUrl: string): Api {
       await request(`/traveller/addresses/${encodeURIComponent(addressId)}`, { method: 'DELETE' });
     },
 
+    async getStoreCategories() {
+      const res = await request<{ storeCategories: string[] }>('/store-categories');
+      return res?.storeCategories ?? [];
+    },
+
+    async getProductTypes() {
+      const res = await request<{ productTypes: string[] }>('/product-types');
+      return res?.productTypes ?? [];
+    },
+
     async getServiceTypes() {
       const res = await request<{ serviceTypes: string[] }>('/service-types');
       return res?.serviceTypes ?? [];
@@ -466,12 +476,18 @@ export function createGhoomoApi(baseUrl: string): Api {
     },
     async getUserProfile() {
       const { userId, userName } = claims<GhoomoUserClaims>();
-      return (
-        userProfiles.get(userId) ?? {
-          name: userName ? displayName(userName) : '',
-          mobile: API_DEFAULTS.userMobile,
-        }
-      );
+      const local = userProfiles.get(userId);
+      // The server knows whether the admin made the account inactive; name and mobile edited in
+      // this app session win over the server's copy.
+      const res = await request<{ profile: { name?: string; mobile?: string; inactive?: boolean } }>(
+        '/traveller/profile',
+      ).catch(() => null);
+      const server = res?.profile;
+      return {
+        name: local?.name ?? (server?.name || (userName ? displayName(userName) : '')),
+        mobile: local?.mobile ?? (server?.mobile || API_DEFAULTS.userMobile),
+        inactive: !!server?.inactive,
+      };
     },
 
     async updateUserProfile(profile) {

@@ -30,6 +30,8 @@ export const queryKeys = {
   storeReviews: (storeId: string) => ['stores', storeId, 'reviews'] as const,
   storeServices: (storeId: string) => ['stores', storeId, 'services'] as const,
   serviceTypes: ['service-types'] as const,
+  storeCategories: ['store-categories'] as const,
+  productTypes: ['product-types'] as const,
   notifications: (accountId: string) => ['me', accountId, 'notifications'] as const,
   reminderBookings: (accountId: string) => ['me', accountId, 'reminder-bookings'] as const,
   addresses: (accountId: string) => ['me', accountId, 'addresses'] as const,
@@ -100,6 +102,14 @@ export function useDeleteAddress() {
     mutationFn: (addressId: string) => api.deleteAddress(addressId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.addresses(session?.accountId ?? '') }),
   });
+}
+
+export function useStoreCategories() {
+  return useQuery({ queryKey: queryKeys.storeCategories, queryFn: () => api.getStoreCategories() });
+}
+
+export function useProductTypes() {
+  return useQuery({ queryKey: queryKeys.productTypes, queryFn: () => api.getProductTypes() });
 }
 
 export function useServiceTypes() {
@@ -188,8 +198,9 @@ export function useUpdateStoreSettings(storeId: string) {
     mutationFn: (settings: StoreSettings) => api.updateStoreSettings(storeId, settings),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stores });
-      // A new "Other" type joins the shared list.
+      // A new "Other" entry joins the shared list.
       queryClient.invalidateQueries({ queryKey: queryKeys.serviceTypes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.storeCategories });
     },
   });
 }
