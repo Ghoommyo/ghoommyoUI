@@ -15,10 +15,11 @@ import { Spacing } from '@/constants/theme';
 import { UserEventsTabs } from '@/features/events/user-events-tabs';
 import { ServicesModal } from '@/features/services/services-modal';
 import { SlotGrid } from '@/features/user-dashboard/slot-grid';
-import { useStores, useStoreSlots } from '@/hooks/queries';
+import { useMyProfile, useStores, useStoreSlots } from '@/hooks/queries';
+import { INACTIVE_USER_HINT } from '@/lib/account-status';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDayLong, formatSlotStart, makeDateKey, MONTHS, toDateKey } from '@/lib/date';
-import { catalogWords, serviceTypeLabel } from '@/lib/order-types';
+import { catalogWords, storeTypeLabel } from '@/lib/order-types';
 import { countServices, encodeServices } from '@/lib/services';
 import { daysInMonth, LIMIT_UNIT_LABEL } from '@/lib/slots';
 import type { ServicePicks, SlotStart } from '@/types/domain';
@@ -39,6 +40,9 @@ function nowSlotStart(now: Date): SlotStart {
 export function UserDashboard() {
   const theme = useTheme();
   const { session } = useSession();
+  // The admin can make a customer inactive: they can look around but not submit requests.
+  const profile = useMyProfile();
+  const inactive = session?.role === 'user' && !!profile.data?.inactive;
   const { booked, status: bookedStatus } = useLocalSearchParams<{
     booked?: string;
     status?: string;
@@ -130,7 +134,7 @@ export function UserDashboard() {
           value={storeId}
           options={(stores.data ?? []).map((s) => ({
             // Service stores show their type of service, e.g. "Raju Tailor · Plumber".
-            label: serviceTypeLabel(s) ? `${s.name} · ${serviceTypeLabel(s)}` : s.name,
+            label: storeTypeLabel(s) ? `${s.name} · ${storeTypeLabel(s)}` : s.name,
             value: s.id,
             // The rating opens the store's reviews; the name still selects the store.
             accessory: {
@@ -235,11 +239,16 @@ export function UserDashboard() {
         )}
       </View>
 
-      <Banner message={message ?? bookedMessage} />
+      <Banner message={inactive ? { type: 'error', text: INACTIVE_USER_HINT } : (message ?? bookedMessage)} />
 
       <View style={styles.actions}>
         <Button label="Reset" variant="danger" onPress={reset} />
-        <Button label={session ? 'Submit request' : 'Login to book'} variant="success" onPress={book} />
+        <Button
+          label={session ? 'Submit request' : 'Login to book'}
+          variant="success"
+          onPress={book}
+          disabled={inactive}
+        />
       </View>
 
       {servicesOpen && store ? (
@@ -247,7 +256,7 @@ export function UserDashboard() {
           storeId={store.id}
           storeName={store.name}
           catalogType={store.catalogType}
-          serviceType={serviceTypeLabel(store)}
+          typeLabel={storeTypeLabel(store)}
           initial={picks}
           onClose={() => setServicesOpen(false)}
           onSave={(next) => {

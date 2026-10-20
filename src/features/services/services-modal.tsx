@@ -19,8 +19,8 @@ type ServicesModalProps = {
   storeName: string;
   /** Products or Services: only the wording changes. */
   catalogType: CatalogType;
-  /** The store's type of service (e.g. "Plumber"), shown in the title; null when none. */
-  serviceType?: string | null;
+  /** What kind of store it is ("Plumber", "Bakery"), shown in the title; null when none. */
+  typeLabel?: string | null;
   /** Picks so far; changes stay in a draft until Save. */
   initial: ServicePicks;
   onSave(picks: ServicePicks): void;
@@ -33,7 +33,7 @@ export function ServicesModal({
   storeId,
   storeName,
   catalogType,
-  serviceType,
+  typeLabel,
   initial,
   onSave,
   onClose,
@@ -63,7 +63,7 @@ export function ServicesModal({
   return (
     <Sheet
       visible
-      title={`${storeName} ${words.items}${serviceType ? ` · ${serviceType}` : ''}`}
+      title={`${storeName} ${words.items}${typeLabel ? ` · ${typeLabel}` : ''}`}
       onClose={onClose}
       footer={
         <Button
@@ -121,6 +121,11 @@ function ServiceRow({ number, service, qty, first, onChange }: ServiceRowProps) 
         <ThemedText type="smallBold" style={styles.name}>
           {service.name}
         </ThemedText>
+        {service.productType ? (
+          <ThemedText type="smallBold" style={{ color: theme.primary }}>
+            {service.productType}
+          </ThemedText>
+        ) : null}
         {service.description ? (
           <ThemedText type="small" themeColor="textSecondary" style={styles.description}>
             {service.description}

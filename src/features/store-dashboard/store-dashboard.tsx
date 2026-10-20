@@ -16,6 +16,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatDayLong, todayKey } from '@/lib/date';
 import { dayCapacity } from '@/lib/slots';
 import type { DateKey } from '@/types/domain';
+import { INACTIVE_STORE_HINT } from '@/lib/account-status';
 
 export function StoreDashboard() {
   const theme = useTheme();
@@ -69,6 +70,7 @@ export function StoreDashboard() {
   return (
     <Screen>
       <AppHeader />
+      {store.data?.inactive ? <Banner message={{ type: 'error', text: INACTIVE_STORE_HINT }} /> : null}
       {store.data ? (
         <View style={styles.subheader}>
           <ThemedText type="default" style={styles.storeName}>

@@ -31,7 +31,7 @@ import {
   catalogWords,
   defaultOrderType,
   orderTypeOptions,
-  serviceTypeLabel,
+  storeTypeLabel,
 } from '@/lib/order-types';
 import {
   countServices,
@@ -42,6 +42,7 @@ import {
   servicesDescription,
 } from '@/lib/services';
 import type { OrderType, ServicePicks, Store, StoreService } from '@/types/domain';
+import { INACTIVE_USER_HINT } from '@/lib/account-status';
 
 const MOBILE_PATTERN = /^\+?\d{10,15}$/;
 
@@ -96,6 +97,7 @@ export default function BookingScreen() {
       slotStart={slotStart}
       initialName={profile.data?.name ?? ''}
       initialMobile={profile.data?.mobile ?? ''}
+      inactive={!!profile.data?.inactive}
     />
   );
 }
@@ -111,6 +113,8 @@ type BookingFormProps = {
   slotStart: string;
   initialName: string;
   initialMobile: string;
+  /** The admin made the customer inactive: they can't submit requests. */
+  inactive: boolean;
 };
 
 function BookingForm({
@@ -121,6 +125,7 @@ function BookingForm({
   slotStart,
   initialName,
   initialMobile,
+  inactive,
 }: BookingFormProps) {
   const [picks, setPicks] = useState(initialPicks);
   const [servicesOpen, setServicesOpen] = useState(false);
@@ -237,7 +242,9 @@ function BookingForm({
         message={
           createBooking.isError
             ? { type: 'error', text: errorMessage(createBooking.error) }
-            : servicesError
+            : inactive
+              ? { type: 'error', text: INACTIVE_USER_HINT }
+              : servicesError
               ? { type: 'error', text: `Your ${words.items} couldn't be loaded: ${servicesError}` }
               : null
         }
@@ -250,9 +257,9 @@ function BookingForm({
               <ThemedText type="smallBold" accessibilityRole="header">
                 {words.Items}
               </ThemedText>
-              {serviceTypeLabel(store) ? (
+              {storeTypeLabel(store) ? (
                 <ThemedText type="smallBold" style={{ color: theme.primary }}>
-                  {serviceTypeLabel(store)}
+                  {storeTypeLabel(store)}
                 </ThemedText>
               ) : null}
               <ThemedText type="small" themeColor="textSecondary">
@@ -378,6 +385,7 @@ function BookingForm({
           variant="success"
           onPress={confirm}
           loading={createBooking.isPending}
+          disabled={inactive}
         />
       </View>
 
@@ -386,7 +394,7 @@ function BookingForm({
           storeId={store.id}
           storeName={store.name}
           catalogType={store.catalogType}
-          serviceType={serviceTypeLabel(store)}
+          typeLabel={storeTypeLabel(store)}
           initial={picks}
           onClose={() => setServicesOpen(false)}
           onSave={saveServices}
