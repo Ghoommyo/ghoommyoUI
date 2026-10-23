@@ -11,7 +11,7 @@ import type {
 } from '@/api/ghoomo/types';
 import { makeDateKey, MONTHS, parseDateKey, toDateKey, toMinutes } from '@/lib/date';
 import { orderTypeFromApi } from '@/lib/order-types';
-import { buildSlotStarts, daysInMonth } from '@/lib/slots';
+import { ALL_DAYS, buildSlotStarts, daysInMonth } from '@/lib/slots';
 import type {
   Booking,
   BookingStatus,
@@ -141,9 +141,15 @@ export function daySummaryFromCalendar(
   }));
 }
 
-type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'store_inactive'>;
+type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'open_days' | 'store_inactive'>;
 /** Settings columns, which are null on browse rows for locations that never opened settings. */
 type SettingsInput = { [K in keyof SettingsFields]?: SettingsFields[K] | null };
+
+/** A store's open weekdays; stores without the setting (or older backends) are open every day. */
+function toOpenDays(value: unknown): number[] {
+  const days = Array.isArray(value) ? value.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [];
+  return days.length ? days : [...ALL_DAYS];
+}
 
 export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'> {
   const d = API_DEFAULTS.settings;
@@ -159,6 +165,7 @@ export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'>
     catalogType: row.catalog_type === 'SERVICE' ? 'service' : 'product',
     serviceType: row.svc_type || null,
     storeCategory: row.store_cat || null,
+    openDays: toOpenDays(row.open_days),
     inactive: Number(row.store_inactive ?? 0) === 1,
   };
 }
@@ -175,6 +182,7 @@ export function settingsToRequest(settings: StoreSettings) {
     catalogType: settings.catalogType === 'service' ? 'SERVICE' : 'PRODUCT',
     serviceType: settings.serviceType,
     storeCategory: settings.storeCategory,
+    openDays: settings.openDays,
   };
 }
 

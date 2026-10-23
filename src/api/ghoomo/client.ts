@@ -321,6 +321,8 @@ export function createGhoomoApi(baseUrl: string): Api {
           loc_id: store.id,
           loc_name: store.name,
           apntmnt_time: localToIso(input.slotStart),
+          // The local date, so the server checks the store's open days against the day picked.
+          apntmnt_date: input.slotStart.slice(0, 10),
           apntmnt_period: store.limitUnit === 'day' ? 'DAY' : 'HOUR',
           cret_on: createdAt,
           cret_by: input.name,

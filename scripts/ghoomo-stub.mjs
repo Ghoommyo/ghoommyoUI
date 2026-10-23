@@ -80,7 +80,7 @@ function ensureSettings(loc) {
   if (!settings.has(loc.user_id)) {
     settings.set(loc.user_id, {
       stng_id: randomUUID(), loc_id: loc.user_id, max_limit: '100', unit: 'DAY', is_auto_approval: 1,
-      open_at: '09:00', close_at: '21:00', max_svc_qty: 1, is_dark_store: 0, catalog_type: 'PRODUCT', svc_type: null, store_cat: null, created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
+      open_at: '09:00', close_at: '21:00', max_svc_qty: 1, is_dark_store: 0, catalog_type: 'PRODUCT', svc_type: null, store_cat: null, open_days: [0, 1, 2, 3, 4, 5, 6], created_on: now(), created_by: loc.loc_name, updated_on: now(), updated_by: loc.loc_name, active: 1,
     });
   }
   return settings.get(loc.user_id);
@@ -206,7 +206,7 @@ const browseRow = (loc) => {
   const avg = rated.length ? (rated.reduce((sum, r) => sum + r.stars, 0) / rated.length).toFixed(1) : null;
   return {
     ...row, max_limit: s?.max_limit ?? null, unit: s?.unit ?? null, is_auto_approval: s?.is_auto_approval ?? null, open_at: s?.open_at ?? null, close_at: s?.close_at ?? null,
-    max_svc_qty: s?.max_svc_qty ?? null, is_dark_store: s?.is_dark_store ?? null, catalog_type: s?.catalog_type ?? null, svc_type: s?.svc_type ?? null, store_cat: s?.store_cat ?? null,
+    max_svc_qty: s?.max_svc_qty ?? null, is_dark_store: s?.is_dark_store ?? null, catalog_type: s?.catalog_type ?? null, svc_type: s?.svc_type ?? null, store_cat: s?.store_cat ?? null, open_days: s?.open_days ?? null,
     loc_address: p?.loc_address ?? null, loc_city: p?.loc_city ?? null, loc_pin_code: p?.loc_pin_code ?? null, loc_country: p?.loc_country ?? null, loc_nav: p?.loc_nav ?? null,
     rating_avg: avg, rating_count: rated.length ? String(rated.length) : null,
   };
@@ -343,6 +343,13 @@ route('PUT', /^\/location\/([^/]+)\/settings$/, 'any', ({ claims, params, body }
     if (name && !listed) addedStoreCategories.push(name);
     row.store_cat = listed || name;
   }
+  if (body?.openDays !== undefined) {
+    const days = body.openDays;
+    if (!Array.isArray(days) || !days.length || new Set(days).size !== days.length || !days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) {
+      return [400, { error: 'openDays must list 1 to 7 different whole numbers from 0 (Sunday) to 6 (Saturday)' }];
+    }
+    row.open_days = [...days].sort((a, b) => a - b);
+  }
   if (body?.catalogType !== undefined) {
     if (!['PRODUCT', 'SERVICE'].includes(body.catalogType)) return [400, { error: 'catalogType must be PRODUCT or SERVICE' }];
     row.catalog_type = body.catalogType;
@@ -403,6 +410,12 @@ route('POST', /^\/appointment$/, 'any', ({ claims, body }) => {
   if (!body?.loc_id || !body.loc_name || !body.apntmnt_time || !body.apntmnt_period) return [400, { error: 'Missing required fields' }];
   if (typeof body.bokng_desc !== 'string' || !body.bokng_desc.trim()) return [400, { error: 'bokng_desc is required' }];
   if (Number.isNaN(new Date(body.apntmnt_time).getTime())) return [400, { error: 'Invalid apntmnt_time' }];
+  // Only on the weekdays the location is open (the local date the client sent, else the stub's local day).
+  const weekday = new Date(`${/^\d{4}-\d{2}-\d{2}$/.test(body.apntmnt_date ?? '') ? body.apntmnt_date : localDay(body.apntmnt_time)}T12:00`).getDay();
+  const openDays = settings.get(body.loc_id)?.open_days ?? [0, 1, 2, 3, 4, 5, 6];
+  if (!openDays.includes(weekday)) {
+    return [400, { error: `The store is closed on ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday]}s` }];
+  }
   // Booked services: each one this location's, listed once, within its limit; saved as a snapshot.
   let booked = null;
   if (body.services != null) {

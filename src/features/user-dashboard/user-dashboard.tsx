@@ -21,7 +21,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatDayLong, formatSlotStart, makeDateKey, MONTHS, toDateKey } from '@/lib/date';
 import { catalogWords, storeTypeLabel } from '@/lib/order-types';
 import { countServices, encodeServices } from '@/lib/services';
-import { daysInMonth, LIMIT_UNIT_LABEL } from '@/lib/slots';
+import { daysInMonth, isOpenDay, LIMIT_UNIT_LABEL, nextOpenDay, openDayOptions, openDaysLabel } from '@/lib/slots';
 import type { ServicePicks, SlotStart } from '@/types/domain';
 
 /** The next 12 months, starting with the current one; values are `year-month` (0-based month). */
@@ -87,6 +87,11 @@ export function UserDashboard() {
 
   const stores = useStores();
   const store = stores.data?.find((s) => s.id === storeId);
+  // The store is closed on the chosen day (new store or new month): move to its next open day that month.
+  if (store && !isOpenDay(store.openDays, year, month, day)) {
+    setDay(nextOpenDay(store.openDays, year, month, day));
+    setSelectedSlot(null);
+  }
   // Products or Services, by the store type; "Products" until a store is picked.
   const words = catalogWords(store?.catalogType);
   const slots = useStoreSlots(storeId, dateKey);
@@ -182,6 +187,7 @@ export function UserDashboard() {
       {store ? (
         <ThemedText type="default" themeColor="textSecondary">
           Max Count : {store.maxPerSlot} {store.isDarkStore ? 'orders ' : ''}per {LIMIT_UNIT_LABEL[store.limitUnit]}
+          {' · '}Open: {openDaysLabel(store.openDays)}
         </ThemedText>
       ) : null}
       {stores.isError ? (
@@ -217,10 +223,8 @@ export function UserDashboard() {
           <Select
             label="Day"
             value={day}
-            options={Array.from({ length: daysInMonth(year, month) }, (_, i) => ({
-              label: String(i + 1),
-              value: i + 1,
-            }))}
+            // Only the days the store is open ("Mon 3"); every day before a store is chosen.
+            options={openDayOptions(store?.openDays, year, month)}
             onChange={(d) => {
               setDay(d);
               setSelectedSlot(null);

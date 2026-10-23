@@ -6,6 +6,7 @@ import { USE_REAL_API } from '@/api/config';
 import { ThemedText } from '@/components/themed-text';
 import { Banner, type BannerMessage } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
+import { DayPicker } from '@/components/ui/day-picker';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
@@ -48,6 +49,7 @@ type FieldErrors = Partial<
     | 'maxPerBooking'
     | 'maxServiceQty'
     | 'closeAt'
+    | 'openDays'
     | 'serviceType'
     | 'otherType'
     | 'storeCategory'
@@ -77,6 +79,7 @@ const toDraft = (store: Store): Draft => ({
   autoApprove: store.autoApprove,
   openAt: store.openAt,
   closeAt: store.closeAt,
+  openDays: store.openDays,
   isDarkStore: store.isDarkStore,
   catalogType: store.catalogType,
   serviceType: store.serviceType,
@@ -118,6 +121,7 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         toMinutes(draft.closeAt) > toMinutes(draft.openAt)
           ? undefined
           : 'Closing time must be after opening time.',
+      openDays: draft.openDays.length ? undefined : 'Choose at least one day.',
       // Service stores need a type of service, product stores a category (each may be their own: Other).
       serviceType: !isService || draft.serviceType ? undefined : 'Choose the type of service you provide.',
       otherType: isService ? otherError(draft.serviceType, draft.otherType, 'type of service') : undefined,
@@ -219,6 +223,16 @@ export function StoreSettingsForm({ store }: { store: Store }) {
           style={styles.flex}
         />
       </View>
+      <DayPicker
+        label="Open days"
+        value={draft.openDays}
+        onChange={(v) => {
+          set('openDays', v);
+          setErrors((e) => ({ ...e, openDays: undefined }));
+        }}
+        error={errors.openDays}
+        hint="Customers can only book on these days."
+      />
       <View style={styles.field}>
         <Select
           label="Store type"
