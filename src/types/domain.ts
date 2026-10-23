@@ -64,6 +64,8 @@ export interface StoreSettings {
   serviceType: string | null;
   /** Category of a product store, e.g. "Bakery" (see `getStoreCategories`); null = not set. */
   storeCategory: string | null;
+  /** Weekdays the store is open, 0 = Sunday … 6 = Saturday (`Date.getDay()`); customers only book these. */
+  openDays: number[];
   /** The admin made the store inactive (only known for the signed-in store's own record). */
   inactive?: boolean;
   /** How many of each service a booking may include, for services without their own limit. */

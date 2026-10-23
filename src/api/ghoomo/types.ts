@@ -26,6 +26,8 @@ export interface GhoomoLocation {
   svc_type?: string | null;
   /** Category of a PRODUCT location, e.g. `Bakery`; null = not set. */
   store_cat?: string | null;
+  /** Weekdays open, 0 = Sunday … 6 = Saturday; all seven when not set. */
+  open_days?: number[] | null;
   /** From the location's profile, so customers know where to go; null when not filled in. */
   loc_address?: string | null;
   loc_city?: string | null;
@@ -52,6 +54,7 @@ export interface GhoomoSettings {
   catalog_type?: string;
   svc_type?: string | null;
   store_cat?: string | null;
+  open_days?: number[];
   /** 1 when the admin made the location inactive (GET settings only). */
   store_inactive?: number;
 }

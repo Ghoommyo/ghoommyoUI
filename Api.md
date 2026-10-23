@@ -320,6 +320,7 @@ curl "$BASE/location"
       "catalog_type": "PRODUCT",
       "svc_type": null,
       "store_cat": "Bakery",
+      "open_days": [1, 2, 3, 4, 5, 6],
       "loc_address": "12 MG Road",
       "loc_city": "Indore",
       "loc_pin_code": "452001",
@@ -467,9 +468,10 @@ curl -X PUT "$BASE/location/raju_tailor/settings" -H "Authorization: $LOC_TOKEN"
 | catalogType      | `PRODUCT` \| `SERVICE` | what the location sells (column `catalog_type`, default `PRODUCT`). Decides what its items are called (Products / Services) and which `order_type`s bookings may use (see §5.6) |
 | serviceType      | string (1–60) \| null | the location's type of service, e.g. `"Plumber"` (column `svc_type`, default `null`; also on `GET /location` rows). Spaces are trimmed. A name not in `GET /service-types` (any case) is **added to that list** for every location; an existing one is saved with its listed spelling (`"plumber"` → `"Plumber"`). `null` clears it. Apps show it for `SERVICE` locations only |
 | storeCategory    | string (1–60) \| null | the category of a `PRODUCT` location, e.g. `"Bakery"` (column `store_cat`; also on `GET /location` rows). Same rules as `serviceType`, against `GET /store-categories` |
+| openDays         | integer[]             | the weekdays the location is open: 1 to 7 different values from `0` (Sunday) to `6` (Saturday), stored sorted (column `open_days`, default every day; also on `GET /location` rows). Customers only see and book dates on these days |
 
 - 200 `{"settings":{ ...same fields as GET... }}`
-- 400 `{"error":"maxServiceQty must be a whole number of at least 1"}` / `{"error":"isDarkStore must be 0 or 1"}` / `{"error":"catalogType must be PRODUCT or SERVICE"}` / `{"error":"serviceType must be 1 to 60 characters, or null"}` / `{"error":"storeCategory must be 1 to 60 characters, or null"}`
+- 400 `{"error":"maxServiceQty must be a whole number of at least 1"}` / `{"error":"isDarkStore must be 0 or 1"}` / `{"error":"catalogType must be PRODUCT or SERVICE"}` / `{"error":"serviceType must be 1 to 60 characters, or null"}` / `{"error":"storeCategory must be 1 to 60 characters, or null"}` / `{"error":"openDays must list 1 to 7 different whole numbers from 0 (Sunday) to 6 (Saturday)"}`
 - `GET` rows also carry `store_inactive`: 1 when the admin made the location inactive (it still works for its owner, but customers can't see or book it).
 - 404 `{"error":"Location settings not found, call GET first to create defaults"}`
 
@@ -610,6 +612,7 @@ curl -X POST "$BASE/appointment" -H "Authorization: $USER_TOKEN" -H "Content-Typ
 | loc_id         | string (uuid)         | ✔   | the location's `user_id`  |
 | loc_name       | string                | ✔   |                           |
 | apntmnt_time   | ISO datetime          | ✔   | slot start                |
+| apntmnt_date   | `YYYY-MM-DD`          |     | the slot's local date, checked against the location's `open_days` (without it, the date written in `apntmnt_time`) |
 | apntmnt_period | `HOUR`\|`DAY`\|`WEEK` | ✔   | sets `end_time`           |
 | cret_on        | ISO datetime          |     | client timestamp          |
 | cret_by        | string                |     | display name              |
@@ -633,7 +636,7 @@ Allowed `order_type` by location:
 `TABLE`, `PICKUP` and `APPOINTMENT` mean the customer goes to the store, so they're only allowed when the location's profile has an address (`loc_address` not blank). Without one, product locations take `PORTER` only and service locations `HOME_VISIT` only.
 
 - 201 `{"message":"Appointment added successfully","appointmentId":"60834c7e-ca6b-4b13-a724-c27df35feec8","status":"ACCEPTED","orderType":"TABLE"}`
-- 400 `{"error":"Missing required fields"}` / `{"error":"bokng_desc is required"}` / `{"error":"Invalid apntmnt_time"}` / `{"error":"qty for Haircut must be between 1 and 2"}` / `{"error":"services contains a service this location doesn't offer"}` / `{"error":"This store takes APPOINTMENT or HOME_VISIT bookings"}` (any type the location doesn't allow) / `{"error":"delivery_address is required for PORTER and HOME_VISIT bookings (at most 500 characters)"}` · 401 · 403 `{"error":"Your account is inactive, so you can't submit requests. Contact support."}` / `{"error":"This store isn't taking bookings right now"}` (inactive customer or location; the customer's `GET /traveller/profile` has `"inactive": true`)
+- 400 `{"error":"Missing required fields"}` / `{"error":"bokng_desc is required"}` / `{"error":"Invalid apntmnt_time"}` / `{"error":"qty for Haircut must be between 1 and 2"}` / `{"error":"services contains a service this location doesn't offer"}` / `{"error":"This store takes APPOINTMENT or HOME_VISIT bookings"}` (any type the location doesn't allow) / `{"error":"delivery_address is required for PORTER and HOME_VISIT bookings (at most 500 characters)"}` / `{"error":"The store is closed on Sundays"}` (a day not in `open_days`) · 401 · 403 `{"error":"Your account is inactive, so you can't submit requests. Contact support."}` / `{"error":"This store isn't taking bookings right now"}` (inactive customer or location; the customer's `GET /traveller/profile` has `"inactive": true`)
 
 **Appointment object** (returned by the list endpoints and the PUT):
 

@@ -3,7 +3,7 @@ import { addDays, makeDateKey, todayKey } from '@/lib/date';
 import { needsDeliveryAddress, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
 import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
 import { STANDARD_STORE_CATEGORIES } from '@/lib/store-categories';
-import { buildSlotStarts, daysInMonth, visitorCount } from '@/lib/slots';
+import { ALL_DAYS, buildSlotStarts, daysInMonth, visitorCount, WEEK } from '@/lib/slots';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type {
   SavedAddress,
@@ -80,6 +80,7 @@ const stores: StoreRecord[] = [
     catalogType: 'service',
     serviceType: null,
     storeCategory: null,
+    openDays: [...ALL_DAYS],
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -105,6 +106,7 @@ const stores: StoreRecord[] = [
     catalogType: 'service',
     serviceType: 'Barber',
     storeCategory: null,
+    openDays: [...ALL_DAYS],
     profile: {
       address: '45 Vijay Nagar',
       pin: '452010',
@@ -131,6 +133,7 @@ const stores: StoreRecord[] = [
     catalogType: 'product',
     serviceType: null,
     storeCategory: 'Fresh produce',
+    openDays: [1, 2, 3, 4, 5, 6],
     profile: {
       // No address entered yet, so customers can't visit: only Porter.
       address: '',
@@ -411,6 +414,7 @@ export const mockApi: Api = {
       catalogType: 'product',
       serviceType: null,
       storeCategory: null,
+      openDays: [...ALL_DAYS],
       profile: {
         address: '',
         pin: '',
@@ -586,6 +590,10 @@ export const mockApi: Api = {
     const store = findStore(input.storeId);
     if (input.slotStart.slice(0, 10) < todayKey()) {
       throw new ApiError('You cannot book a date in the past.', 400);
+    }
+    const weekday = new Date(`${input.slotStart.slice(0, 10)}T12:00`).getDay();
+    if (!store.openDays.includes(weekday)) {
+      throw new ApiError(`The store is closed on ${WEEK.find((w) => w.day === weekday)!.long}s`, 400);
     }
     // Dark-store orders and home visits count as 1, whatever the head count.
     const people = store.isDarkStore || input.orderType === 'homeVisit' ? 1 : input.people;
@@ -796,7 +804,15 @@ export const mockApi: Api = {
     await delay();
     requireStoreOwner(storeId);
     const store = findStore(storeId);
+    if (
+      !settings.openDays.length ||
+      new Set(settings.openDays).size !== settings.openDays.length ||
+      !settings.openDays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+    ) {
+      throw new ApiError('openDays must list 1 to 7 different whole numbers from 0 (Sunday) to 6 (Saturday)', 400);
+    }
     Object.assign(store, settings, {
+      openDays: [...settings.openDays].sort((a, b) => a - b),
       serviceType: settings.serviceType && addServiceType(settings.serviceType),
       storeCategory: settings.storeCategory && addStoreCategory(settings.storeCategory),
       inactive: undefined,
