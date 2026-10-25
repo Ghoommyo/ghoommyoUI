@@ -8,7 +8,10 @@ import type {
   Credentials,
   DateKey,
   DaySummary,
+  EmailCodeRequest,
+  EmailCodeSent,
   NewBooking,
+  PasswordReset,
   ReminderSettings,
   ReviewsPage,
   ImageKind,
@@ -40,6 +43,11 @@ export class ApiError extends Error {
 export interface Api {
   signup(input: SignupInput): Promise<SignupResult>;
   login(credentials: Credentials): Promise<Session>;
+  /** Emails a 6-digit code to verify an email (signup) or reset a password. */
+  sendEmailCode(input: EmailCodeRequest): Promise<EmailCodeSent>;
+  /** Checks the code; returns the `verificationToken` for `signup` or `resetPassword`. */
+  verifyEmailCode(input: EmailCodeRequest & { code: string }): Promise<string>;
+  resetPassword(input: PasswordReset): Promise<void>;
 
   listStores(): Promise<Store[]>;
   getStore(storeId: string): Promise<Store>;

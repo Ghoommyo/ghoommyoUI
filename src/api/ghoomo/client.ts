@@ -181,7 +181,12 @@ export function createGhoomoApi(baseUrl: string): Api {
         // `username` isn't accepted by POST /signup yet; kept locally until it is.
         await request('/signup', {
           method: 'POST',
-          body: { user_name: input.email, password: input.password, confirmPassword: input.password },
+          body: {
+          user_name: input.email,
+          password: input.password,
+          confirmPassword: input.password,
+          verificationToken: input.verificationToken,
+        },
         });
         usernames.set(input.email.trim().toLowerCase(), input.username.trim());
         return {};
@@ -195,9 +200,30 @@ export function createGhoomoApi(baseUrl: string): Api {
           email: input.email,
           password: input.password,
           confirmPassword: input.password,
+          verificationToken: input.verificationToken,
         },
       });
       return { loginCode: storeKey(name) };
+    },
+
+    async sendEmailCode(input) {
+      const res = await request<{ message: string; devCode?: string }>('/email/send-code', {
+        method: 'POST',
+        body: { ...input, email: input.email.trim() },
+      });
+      return { message: res!.message, devCode: res!.devCode };
+    },
+
+    async verifyEmailCode(input) {
+      const res = await request<{ verificationToken: string }>('/email/verify-code', {
+        method: 'POST',
+        body: { ...input, email: input.email.trim(), code: input.code.trim() },
+      });
+      return res!.verificationToken;
+    },
+
+    async resetPassword(input) {
+      await request('/password/reset', { method: 'POST', body: input });
     },
 
     async login(credentials): Promise<Session> {

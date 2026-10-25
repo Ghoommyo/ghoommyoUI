@@ -245,7 +245,60 @@ const routes = [];
 const route = (method, pattern, auth, handler) => routes.push({ method, pattern, auth, handler });
 const UNAUTH = [401, { message: 'Authentication token is missing or invalid' }];
 
+// Email codes (Api.md §5.0). The stub's code is always 123456 and is returned as devCode.
+const STUB_CODE = '123456';
+const RESET_SENT = "If an account uses this email, we've sent it a code.";
+const emailCodes = new Map(); // "purpose role email" → { attempts, sentAt }
+const verifications = new Map(); // verificationToken → { email, purpose, role }
+const codeKey = (b) => `${b.purpose} ${b.role} ${String(b.email ?? '').trim().toLowerCase()}`;
+const emailTaken = (email, role) =>
+  role === 'user'
+    ? users.some((u) => u.user_name.toLowerCase() === email && u.active !== 0)
+    : locations.some((l) => (l.email ?? '').toLowerCase() === email && l.active);
+const verifiedEmail = (token, purpose, role) => {
+  const v = verifications.get(token);
+  return v && v.purpose === purpose && v.role === role ? v.email : null;
+};
+route('POST', /^\/email\/send-code$/, 'none', ({ body }) => {
+  const email = String(body?.email ?? '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return [400, { error: 'Enter a valid email address.' }];
+  if (!['signup', 'reset'].includes(body.purpose) || !['user', 'store'].includes(body.role)) return [400, { error: 'purpose must be signup or reset, and role user or store' }];
+  const taken = emailTaken(email, body.role);
+  if (body.purpose === 'signup' && taken) return [409, { error: 'An account with this email already exists. Log in or reset your password.' }];
+  if (body.purpose === 'reset' && !taken) return [200, { message: RESET_SENT }];
+  const previous = emailCodes.get(codeKey(body));
+  const wait = previous ? 60 - Math.floor((Date.now() - previous.sentAt) / 1000) : 0;
+  if (wait > 0) return [429, { error: `Wait ${wait} seconds before asking for another code.`, retryAfter: wait }];
+  emailCodes.set(codeKey(body), { attempts: 0, sentAt: Date.now() });
+  console.log(`  [mail] ${body.purpose} code for ${email}: ${STUB_CODE}`);
+  return [200, { message: body.purpose === 'reset' ? RESET_SENT : "We've sent a code to your email.", devCode: STUB_CODE }];
+});
+route('POST', /^\/email\/verify-code$/, 'none', ({ body }) => {
+  const entry = emailCodes.get(codeKey(body ?? {}));
+  if (!entry || entry.attempts >= 5) return [400, { error: 'This code has expired. Ask for a new one.' }];
+  if (String(body.code ?? '').trim() !== STUB_CODE) {
+    const left = 5 - ++entry.attempts;
+    return [400, { error: left > 0 ? `That code isn't right. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many wrong tries. Ask for a new code.' }];
+  }
+  entry.attempts = 99; // used
+  const verificationToken = randomUUID();
+  verifications.set(verificationToken, { email: String(body.email).trim().toLowerCase(), purpose: body.purpose, role: body.role });
+  return [200, { verificationToken }];
+});
+route('POST', /^\/password\/reset$/, 'none', ({ body }) => {
+  const email = verifiedEmail(body?.verificationToken, 'reset', body?.role);
+  if (!email) return [400, { error: 'Your code has expired. Start again to get a new one.' }];
+  if (typeof body.password !== 'string' || body.password.length < 8) return [400, { error: 'Password must be at least 8 characters.' }];
+  const accounts = body.role === 'user'
+    ? users.filter((u) => u.user_name.toLowerCase() === email && u.active !== 0)
+    : locations.filter((l) => (l.email ?? '').toLowerCase() === email && l.active);
+  if (!accounts.length) return [404, { error: 'No account uses this email.' }];
+  for (const account of accounts) account.password = body.password;
+  return [200, { message: 'Password changed.' }];
+});
+
 route('POST', /^\/signup$/, 'none', ({ body }) => {
+  if (verifiedEmail(body?.verificationToken, 'signup', 'user') !== String(body?.user_name ?? '').trim().toLowerCase()) return [400, { error: 'Verify your email first.' }];
   if (!body?.user_name || !body.password || body.password !== body.confirmPassword) return [400, { message: 'Invalid sign-up data' }];
   if (users.some((u) => u.user_name === body.user_name && u.active !== 0)) return [409, { error: 'User name already exists' }];
   users.push({ user_id: randomUUID(), user_name: body.user_name, password: body.password, disp_name: body.display_name ?? null });
@@ -263,6 +316,7 @@ route('GET', /^\/signout$/, 'none', () => [200, { message: 'Sign-out successful'
 route('GET', /^\/traveller$/, 'any', ({ claims }) => (isLocToken(claims) ? [403, { error: 'Forbidden' }] : [200, { user: claims }]));
 
 route('POST', /^\/location\/signup$/, 'none', ({ body }) => {
+  if (verifiedEmail(body?.verificationToken, 'signup', 'store') !== String(body?.email ?? '').trim().toLowerCase()) return [400, { error: 'Verify your email first.' }];
   const ok = body?.location_name && ['SHOP', 'PLACE'].includes(body.location_type) && body.email && body.password && body.password === body.confirmPassword;
   if (!ok) return [400, { message: 'Invalid Location sign-up data' }];
   const code = body.location_name.toLowerCase().replace(/ /g, '_');

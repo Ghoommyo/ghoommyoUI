@@ -1,9 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { StyleSheet } from 'react-native';
 
 import { api, errorMessage } from '@/api';
 import { useSession } from '@/auth/session';
+import { ThemedText } from '@/components/themed-text';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
@@ -13,8 +15,8 @@ import type { Credentials, Role } from '@/types/domain';
 
 export default function LoginScreen() {
   const { signIn } = useSession();
-  // Set by signup: show a confirmation and, for stores, prefill the store name.
-  const params = useLocalSearchParams<{ registered?: string; role?: Role; store?: string }>();
+  // Set by signup (and forgot password): show a confirmation and, for stores, prefill the store name.
+  const params = useLocalSearchParams<{ registered?: string; passwordReset?: string; role?: Role; store?: string }>();
   const [role, setRole] = useState<Role>(params.role === 'store' ? 'store' : 'user');
   const [identifier, setIdentifier] = useState(params.store ?? '');
   const [password, setPassword] = useState('');
@@ -64,7 +66,9 @@ export default function LoginScreen() {
             ? { type: 'error', text: errorMessage(login.error) }
             : params.registered
               ? { type: 'success', text: registeredText }
-              : null
+              : params.passwordReset
+                ? { type: 'success', text: 'Password changed. Log in with your new password.' }
+                : null
         }
       />
       <Select
@@ -113,7 +117,16 @@ export default function LoginScreen() {
         textContentType="password"
         onSubmitEditing={submit}
       />
+      <Link href={{ pathname: '/forgot-password', params: { role } }} style={styles.forgot}>
+        <ThemedText type="linkPrimary">Forgot password?</ThemedText>
+      </Link>
       <Button label="Login" onPress={submit} loading={login.isPending} fullWidth />
     </AuthFormLayout>
   );
 }
+
+const styles = StyleSheet.create({
+  forgot: {
+    alignSelf: 'flex-end',
+  },
+});

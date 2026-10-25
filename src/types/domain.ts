@@ -34,11 +34,34 @@ export type Credentials =
   | { role: 'user'; email: string; password: string }
   | { role: 'store'; /** Email, or store name in any case/spacing. */ login: string; password: string };
 
+/** `verificationToken` proves the email was verified with a code (`verifyEmailCode`). */
 export type SignupInput =
   /** `username` is a display name and may be shared by several users. */
-  | { role: 'user'; username: string; email: string; password: string }
+  | { role: 'user'; username: string; email: string; password: string; verificationToken: string }
   /** `locationName` is unique per store once normalized (see `storeKey`). */
-  | { role: 'store'; locationName: string; email: string; password: string };
+  | { role: 'store'; locationName: string; email: string; password: string; verificationToken: string };
+
+/** What an emailed 6-digit code is for. */
+export type CodePurpose = 'signup' | 'reset';
+
+export interface EmailCodeRequest {
+  email: string;
+  purpose: CodePurpose;
+  role: Role;
+}
+
+export interface EmailCodeSent {
+  message: string;
+  /** Only from a local server without email settings (or the dummy backend): the code itself. */
+  devCode?: string;
+}
+
+export interface PasswordReset {
+  role: Role;
+  /** From `verifyEmailCode` with `purpose: 'reset'`. */
+  verificationToken: string;
+  password: string;
+}
 
 export interface SignupResult {
   /** For stores: the code to log in with. */

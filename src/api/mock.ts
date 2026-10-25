@@ -9,6 +9,7 @@ import type {
   SavedAddress,
   AddressInput,
   AppNotification,
+  CodePurpose,
   Booking,
   NotificationKind,
   ReminderSettings,
@@ -37,6 +38,13 @@ interface Account {
   locCode?: string;
   profile: UserProfile;
 }
+
+/** The dummy backend's emailed code is always this. */
+const MOCK_CODE = '123456';
+const RESET_SENT = "If an account uses this email, we've sent it a code.";
+/** Codes waiting to be entered, by `codeKey`. */
+const codes = new Map<string, { attempts: number }>();
+const codeKey = (email: string, purpose: CodePurpose, role: Role) => `${purpose} ${role} ${email.trim().toLowerCase()}`;
 
 const LATENCY_MS = 250;
 const delay = () => new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
@@ -374,9 +382,51 @@ function requireStoreOwner(storeId: string) {
 }
 
 export const mockApi: Api = {
+  async sendEmailCode({ email, purpose, role }) {
+    await delay();
+    const normalized = email.trim().toLowerCase();
+    const exists = accounts.some((a) => a.role === role && a.email === normalized);
+    if (purpose === 'signup' && exists) {
+      throw new ApiError('An account with this email already exists. Log in or reset your password.', 409);
+    }
+    if (purpose === 'reset' && !exists) return { message: RESET_SENT };
+    codes.set(codeKey(email, purpose, role), { attempts: 0 });
+    console.log(`[mock] ${purpose} code for ${email}: ${MOCK_CODE}`);
+    return { message: purpose === 'reset' ? RESET_SENT : "We've sent a code to your email.", devCode: MOCK_CODE };
+  },
+
+  async verifyEmailCode({ email, purpose, role, code }) {
+    await delay();
+    const key = codeKey(email, purpose, role);
+    const entry = codes.get(key);
+    if (!entry || entry.attempts >= 5) throw new ApiError('This code has expired. Ask for a new one.', 400);
+    if (code.trim() !== MOCK_CODE) {
+      entry.attempts += 1;
+      const left = 5 - entry.attempts;
+      throw new ApiError(left > 0 ? `That code isn't right. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many wrong tries. Ask for a new code.', 400);
+    }
+    codes.delete(key);
+    return `mockverify ${key}`;
+  },
+
+  async resetPassword({ role, verificationToken, password }) {
+    await delay();
+    const [kind, purpose, tokenRole, email] = verificationToken.split(' ');
+    if (kind !== 'mockverify' || purpose !== 'reset' || tokenRole !== role) {
+      throw new ApiError('Your code has expired. Start again to get a new one.', 400);
+    }
+    if (password.length < 8) throw new ApiError('Password must be at least 8 characters.', 400);
+    const matches = accounts.filter((a) => a.role === role && a.email === email);
+    if (!matches.length) throw new ApiError('No account uses this email.', 404);
+    for (const account of matches) account.password = password;
+  },
+
   async signup(input) {
     await delay();
     const email = input.email.trim().toLowerCase();
+    if (input.verificationToken !== `mockverify ${codeKey(email, 'signup', input.role)}`) {
+      throw new ApiError('Verify your email first.', 400);
+    }
     if (input.role === 'user') {
       // Users log in by email, so it must be unique; usernames may repeat.
       if (accounts.some((a) => a.role === 'user' && a.email === email)) {

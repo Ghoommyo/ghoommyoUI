@@ -59,11 +59,11 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 
 | #   | Method | Path                           | Auth                 | Purpose                                              |
 | --- | ------ | ------------------------------ | -------------------- | ---------------------------------------------------- |
-| 1   | POST   | `/signup`                      | none                 | Register a customer                                  |
+| 1   | POST   | `/signup`                      | none                 | Register a customer (needs `verificationToken`)      |
 | 2   | POST   | `/signin`                      | none                 | Customer login → user token                          |
 | 3   | GET    | `/signout`                     | none                 | No-op                                                |
 | 4   | GET    | `/traveller`                   | User                 | Decoded current-user info                            |
-| 5   | POST   | `/location/signup`             | none                 | Register a shop or place                             |
+| 5   | POST   | `/location/signup`             | none                 | Register a shop or place (needs `verificationToken`) |
 | 6   | POST   | `/location/signin`             | none                 | Owner login → location token                         |
 | 7   | GET    | `/location`                    | none                 | All active locations (SHOP + PLACE) with settings    |
 | 8   | GET    | `/shop`                        | any token            | All active SHOP locations with settings              |
@@ -98,6 +98,9 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 | 36  | GET    | `/product-types`               | none                 | Types a location can give its products (§5.4a)       |
 | 38  | GET, PUT | `/traveller/profile`         | User                 | Customer's name, mobile and photo                    |
 | 39  | POST   | `/uploads`                     | User or Location     | Upload a picture → its URL (§5.4b)                   |
+| 40  | POST   | `/email/send-code`             | none                 | Email a 6-digit code: signup or password reset (§5.0) |
+| 41  | POST   | `/email/verify-code`           | none                 | Check the code → `verificationToken` (§5.0)          |
+| 42  | POST   | `/password/reset`              | none                 | New password with a reset `verificationToken` (§5.0) |
 
 The admin console's routes (`/admin/*`, admin token only) are web only and aren't used by this app; see the server's `docs/API.md` §5.8. The admin turns picture uploads on per location there (A13).
 
@@ -169,6 +172,23 @@ The admin console's routes (`/admin/*`, admin token only) are web only and aren'
 
 ## 5. Endpoint details
 
+### 5.0 Email codes: verify an email, reset a password
+
+Signup and forgot password both use a 6-digit code sent by email. The flow is the same for customers (`role: "user"`, matched on `user_name`) and owners (`role: "store"`, matched on `email`):
+
+1. `POST /email/send-code` `{email, purpose: "signup" | "reset", role: "user" | "store"}` emails a code.
+2. `POST /email/verify-code` `{email, purpose, role, code}` returns `{verificationToken}`, valid for 30 minutes.
+3. Pass the token to `POST /signup` / `POST /location/signup`, or to `POST /password/reset` `{role, verificationToken, password}`.
+
+Rules and responses:
+
+- **Codes:** a code lasts 10 minutes, and 5 wrong tries use it up. Wait 60 s between codes, and send at most 5 per email per hour.
+- **Send errors:** 429 `{"error":"Wait 42 seconds…","retryAfter":42}`; 409 when signing up with an email that already has an account of that role.
+- **Reset doesn't reveal accounts:** `send-code` for a reset always answers `{"message":"If an account uses this email, we've sent it a code."}`.
+- **Wrong or expired code:** 400 `{"error":"That code isn't right. 4 tries left."}` · `"Too many wrong tries. Ask for a new code."` · `"This code has expired. Ask for a new one."`
+- **The token** is tied to the email, purpose and role, and isn't a login token. Send it without `Bearer`.
+- **`devCode`:** a local server without email settings (and the stub, whose code is always `123456`) also returns it, so testing needs no inbox. The app shows it under the Code field.
+
 ### 5.1 Customer auth
 
 #### POST /signup
@@ -177,17 +197,18 @@ Register a customer. `user_name` is used as the login and as the email that PLAC
 
 ```bash
 curl -X POST "$BASE/signup" -H "Content-Type: application/json" \
-  -d '{"user_name":"asha@example.com","password":"Secret@123","confirmPassword":"Secret@123"}'
+  -d '{"user_name":"asha@example.com","password":"Secret@123","confirmPassword":"Secret@123","verificationToken":"eyJ…"}'
 ```
 
-| Field           | Type   | Req | Notes                 |
-| --------------- | ------ | --- | --------------------- |
-| user_name       | string | ✔   | email recommended     |
-| password        | string | ✔   |                       |
-| confirmPassword | string | ✔   | must equal `password` |
+| Field             | Type   | Req | Notes                                                        |
+| ----------------- | ------ | --- | ------------------------------------------------------------ |
+| user_name         | string | ✔   | email recommended                                            |
+| password          | string | ✔   |                                                              |
+| confirmPassword   | string | ✔   | must equal `password`                                        |
+| verificationToken | string | ✔   | §5.0, `purpose: "signup"`, `role: "user"` for this user_name |
 
 - 201 `{"message":"Sign-up successful"}`
-- 400 `{"message":"Invalid sign-up data"}` (missing fields or the passwords don't match)
+- 400 `{"error":"Verify your email first."}` · `{"message":"Invalid sign-up data"}` (missing fields or the passwords don't match)
 - 409 `{"error":"User name already exists"}`
 
 #### POST /signin
@@ -261,7 +282,7 @@ PUT replaces the label and address; DELETE removes it (soft delete; bookings kee
 
 ```bash
 curl -X POST "$BASE/location/signup" -H "Content-Type: application/json" \
-  -d '{"location_name":"Raju Tailor","location_type":"SHOP","email":"raju@example.com","password":"Secret@123","confirmPassword":"Secret@123"}'
+  -d '{"location_name":"Raju Tailor","location_type":"SHOP","email":"raju@example.com","password":"Secret@123","confirmPassword":"Secret@123","verificationToken":"eyJ…"}'
 ```
 
 | Field                      | Type              | Req | Notes              |
@@ -270,9 +291,10 @@ curl -X POST "$BASE/location/signup" -H "Content-Type: application/json" \
 | location_type              | `SHOP` \| `PLACE` | ✔   |                    |
 | email                      | string            | ✔   |                    |
 | password / confirmPassword | string            | ✔   | must match         |
+| verificationToken          | string            | ✔   | §5.0, `purpose: "signup"`, `role: "store"` for this email |
 
 - 201 `{"message":"Location Sign-up successful"}`
-- 400 `{"message":"Invalid Location sign-up data"}` · 409 `{"error":"Location already exists"}`
+- 400 `{"error":"Verify your email first."}` · `{"message":"Invalid Location sign-up data"}` · 409 `{"error":"Location already exists"}`
 
 #### POST /location/signin
 

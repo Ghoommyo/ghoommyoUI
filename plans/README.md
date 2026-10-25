@@ -131,3 +131,9 @@ A Home screen (store types with their best rated stores), About with screenshots
 Stores upload photos of their products/services and a store photo once the app admin turns uploads on for them (off by default); users upload a profile photo. Photos show on Home cards, the dashboard store header and the side menu.
 
 - [x] [Picture uploads](image-uploads.md)
+
+## Email verification and forgot password (branch `email_verification`)
+
+Signup verifies the email with a 6-digit code (a **Verify** button beside Email); **Forgot password?** on login resets the password with an emailed code. Users and stores alike.
+
+- [x] [Email verification and forgot password](email-verification.md)

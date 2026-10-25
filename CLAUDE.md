@@ -69,6 +69,10 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
   - **Admin switch:** stores can upload only when the app admin turned it on (`uploads_on` on the owner's settings GET → `Store.uploadsEnabled`); otherwise the photo controls are disabled with `UPLOADS_OFF_HINT`. Pasting an item image link always works. User photos aren't gated.
   - **Client:** `src/lib/pick-image.ts` (expo-image-picker, then expo-image-manipulator to a ≤1280 px JPEG), `ImageField` (`src/components/ui/image-field.tsx`), `Avatar` with `uri`, `StorePhoto` (Home cards, dashboard header). The picker and manipulator are native modules: rebuild dev builds after pulling.
   - **Backends:** the server stores pictures on Cloudinary (a local server without keys uses its `.uploads/` folder); the stub keeps them in memory (Raju Tailor has uploads on, City Salon off); the dummy backend returns the device's local URI (Raju Tailor on).
+- **Email verification and forgot password** (branch `email_verification`, plan `plans/email-verification.md`):
+  - **Endpoints:** `POST /email/send-code` → `POST /email/verify-code` → a 30-minute `verificationToken` that `signup` requires (`SignupInput.verificationToken`), or that `POST /password/reset` takes (`Api.md` §5.0). Codes are per email + purpose (`signup` | `reset`) + role.
+  - **UI:** `EmailVerifyField` (`src/features/auth/email-verify-field.tsx`): the Email field with **Verify** / **Send code** beside it (`TextField`'s `accessory`), then a Code field. Signup and `src/app/(auth)/forgot-password.tsx` (linked from login) both use it.
+  - **Test codes:** the dummy backend's code is `123456`; the stub and a local server without SMTP return `devCode`, shown under the Code field.
 - **API gaps:** the API has nowhere to store store name edits, max per booking, state or map coordinates. Usernames at signup and store login by email aren't supported either. They use `API_DEFAULTS` or session-only values, and are read-only in the UI when the flag is on. Wire each one through when the API supports it.
 
 ### Session and auth
