@@ -68,6 +68,8 @@ export interface StoreSettings {
   openDays: number[];
   /** The admin made the store inactive (only known for the signed-in store's own record). */
   inactive?: boolean;
+  /** The app admin lets the store upload pictures; off by default (only known for the store's own record). */
+  uploadsEnabled?: boolean;
   /** How many of each service a booking may include, for services without their own limit. */
   maxServiceQty: number;
 }
@@ -84,6 +86,8 @@ export interface StoreProfile {
   lng?: number;
   /** Navigation link set by the store (Ghoomo `loc_nav`). */
   mapUrl?: string;
+  /** The store's photo; `''` when none. */
+  photoUrl: string;
 }
 
 /** Average stars (1 decimal; null when unrated) and how many ratings. */
@@ -128,6 +132,19 @@ export interface ServiceInput {
   productType: string | null;
 }
 
+/** What a picture is for: a store's item or its photo (stores, when the admin allows it), or a user's photo. */
+export type ImageKind = 'item' | 'store' | 'user';
+
+/**
+ * A picked picture, ready to upload: `{ uri, name, type }` is what React Native's FormData sends
+ * as a file; on web it's a `Blob`. `previewUri` shows it before upload.
+ */
+export interface PickedImage {
+  /** A web Blob, or an expo-file-system File on iOS/Android. */
+  file: Blob;
+  previewUri: string;
+}
+
 /** Service id → quantity picked for a booking. */
 export type ServicePicks = Record<string, number>;
 
@@ -142,6 +159,8 @@ export interface BookedService {
 export interface UserProfile {
   name: string;
   mobile: string;
+  /** Profile photo; `''` when none. */
+  photoUrl: string;
   /** The admin made the account inactive: no new or changed bookings. Read-only. */
   inactive?: boolean;
 }

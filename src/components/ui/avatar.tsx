@@ -1,3 +1,5 @@
+import { Image } from 'expo-image';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -8,16 +10,29 @@ function initials(name: string) {
   return (parts[0]?.[0] ?? '?').concat(parts[1]?.[0] ?? '').toUpperCase();
 }
 
-export function Avatar({ name, size = 56 }: { name: string; size?: number }) {
+/** A round photo, or the name's initials when there's none or it fails to load. */
+export function Avatar({ name, uri, size = 56 }: { name: string; uri?: string; size?: number }) {
   const theme = useTheme();
+  // Remember which link failed, so a new link is tried again.
+  const [failed, setFailed] = useState<string | null>(null);
+  const circle = { width: size, height: size, borderRadius: size / 2 };
 
+  if (uri && failed !== uri) {
+    return (
+      <Image
+        source={{ uri }}
+        onError={() => setFailed(uri)}
+        contentFit="cover"
+        accessibilityLabel={`${name} photo`}
+        accessibilityIgnoresInvertColors
+        style={[circle, { backgroundColor: theme.backgroundSelected }]}
+      />
+    );
+  }
   return (
     <View
       accessibilityLabel={`${name} avatar`}
-      style={[
-        styles.circle,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: theme.primary },
-      ]}>
+      style={[styles.circle, circle, { backgroundColor: theme.primary }]}>
       <ThemedText style={{ color: theme.onPrimary, fontSize: size * 0.38, fontWeight: 700 }}>
         {initials(name)}
       </ThemedText>

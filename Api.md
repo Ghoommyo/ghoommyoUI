@@ -96,8 +96,10 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 | 37  | DELETE | `/account`                     | User or Location     | Delete the signed-in account (§5.1)                  |
 | 35  | GET    | `/store-categories`            | none                 | Categories a PRODUCT location can pick (§5.4a)       |
 | 36  | GET    | `/product-types`               | none                 | Types a location can give its products (§5.4a)       |
+| 38  | GET, PUT | `/traveller/profile`         | User                 | Customer's name, mobile and photo                    |
+| 39  | POST   | `/uploads`                     | User or Location     | Upload a picture → its URL (§5.4b)                   |
 
-The admin console's routes (`/admin/*`, admin token only) are web only and aren't used by this app; see the server's `docs/API.md` §5.8.
+The admin console's routes (`/admin/*`, admin token only) are web only and aren't used by this app; see the server's `docs/API.md` §5.8. The admin turns picture uploads on per location there (A13).
 
 **Do not use:** `GET /shop/{shopCode}`, `GET|PUT /shop/profile`, `GET|PUT /shop/settings`. These are broken legacy copies of the `/location/{locCode}/*` routes and respond 403 to location tokens. Use rows 9–13 instead.
 
@@ -397,7 +399,7 @@ curl "$BASE/location/raju_tailor/profile" -H "Authorization: $LOC_TOKEN"
 
 #### PUT /location/{locCode}/profile
 
-All fields are optional. Only the fields you send are changed, and empty strings are ignored. Call GET first so that the profile exists (otherwise 404).
+All fields are optional. Only the fields you send are changed, and empty strings are ignored, except `locProfileUrl` (the location's photo, §5.4b), where `""` removes it. Call GET first so that the profile exists (otherwise 404). A replaced or removed uploaded photo is deleted from storage; `loc_profile_url` is also on the `GET /location` rows.
 
 ```bash
 curl -X PUT "$BASE/location/raju_tailor/profile" -H "Authorization: $LOC_TOKEN" -H "Content-Type: application/json" \
@@ -442,11 +444,15 @@ curl "$BASE/location/raju_tailor/settings" -H "Authorization: $LOC_TOKEN"
       "created_by": "Raju Tailor",
       "updated_on": "...",
       "updated_by": "Raju Tailor",
-      "active": 1
+      "active": 1,
+      "store_inactive": 0,
+      "uploads_on": 0
     }
   ]
 }
 ```
+
+- `uploads_on`: `1` when the app admin lets this location upload pictures (§5.4b). Off by default; the location can't change it.
 
 #### PUT /location/{locCode}/settings
 
@@ -531,6 +537,24 @@ Public. The types of service a `SERVICE` location can pick in its settings: 34 s
 Public. `{"storeCategories":["Food","Beverages","Grocery", …]}` (44 standard categories, then ones locations added) and `{"productTypes":[…]}` (managed by the admin). A service's `productType` (POST/PUT) must be one of the product types (any case) or `null` → otherwise 400 `{"error":"productType must be one of the product types"}`.
 
 ---
+
+### 5.4b Picture uploads
+
+Pictures for items (`kind` `item`), the location's photo (`store`) and the customer's photo (`user`). Upload first, then save the returned URL: an item's `imageUrl`, the profile's `locProfileUrl`, or `photoUrl` on `PUT /traveller/profile` (`{ name, mobile, photoUrl }`; `""` removes it, absent keeps it). Needs the server's migration `012_image_uploads.sql`. Pictures are stored on Cloudinary (or, on a local server without Cloudinary keys, under its `.uploads/` folder).
+
+#### POST /uploads
+
+`multipart/form-data` with `kind` and `file`.
+
+```bash
+curl -X POST "$BASE/uploads" -H "Authorization: $LOC_TOKEN" -F kind=item -F file=@cake.jpg
+```
+
+- `item` and `store` need a location token **and** `uploads_on` (the admin's switch); `user` needs a user token.
+- JPEG, PNG or WebP (checked from the bytes), up to 2 MB. The app sends JPEGs of at most 1280 px.
+- 200 `{"url":"https://res.cloudinary.com/<cloud>/image/upload/v…/ghoomo/item/<locationId>/<uuid>.jpg"}`
+- 400 bad `kind`, no file, not an image · 401 · 403 `{"error":"Picture uploads aren't enabled for this store"}` (or the wrong kind of token) · 413 over 2 MB
+- When a saved picture is replaced or removed (item update/delete, profile PUTs, account deletion), the old uploaded file is deleted. Other links are never touched.
 
 ### 5.5 Calendar (availability)
 

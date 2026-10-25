@@ -35,7 +35,7 @@ import { decodeJwt } from '@/lib/jwt';
 import { normalizeStoreName, storeKey } from '@/lib/store-name';
 import { parseDateKey } from '@/lib/date';
 import { orderTypeFromApi, orderTypeToApi } from '@/lib/order-types';
-import type { AppNotification, Booking, NotificationKind, Session, Store, UserProfile } from '@/types/domain';
+import type { AppNotification, Booking, NotificationKind, Session, Store } from '@/types/domain';
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -76,6 +76,29 @@ export function createRequest(baseUrl: string): GhoomoRequest {
   };
 }
 
+/** POST /uploads: multipart, so it skips the JSON request helper. */
+async function postImage(baseUrl: string, form: FormData): Promise<string> {
+  const token = getAuthToken();
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/uploads`, {
+      method: 'POST',
+      // No Content-Type: fetch sets the multipart boundary itself.
+      headers: token ? { Authorization: /^Bearer /i.test(token) ? token : `Bearer ${token}` } : {},
+      body: form,
+    });
+  } catch {
+    throw new ApiError('Could not reach the server. Check your connection and API URL.', 0);
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.url) {
+    throw new ApiError(data?.error ?? data?.message ?? `Upload failed (${response.status})`, response.status);
+  }
+  return data.url as string;
+}
+
+type ProfileResponse = { profile: { name?: string; mobile?: string; photoUrl?: string; inactive?: boolean } };
+
 type TokenResponse = { message: string; token: string };
 type EventsResponse = { success: boolean; data: GhoomoAppointment[] };
 
@@ -89,9 +112,7 @@ export function createGhoomoApi(baseUrl: string): Api {
     return decodeJwt<T>(token);
   }
 
-  // The API has no user-profile endpoints yet: keep edits for this session, keyed by account.
-  const userProfiles = new Map<string, UserProfile>();
-  // Nor a username on signup: remember it by email for this app session (lost on reload).
+  // The API takes no username on signup: remember it by email for this app session (lost on reload).
   const usernames = new Map<string, string>();
   const displayName = (email: string) =>
     usernames.get(email.toLowerCase()) ?? email.split('@')[0] ?? '';
@@ -477,33 +498,42 @@ export function createGhoomoApi(baseUrl: string): Api {
       return getOwnStore(locCode);
     },
     async getUserProfile() {
-      const { userId, userName } = claims<GhoomoUserClaims>();
-      const local = userProfiles.get(userId);
-      // The server knows whether the admin made the account inactive; name and mobile edited in
-      // this app session win over the server's copy.
+      const { userName } = claims<GhoomoUserClaims>();
       // Only customer tokens may read it (a store gets 403), so stores skip the call.
       const isStore = 'locCode' in claims<GhoomoUserClaims | GhoomoLocationClaims>();
-      const res = isStore
-        ? null
-        : await request<{ profile: { name?: string; mobile?: string; inactive?: boolean } }>(
-            '/traveller/profile',
-          ).catch(() => null);
+      const res = isStore ? null : await request<ProfileResponse>('/traveller/profile').catch(() => null);
       const server = res?.profile;
       return {
-        name: local?.name ?? (server?.name || (userName ? displayName(userName) : '')),
-        mobile: local?.mobile ?? (server?.mobile || API_DEFAULTS.userMobile),
+        name: server?.name || (userName ? displayName(userName) : ''),
+        mobile: server?.mobile || API_DEFAULTS.userMobile,
+        photoUrl: server?.photoUrl ?? '',
         inactive: !!server?.inactive,
       };
     },
 
+    async uploadImage(kind, image) {
+      const form = new FormData();
+      form.append('kind', kind);
+      form.append('file', image.file, 'picture.jpg');
+      return postImage(baseUrl, form);
+    },
+
     async deleteAccount(password) {
       await request('/account', { method: 'DELETE', body: { password } });
-      userProfiles.delete(claims<GhoomoUserClaims>().userId);
     },
 
     async updateUserProfile(profile) {
-      userProfiles.set(claims<GhoomoUserClaims>().userId, profile);
-      return profile;
+      const res = await request<ProfileResponse>('/traveller/profile', {
+        method: 'PUT',
+        body: { name: profile.name, mobile: profile.mobile, photoUrl: profile.photoUrl },
+      });
+      const server = res?.profile;
+      return {
+        name: server?.name || profile.name,
+        mobile: server?.mobile ?? profile.mobile,
+        photoUrl: server?.photoUrl ?? '',
+        inactive: !!server?.inactive,
+      };
     },
   };
 }

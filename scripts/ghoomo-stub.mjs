@@ -13,8 +13,9 @@
  *   shop      city_salon    (settings never opened → null settings on browse rows)
  *   place     taj_mahal     (PLACE; the app should hide it)
  *
- * Also serves services (Api.md §5.4a), notifications, booking edits, ratings/reviews and
- * reminder settings (§5.6–5.6b) so those flows can be tried without the real backend.
+ * Also serves services (Api.md §5.4a), picture uploads (§5.4b; Raju Tailor has uploads turned on,
+ * City Salon doesn't; there's no admin console here), notifications, booking edits, ratings/reviews
+ * and reminder settings (§5.6–5.6b) so those flows can be tried without the real backend.
  *
  * Data resets on restart. Every request is logged with its body.
  */
@@ -61,6 +62,7 @@ const STANDARD_STORE_CATEGORIES = ['Food', 'Beverages', 'Grocery', 'Fresh produc
 const addedStoreCategories = [];
 const productTypes = ['Handmade', 'Organic food'];
 const services = []; // { svc_id, loc_id, svc_name, svc_desc, svc_price, svc_img_url, max_qty, active, created_on }
+const uploads = new Map(); // upload id → { bytes, type, owner }
 function notify(rcptId, apptId, kind, text) {
   notifications.push({ ntfy_id: randomUUID(), rcpt_id: rcptId, apntmnt_id: apptId, kind, text, cret_on: now(), read_on: null });
 }
@@ -71,7 +73,7 @@ function addLocation(name, type, email) {
   const row = {
     user_id: randomUUID(), loc_name: name, loc_type: type, loc_access: 'LIMITED', loc_code: code,
     active: 1, created_on: now(), created_by: code, updated_on: now(), updated_by: code, email,
-    password: PASSWORD,
+    password: PASSWORD, uploads_on: 0,
   };
   locations.push(row);
   return row;
@@ -155,6 +157,7 @@ function addToCalendar({ plan_id, count_of_ppl, type, details }) {
 // Seed: two shops, one place, and appointments around today (local time, like the app books).
 {
   const raju = addLocation('Raju Tailor', 'SHOP', 'raju@example.com');
+  raju.uploads_on = 1;
   Object.assign(ensureSettings(raju), { max_limit: '3', unit: 'HOUR', is_auto_approval: 0, open_at: '09:00', close_at: '22:00', max_svc_qty: 2, catalog_type: 'SERVICE' });
   for (const [name, desc, price, maxQty] of [
     ['Blouse stitching', 'Lined blouse, fitted to your measurements', 450, null],
@@ -199,7 +202,7 @@ function addToCalendar({ plan_id, count_of_ppl, type, details }) {
 
 // ---------- helpers ----------
 const browseRow = (loc) => {
-  const { password: _pw, email: _email, ...row } = loc;
+  const { password: _pw, email: _email, uploads_on: _uploads, ...row } = loc;
   const s = settings.get(loc.user_id);
   const p = profiles.get(loc.user_id);
   const rated = ratings.filter((r) => r.loc_id === loc.user_id);
@@ -207,7 +210,7 @@ const browseRow = (loc) => {
   return {
     ...row, max_limit: s?.max_limit ?? null, unit: s?.unit ?? null, is_auto_approval: s?.is_auto_approval ?? null, open_at: s?.open_at ?? null, close_at: s?.close_at ?? null,
     max_svc_qty: s?.max_svc_qty ?? null, is_dark_store: s?.is_dark_store ?? null, catalog_type: s?.catalog_type ?? null, svc_type: s?.svc_type ?? null, store_cat: s?.store_cat ?? null, open_days: s?.open_days ?? null,
-    loc_address: p?.loc_address ?? null, loc_city: p?.loc_city ?? null, loc_pin_code: p?.loc_pin_code ?? null, loc_country: p?.loc_country ?? null, loc_nav: p?.loc_nav ?? null,
+    loc_address: p?.loc_address ?? null, loc_city: p?.loc_city ?? null, loc_pin_code: p?.loc_pin_code ?? null, loc_country: p?.loc_country ?? null, loc_nav: p?.loc_nav ?? null, loc_profile_url: p?.loc_profile_url ?? null,
     rating_avg: avg, rating_count: rated.length ? String(rated.length) : null,
   };
 };
@@ -245,7 +248,7 @@ const UNAUTH = [401, { message: 'Authentication token is missing or invalid' }];
 route('POST', /^\/signup$/, 'none', ({ body }) => {
   if (!body?.user_name || !body.password || body.password !== body.confirmPassword) return [400, { message: 'Invalid sign-up data' }];
   if (users.some((u) => u.user_name === body.user_name && u.active !== 0)) return [409, { error: 'User name already exists' }];
-  users.push({ user_id: randomUUID(), user_name: body.user_name, password: body.password });
+  users.push({ user_id: randomUUID(), user_name: body.user_name, password: body.password, disp_name: body.display_name ?? null });
   return [201, { message: 'Sign-up successful' }];
 });
 route('POST', /^\/signin$/, 'none', ({ body }) => {
@@ -301,14 +304,21 @@ route('PUT', /^\/location\/([^/]+)\/profile$/, 'any', ({ claims, params, body })
   if (err) return err;
   const row = profiles.get(loc.user_id);
   if (!row) return [404, { error: 'Location profile not found' }];
-  const map = { locType: 'loc_type', locInfo: 'loc_info', locNavigation: 'loc_nav', locCity: 'loc_city', locCountry: 'loc_country', locPinCode: 'loc_pin_code', locProfileUrl: 'loc_profile_url', locAddress: 'loc_address' };
+  const map = { locType: 'loc_type', locInfo: 'loc_info', locNavigation: 'loc_nav', locCity: 'loc_city', locCountry: 'loc_country', locPinCode: 'loc_pin_code', locAddress: 'loc_address' };
   for (const [field, column] of Object.entries(map)) if (body?.[field]) row[column] = body[field]; // empty strings ignored
+  // The photo can be removed with "".
+  if (body?.locProfileUrl !== undefined) {
+    const photo = body.locProfileUrl || null;
+    if (photo && !/^https?:\/\/\S+$/.test(photo)) return [400, { error: 'locProfileUrl must be empty or a link starting with http:// or https://' }];
+    if (row.loc_profile_url !== photo) deleteUpload(row.loc_profile_url);
+    row.loc_profile_url = photo;
+  }
   Object.assign(row, { updated_on: now(), updated_by: loc.loc_name });
   return [200, { profile: row }];
 });
 route('GET', /^\/location\/([^/]+)\/settings$/, 'any', ({ claims, params }) => {
   const [loc, err] = ownLocation(claims, params[0]);
-  return err ?? [200, { locationList: [ensureSettings(loc)] }];
+  return err ?? [200, { locationList: [{ ...ensureSettings(loc), store_inactive: 0, uploads_on: loc.uploads_on }] }];
 });
 route('PUT', /^\/location\/([^/]+)\/settings$/, 'any', ({ claims, params, body }) => {
   const [loc, err] = ownLocation(claims, params[0]);
@@ -518,6 +528,30 @@ route('POST', /^\/notifications\/read$/, 'any', ({ claims, body }) => {
   for (const n of notifications) if (n.rcpt_id === claims.userId && body.ids.includes(n.ntfy_id) && !n.read_on) { n.read_on = now(); updated++; }
   return [200, { updated }];
 });
+// Customer profile (user token): name, mobile and photo.
+const profileJson = (u) => ({ userId: u.user_id, email: u.user_name, name: u.disp_name ?? '', mobile: u.mobile_number ?? '', photoUrl: u.photo_url ?? '', inactive: false });
+route('GET', /^\/traveller\/profile$/, 'any', ({ claims }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const user = users.find((u) => u.user_id === claims.userId && u.active !== 0);
+  return user ? [200, { profile: profileJson(user) }] : [404, { error: 'User not found' }];
+});
+route('PUT', /^\/traveller\/profile$/, 'any', ({ claims, body }) => {
+  if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  const user = users.find((u) => u.user_id === claims.userId && u.active !== 0);
+  if (!user) return [404, { error: 'User not found' }];
+  if (typeof body?.name !== 'string' || !body.name.trim()) return [400, { error: 'name is required' }];
+  if (body.photoUrl !== undefined && body.photoUrl !== '' && !/^https?:\/\/\S+$/.test(body.photoUrl)) {
+    return [400, { error: 'photoUrl must be empty or a link starting with http:// or https://' }];
+  }
+  user.disp_name = body.name.trim();
+  user.mobile_number = body.mobile?.trim() || null;
+  if (body.photoUrl !== undefined) {
+    const photo = body.photoUrl || null;
+    if (user.photo_url !== photo) deleteUpload(user.photo_url);
+    user.photo_url = photo;
+  }
+  return [200, { profile: profileJson(user) }];
+});
 // Account deletion (user or location token; the password must match).
 route('DELETE', /^\/account$/, 'any', ({ claims, body }) => {
   if (typeof body?.password !== 'string' || !body.password) return [400, { error: 'password is required' }];
@@ -531,6 +565,7 @@ route('DELETE', /^\/account$/, 'any', ({ claims, body }) => {
       notify(a.user_id, a.apntmnt_id, 'REJECTED', `${loc.loc_name} closed its account, so your booking was cancelled`);
     }
     loc.active = 0;
+    deleteOwnUploads(loc.user_id);
     return [200, { message: 'Account deleted' }];
   }
   for (const a of appointments.filter((a) => a.user_id === claims.userId)) {
@@ -540,6 +575,7 @@ route('DELETE', /^\/account$/, 'any', ({ claims, body }) => {
   for (const a of addresses.filter((a) => a.user_id === claims.userId)) a.active = 0;
   const user = users.find((u) => u.user_id === claims.userId);
   if (user) user.active = 0;
+  deleteOwnUploads(claims.userId);
   return [200, { message: 'Account deleted' }];
 });
 // Saved delivery addresses (user token; own rows only).
@@ -608,6 +644,45 @@ route('GET', /^\/events\/(coming-events|inprogress-events|completed-events)$/, '
   return [200, { success: true, data }];
 });
 
+// ---------- picture uploads (§5.4b) ----------
+const uploadId = (url) => url?.match(/\/apis\/uploads\/([\w-]+)$/)?.[1];
+function deleteUpload(url) {
+  const id = uploadId(url);
+  if (id) uploads.delete(id);
+}
+function deleteOwnUploads(owner) {
+  for (const [id, u] of uploads) if (u.owner === owner) uploads.delete(id);
+}
+function sniffImage(b) {
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  if (b.subarray(0, 4).toString() === 'RIFF' && b.subarray(8, 12).toString() === 'WEBP') return 'image/webp';
+  return null;
+}
+/** POST /uploads (multipart `kind` + `file`). Async, so it runs outside the JSON routes. */
+async function handleUpload(claims, form, origin) {
+  if (!claims) return UNAUTH;
+  const kind = form?.get('kind');
+  const file = form?.get('file');
+  if (!['item', 'store', 'user'].includes(kind)) return [400, { error: 'kind must be item, store or user' }];
+  if (!file || typeof file === 'string') return [400, { error: 'file is required' }];
+  if (kind === 'user') {
+    if (isLocToken(claims)) return [403, { error: 'Forbidden: user login required' }];
+  } else {
+    if (!isLocToken(claims)) return [403, { error: 'Forbidden: location login required' }];
+    const loc = locations.find((l) => l.user_id === claims.userId);
+    if (!loc?.uploads_on) return [403, { error: "Picture uploads aren't enabled for this store" }];
+  }
+  if (file.size > 2 * 1024 * 1024) return [413, { error: 'The picture must be 2 MB or smaller' }];
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const type = sniffImage(bytes);
+  if (!type) return [400, { error: 'The picture must be a JPEG, PNG or WebP image' }];
+  const id = randomUUID();
+  uploads.set(id, { bytes, type, owner: claims.userId });
+  console.log(`  upload ${kind} ${bytes.length} bytes → ${id}`);
+  return [200, { url: `${origin}/apis/uploads/${id}` }];
+}
+
 // ---------- server ----------
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS' };
 
@@ -622,8 +697,26 @@ createServer(async (req, res) => {
   if (!url.pathname.startsWith('/apis')) return send(404, { error: 'Not found' });
   const path = url.pathname.slice('/apis'.length) || '/';
 
-  let raw = '';
-  for await (const chunk of req) raw += chunk;
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const buffer = Buffer.concat(chunks);
+
+  if (req.method === 'GET' && path.startsWith('/uploads/')) {
+    const file = uploads.get(path.slice('/uploads/'.length));
+    if (!file) return send(404, { error: 'Not found' });
+    res.writeHead(200, { ...CORS, 'Content-Type': file.type, 'Cache-Control': 'public, max-age=31536000, immutable' });
+    res.end(file.bytes);
+    return console.log(`${req.method} ${url.pathname} → 200`);
+  }
+  if (req.method === 'POST' && path === '/uploads') {
+    const contentType = req.headers['content-type'] ?? '';
+    const form = contentType.startsWith('multipart/form-data')
+      ? await new Response(buffer, { headers: { 'content-type': contentType } }).formData().catch(() => null)
+      : null;
+    return send(...(await handleUpload(verifyJwt(req.headers.authorization), form, `http://${req.headers.host}`)));
+  }
+
+  const raw = buffer.toString();
   let body;
   try {
     body = raw ? JSON.parse(raw) : undefined;

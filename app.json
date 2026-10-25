@@ -48,6 +48,14 @@
           ],
           "color": "#3B6FF5"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ghoomyo uses your photos so you can add pictures of your store, its products and yourself.",
+          "cameraPermission": "Ghoomyo uses the camera so you can take pictures of your store, its products and yourself.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { errorMessage } from '@/api';
 import { Banner, type BannerMessage } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
+import { ImageField } from '@/components/ui/image-field';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useUpdateMyProfile } from '@/hooks/queries';
@@ -14,6 +15,7 @@ const MOBILE_PATTERN = /^\+?\d{10,15}$/;
 export function UserProfileForm({ profile }: { profile: UserProfile }) {
   const [name, setName] = useState(profile.name);
   const [mobile, setMobile] = useState(profile.mobile);
+  const [photoUrl, setPhotoUrl] = useState(profile.photoUrl);
   const [errors, setErrors] = useState<{ name?: string; mobile?: string }>({});
   const [message, setMessage] = useState<BannerMessage | null>(null);
   const update = useUpdateMyProfile();
@@ -28,7 +30,7 @@ export function UserProfileForm({ profile }: { profile: UserProfile }) {
     setErrors(next);
     if (next.name || next.mobile) return;
     update.mutate(
-      { name: name.trim(), mobile: cleanMobile },
+      { name: name.trim(), mobile: cleanMobile, photoUrl },
       {
         onSuccess: () => setMessage({ type: 'success', text: 'Profile saved.' }),
         onError: (error) => setMessage({ type: 'error', text: errorMessage(error) }),
@@ -39,6 +41,18 @@ export function UserProfileForm({ profile }: { profile: UserProfile }) {
   return (
     <View style={styles.form}>
       <Banner message={message} />
+      <ImageField
+        label="Profile photo"
+        kind="user"
+        round
+        name={name || profile.name}
+        value={photoUrl}
+        onChange={(url) => {
+          setPhotoUrl(url);
+          setMessage(null);
+        }}
+        hint="Save to keep it."
+      />
       <TextField
         label="Name"
         value={name}

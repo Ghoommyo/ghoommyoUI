@@ -9,7 +9,9 @@ import type {
   BookingRating,
   BookingStatus,
   DateKey,
+  ImageKind,
   NewBooking,
+  PickedImage,
   ServiceInput,
   StoreProfile,
   StoreSettings,
@@ -226,6 +228,11 @@ export function useUpdateMyProfile() {
     onSuccess: (profile) =>
       queryClient.setQueryData(queryKeys.myProfile(session?.accountId ?? ''), profile),
   });
+}
+
+/** Uploads a picture and resolves to its URL; the form that shows it saves the URL. */
+export function useUploadImage(kind: ImageKind) {
+  return useMutation({ mutationFn: (image: PickedImage) => api.uploadImage(kind, image) });
 }
 
 /** The customer edits their own booking; refreshes the store's lists and the customer's own. */

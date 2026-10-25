@@ -119,6 +119,7 @@ export function StoreServices({ store }: { store: Store }) {
           defaultMaxQty={store.maxServiceQty}
           item={words.item}
           isProductStore={store.catalogType !== 'service'}
+          uploadsEnabled={!!store.uploadsEnabled}
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
             setEditing(null);

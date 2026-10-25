@@ -39,6 +39,8 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
       ? (store.data?.name ?? session.name ?? session.email)
       : (profile.data?.name || session?.name || session?.email || 'Guest');
 
+  const photoUrl = session?.role === 'store' ? store.data?.profile.photoUrl : profile.data?.photoUrl;
+
   const items: Item[] = session
     ? [
         { label: 'Home', href: '/home', route: 'home' },
@@ -71,7 +73,7 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
     <ThemedView type="backgroundElement" style={styles.fill}>
       <SafeAreaView style={styles.fill}>
         <View style={[styles.profile, { borderBottomColor: theme.border }]}>
-          <Avatar name={displayName} />
+          <Avatar name={displayName} uri={photoUrl || undefined} />
           <View style={styles.flex}>
             <ThemedText type="smallBold" numberOfLines={1} style={styles.name}>
               {displayName}

@@ -64,7 +64,12 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
   - **Endpoints:** public `GET /services/{locId}`; owner `GET/POST /location/{locCode}/services` and `PUT/DELETE …/{svcId}`; the `maxServiceQty` setting (`max_svc_qty`); `services: [{svc_id, qty}]` on `POST /appointment`, snapshotted on booking rows (`Api.md` §5.4a).
   - **Limit per booking:** `service.maxQty ?? store.maxServiceQty` (both default 1); no cap on the total.
   - **Flow:** the dashboard's **Services** modal → **Submit request** passes picks as the `services` route param (`id:qty,…`, `src/lib/services.ts`) → the booking form prefills the description with the numbered services and total, and sends them as structured data too.
-- **API gaps:** the API has nowhere to store store name edits, max per booking, state, map coordinates, or the user's name and mobile. Usernames at signup and store login by email aren't supported either. They use `API_DEFAULTS` or session-only values, and are read-only in the UI when the flag is on. Wire each one through when the API supports it.
+- **Picture uploads** (branch `image_uploads`, plan `plans/image-uploads.md`):
+  - **Endpoint:** `POST /uploads` (multipart `kind` = `item` | `store` | `user`, `file`) returns a URL; the forms save it as the item's `imageUrl`, the store profile's `photoUrl` (`locProfileUrl`) or the user profile's `photoUrl` (`PUT /traveller/profile`, which now saves name and mobile too).
+  - **Admin switch:** stores can upload only when the app admin turned it on (`uploads_on` on the owner's settings GET → `Store.uploadsEnabled`); otherwise the photo controls are disabled with `UPLOADS_OFF_HINT`. Pasting an item image link always works. User photos aren't gated.
+  - **Client:** `src/lib/pick-image.ts` (expo-image-picker, then expo-image-manipulator to a ≤1280 px JPEG), `ImageField` (`src/components/ui/image-field.tsx`), `Avatar` with `uri`, `StorePhoto` (Home cards, dashboard header). The picker and manipulator are native modules: rebuild dev builds after pulling.
+  - **Backends:** the server stores pictures on Cloudinary (a local server without keys uses its `.uploads/` folder); the stub keeps them in memory (Raju Tailor has uploads on, City Salon off); the dummy backend returns the device's local URI (Raju Tailor on).
+- **API gaps:** the API has nowhere to store store name edits, max per booking, state or map coordinates. Usernames at signup and store login by email aren't supported either. They use `API_DEFAULTS` or session-only values, and are read-only in the UI when the flag is on. Wire each one through when the API supports it.
 
 ### Session and auth
 

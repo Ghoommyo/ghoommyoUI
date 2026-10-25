@@ -125,3 +125,9 @@ Product stores pick a category; products can carry a product type; stores/custom
 A Home screen (store types with their best rated stores), About with screenshots, Contact, Delete account, and links to the website's Privacy policy, Terms of service and Help & FAQ.
 
 - [x] [Home page and information pages](info-pages.md)
+
+## Picture uploads (branch `image_uploads`)
+
+Stores upload photos of their products/services and a store photo once the app admin turns uploads on for them (off by default); users upload a profile photo. Photos show on Home cards, the dashboard store header and the side menu.
+
+- [x] [Picture uploads](image-uploads.md)

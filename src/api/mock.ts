@@ -50,7 +50,7 @@ const accounts: Account[] = [
     email: 'user@ghoomyo.app',
     password: 'password123',
     role: 'user',
-    profile: { name: 'Asha Verma', mobile: '9876543210' },
+    profile: { name: 'Asha Verma', mobile: '9876543210', photoUrl: '' },
   },
   {
     id: 's1',
@@ -58,7 +58,7 @@ const accounts: Account[] = [
     password: 'password123',
     role: 'store',
     locCode: 'raju_tailor',
-    profile: { name: 'Raju Tailor', mobile: '9123456780' },
+    profile: { name: 'Raju Tailor', mobile: '9123456780', photoUrl: '' },
   },
 ];
 
@@ -81,6 +81,8 @@ const stores: StoreRecord[] = [
     serviceType: null,
     storeCategory: null,
     openDays: [...ALL_DAYS],
+    // The admin turned picture uploads on for Raju Tailor only.
+    uploadsEnabled: true,
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -90,6 +92,7 @@ const stores: StoreRecord[] = [
       bio: 'Custom tailoring and alterations since 1998.',
       lat: 22.7196,
       lng: 75.8577,
+      photoUrl: '',
     },
   },
   {
@@ -116,6 +119,7 @@ const stores: StoreRecord[] = [
       bio: 'Haircuts, styling and grooming.',
       lat: 22.7533,
       lng: 75.8937,
+      photoUrl: '',
     },
   },
   {
@@ -144,6 +148,7 @@ const stores: StoreRecord[] = [
       bio: 'Fresh produce delivered from local farms.',
       lat: 22.7244,
       lng: 75.8839,
+      photoUrl: '',
     },
   },
 ];
@@ -382,7 +387,7 @@ export const mockApi: Api = {
         email,
         password: input.password,
         role: 'user',
-        profile: { name: input.username.trim(), mobile: '' },
+        profile: { name: input.username.trim(), mobile: '', photoUrl: '' },
       });
       return {};
     }
@@ -399,7 +404,7 @@ export const mockApi: Api = {
       throw new ApiError('Email already registered', 409);
     }
     const id = newId('s');
-    accounts.push({ id, email, password: input.password, role: 'store', locCode, profile: { name, mobile: '' } });
+    accounts.push({ id, email, password: input.password, role: 'store', locCode, profile: { name, mobile: '', photoUrl: '' } });
     stores.push({
       id,
       name,
@@ -424,7 +429,9 @@ export const mockApi: Api = {
         bio: '',
         lat: 22.7196,
         lng: 75.8577,
+        photoUrl: '',
       },
+      uploadsEnabled: false,
     });
     return { loginCode: locCode };
   },
@@ -812,6 +819,8 @@ export const mockApi: Api = {
       throw new ApiError('openDays must list 1 to 7 different whole numbers from 0 (Sunday) to 6 (Saturday)', 400);
     }
     Object.assign(store, settings, {
+      // Only the app admin changes this.
+      uploadsEnabled: store.uploadsEnabled,
       openDays: [...settings.openDays].sort((a, b) => a - b),
       serviceType: settings.serviceType && addServiceType(settings.serviceType),
       storeCategory: settings.storeCategory && addStoreCategory(settings.storeCategory),
@@ -827,6 +836,19 @@ export const mockApi: Api = {
     const store = findStore(storeId);
     store.profile = { ...profile };
     return clone(withRating(store));
+  },
+
+  // Pictures stay on the device: the returned link is the local one, so they last until reload.
+  async uploadImage(kind, image) {
+    await delay();
+    const account = currentAccount();
+    if (kind === 'user') {
+      if (account.role !== 'user') throw new ApiError('Forbidden: user login required', 403);
+    } else {
+      if (account.role !== 'store') throw new ApiError('Forbidden: location login required', 403);
+      if (!findStore(account.id).uploadsEnabled) throw new ApiError("Picture uploads aren't enabled for this store", 403);
+    }
+    return image.previewUri;
   },
 
   async getUserProfile() {

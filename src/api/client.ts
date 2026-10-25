@@ -11,6 +11,8 @@ import type {
   NewBooking,
   ReminderSettings,
   ReviewsPage,
+  ImageKind,
+  PickedImage,
   ServiceInput,
   Session,
   SignupInput,
@@ -85,6 +87,11 @@ export interface Api {
 
   updateStoreSettings(storeId: string, settings: StoreSettings): Promise<Store>;
   updateStoreProfile(storeId: string, profile: StoreProfile): Promise<Store>;
+  /**
+   * Uploads a picture and returns its URL, which is then saved on an item, the store profile or the
+   * user profile. `item`/`store` need a store whose uploads the admin turned on.
+   */
+  uploadImage(kind: ImageKind, image: PickedImage): Promise<string>;
   getUserProfile(): Promise<UserProfile>;
   updateUserProfile(profile: UserProfile): Promise<UserProfile>;
   /**

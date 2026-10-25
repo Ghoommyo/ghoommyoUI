@@ -9,6 +9,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { RatingBadge } from '@/components/ui/stars';
+import { StorePhoto } from '@/components/ui/store-photo';
 import { Spacing } from '@/constants/theme';
 import { useStores } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
@@ -100,6 +101,7 @@ function StoreCard({ store }: { store: Store }) {
   const place = [store.profile.city, store.profile.pin].filter(Boolean).join(' ');
   return (
     <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
+      <StorePhoto uri={store.profile.photoUrl} name={store.name} style={styles.cardPhoto} />
       <View style={styles.cardTop}>
         <ThemedText type="smallBold" style={styles.cardName}>
           {store.name}
@@ -164,6 +166,12 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     padding: Spacing.three,
     gap: Spacing.one,
+  },
+  cardPhoto: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: Spacing.two,
+    marginBottom: Spacing.one,
   },
   cardTop: {
     flexDirection: 'row',
