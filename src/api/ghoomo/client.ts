@@ -31,6 +31,7 @@ import type {
   GhoomoSettings,
   GhoomoUserClaims,
 } from '@/api/ghoomo/types';
+import { adoptServerTime, CLIENT_NOT_ALLOWED, signatureHeaders } from '@/api/ghoomo/signature';
 import { decodeJwt } from '@/lib/jwt';
 import { normalizeStoreName, storeKey } from '@/lib/store-name';
 import { parseDateKey } from '@/lib/date';
@@ -48,13 +49,18 @@ export type GhoomoRequest = <T>(path: string, options?: RequestOptions) => Promi
 
 /** Fetch wrapper for the Ghoomo API: JSON in/out, token sent as received, errors as ApiError. */
 export function createRequest(baseUrl: string): GhoomoRequest {
-  return async function request<T>(path: string, { method = 'GET', body, emptyOn = [] }: RequestOptions = {}) {
+  return async function request<T>(
+    path: string,
+    { method = 'GET', body, emptyOn = [] }: RequestOptions = {},
+    retried = false,
+  ): Promise<T | null> {
     const token = getAuthToken();
     let response: Response;
     try {
       response = await fetch(`${baseUrl}${path}`, {
         method,
         headers: {
+          ...signatureHeaders(method, `${baseUrl}${path}`),
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
           // Sign-in responses already include the "Bearer " prefix (Api.md §1).
           ...(token ? { Authorization: /^Bearer /i.test(token) ? token : `Bearer ${token}` } : {}),
@@ -68,31 +74,46 @@ export function createRequest(baseUrl: string): GhoomoRequest {
 
     const data = await response.json().catch(() => null);
     if (!response.ok) {
-      // Errors use either an `error` or a `message` key.
-      const message = data?.error ?? data?.message ?? `Request failed (${response.status})`;
-      throw new ApiError(message, response.status);
+      // The phone's clock is off: retry once with the server's time.
+      if (response.status === 401 && !retried && adoptServerTime(data)) {
+        return request<T>(path, { method, body, emptyOn }, true);
+      }
+      throw apiError(data, response.status, `Request failed (${response.status})`);
     }
     return data as T;
   };
 }
 
+/**
+ * Errors use either an `error` or a `message` key. A rejected app signature becomes status 403 so
+ * it never signs the user out (only 401 does): it's the app, not the account.
+ */
+function apiError(data: { error?: string; message?: string; code?: string } | null, status: number, fallback: string) {
+  const message = data?.error ?? data?.message ?? fallback;
+  return new ApiError(message, status === 401 && data?.code === CLIENT_NOT_ALLOWED ? 403 : status);
+}
+
 /** POST /uploads: multipart, so it skips the JSON request helper. */
-async function postImage(baseUrl: string, form: FormData): Promise<string> {
+async function postImage(baseUrl: string, form: FormData, retried = false): Promise<string> {
   const token = getAuthToken();
   let response: Response;
   try {
     response = await fetch(`${baseUrl}/uploads`, {
       method: 'POST',
       // No Content-Type: fetch sets the multipart boundary itself.
-      headers: token ? { Authorization: /^Bearer /i.test(token) ? token : `Bearer ${token}` } : {},
+      headers: {
+        ...signatureHeaders('POST', `${baseUrl}/uploads`),
+        ...(token ? { Authorization: /^Bearer /i.test(token) ? token : `Bearer ${token}` } : {}),
+      },
       body: form,
     });
   } catch {
     throw new ApiError('Could not reach the server. Check your connection and API URL.', 0);
   }
   const data = await response.json().catch(() => null);
+  if (response.status === 401 && !retried && adoptServerTime(data)) return postImage(baseUrl, form, true);
   if (!response.ok || !data?.url) {
-    throw new ApiError(data?.error ?? data?.message ?? `Upload failed (${response.status})`, response.status);
+    throw apiError(data, response.status, `Upload failed (${response.status})`);
   }
   return data.url as string;
 }

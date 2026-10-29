@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~57.0.21",
+    "@noble/hashes": "^1.8.0",
     "@tanstack/react-query": "^5.104.1",
     "expo": "~57.0.26",
     "expo-constants": "~57.0.20",

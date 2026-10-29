@@ -6,13 +6,19 @@ Reference for building a UI against the Ghoomo backend (the `/apis/*` routes of 
 
 ---
 
+## 0. Client signature (required on every request)
+
+Only our own apps may call the API. Every request carries `X-Client-Id` (`android`, `ios`, or `web` for the browser build), `X-Timestamp` (Unix ms) and `X-Signature` = lowercase hex `HMAC-SHA256(clientKey, "<timestamp>.<METHOD>.<path and query>")`, e.g. `1793260000000.GET./apis/location`. The body isn't signed, and the timestamp must be within 5 minutes of the server's clock. The app signs in `src/api/ghoomo/signature.ts` (keys `EXPO_PUBLIC_*_APP_KEY`, see `.env.example`).
+
+A bad or expired signature returns 401 `{"error":"This app isn't allowed to use the API","code":"CLIENT_NOT_ALLOWED","serverTime":<ms>}`. The app then corrects its clock from `serverTime` and retries once; if it still fails it's reported as 403 so the session isn't signed out. The local stub (`npm run stub:api`) doesn't check signatures.
+
 ## 1. Basics
 
 | Item           | Value                                                                                                                                                     |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Base URL       | `https://ghoommyo-eight.vercel.app/apis` (deployed; production data). Local server: `http://localhost:3000/apis`. Note `/apis`, not `/api`              |
 | Body format    | JSON. Send `Content-Type: application/json` on POST/PUT                                                                                                   |
-| CORS           | Any origin is allowed (`Access-Control-Allow-Origin: *`). Preflight `OPTIONS` returns 204                                                                 |
+| CORS           | Only the server's `ALLOWED_ORIGINS` get browser access; the phone apps send no `Origin`, so CORS doesn't apply to them. Preflight `OPTIONS` returns 204 |
 | Auth header    | `Authorization: Bearer <jwt>`. The sign-in responses return the token **already prefixed** with `Bearer `, so send the `token` string exactly as received |
 | Token lifetime | Set by the server's `JWT_EXPIRES_IN` (currently 1 day). An expired or invalid token returns 401; send the user back to sign-in                            |
 | Sign-out       | Stateless. Delete the token on the client. `GET /signout` exists but does nothing server-side                                                             |
