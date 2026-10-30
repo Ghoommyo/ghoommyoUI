@@ -34,6 +34,8 @@ export interface GhoomoLocation {
   loc_pin_code?: string | null;
   loc_country?: string | null;
   loc_nav?: string | null;
+  /** The location's photo; null when none. */
+  loc_profile_url?: string | null;
   /** Average stars (1 decimal) and number of ratings; strings, null when unrated. */
   rating_avg?: string | null;
   rating_count?: string | null;
@@ -57,6 +59,8 @@ export interface GhoomoSettings {
   open_days?: number[];
   /** 1 when the admin made the location inactive (GET settings only). */
   store_inactive?: number;
+  /** 1 when the app admin lets the location upload pictures (GET settings only). */
+  uploads_on?: number;
 }
 
 /** A location's service (Api.md §5.4a). Already camelCase on the wire. */

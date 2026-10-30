@@ -31,11 +31,12 @@ import type {
   GhoomoSettings,
   GhoomoUserClaims,
 } from '@/api/ghoomo/types';
+import { adoptServerTime, CLIENT_NOT_ALLOWED, signatureHeaders } from '@/api/ghoomo/signature';
 import { decodeJwt } from '@/lib/jwt';
 import { normalizeStoreName, storeKey } from '@/lib/store-name';
 import { parseDateKey } from '@/lib/date';
 import { orderTypeFromApi, orderTypeToApi } from '@/lib/order-types';
-import type { AppNotification, Booking, NotificationKind, Session, Store, UserProfile } from '@/types/domain';
+import type { AppNotification, Booking, NotificationKind, Session, Store } from '@/types/domain';
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -48,13 +49,18 @@ export type GhoomoRequest = <T>(path: string, options?: RequestOptions) => Promi
 
 /** Fetch wrapper for the Ghoomo API: JSON in/out, token sent as received, errors as ApiError. */
 export function createRequest(baseUrl: string): GhoomoRequest {
-  return async function request<T>(path: string, { method = 'GET', body, emptyOn = [] }: RequestOptions = {}) {
+  return async function request<T>(
+    path: string,
+    { method = 'GET', body, emptyOn = [] }: RequestOptions = {},
+    retried = false,
+  ): Promise<T | null> {
     const token = getAuthToken();
     let response: Response;
     try {
       response = await fetch(`${baseUrl}${path}`, {
         method,
         headers: {
+          ...signatureHeaders(method, `${baseUrl}${path}`),
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
           // Sign-in responses already include the "Bearer " prefix (Api.md §1).
           ...(token ? { Authorization: /^Bearer /i.test(token) ? token : `Bearer ${token}` } : {}),
@@ -68,13 +74,51 @@ export function createRequest(baseUrl: string): GhoomoRequest {
 
     const data = await response.json().catch(() => null);
     if (!response.ok) {
-      // Errors use either an `error` or a `message` key.
-      const message = data?.error ?? data?.message ?? `Request failed (${response.status})`;
-      throw new ApiError(message, response.status);
+      // The phone's clock is off: retry once with the server's time.
+      if (response.status === 401 && !retried && adoptServerTime(data)) {
+        return request<T>(path, { method, body, emptyOn }, true);
+      }
+      throw apiError(data, response.status, `Request failed (${response.status})`);
     }
     return data as T;
   };
 }
+
+/**
+ * Errors use either an `error` or a `message` key. A rejected app signature becomes status 403 so
+ * it never signs the user out (only 401 does): it's the app, not the account.
+ */
+function apiError(data: { error?: string; message?: string; code?: string } | null, status: number, fallback: string) {
+  const message = data?.error ?? data?.message ?? fallback;
+  return new ApiError(message, status === 401 && data?.code === CLIENT_NOT_ALLOWED ? 403 : status);
+}
+
+/** POST /uploads: multipart, so it skips the JSON request helper. */
+async function postImage(baseUrl: string, form: FormData, retried = false): Promise<string> {
+  const token = getAuthToken();
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/uploads`, {
+      method: 'POST',
+      // No Content-Type: fetch sets the multipart boundary itself.
+      headers: {
+        ...signatureHeaders('POST', `${baseUrl}/uploads`),
+        ...(token ? { Authorization: /^Bearer /i.test(token) ? token : `Bearer ${token}` } : {}),
+      },
+      body: form,
+    });
+  } catch {
+    throw new ApiError('Could not reach the server. Check your connection and API URL.', 0);
+  }
+  const data = await response.json().catch(() => null);
+  if (response.status === 401 && !retried && adoptServerTime(data)) return postImage(baseUrl, form, true);
+  if (!response.ok || !data?.url) {
+    throw apiError(data, response.status, `Upload failed (${response.status})`);
+  }
+  return data.url as string;
+}
+
+type ProfileResponse = { profile: { name?: string; mobile?: string; photoUrl?: string; inactive?: boolean } };
 
 type TokenResponse = { message: string; token: string };
 type EventsResponse = { success: boolean; data: GhoomoAppointment[] };
@@ -89,9 +133,7 @@ export function createGhoomoApi(baseUrl: string): Api {
     return decodeJwt<T>(token);
   }
 
-  // The API has no user-profile endpoints yet: keep edits for this session, keyed by account.
-  const userProfiles = new Map<string, UserProfile>();
-  // Nor a username on signup: remember it by email for this app session (lost on reload).
+  // The API takes no username on signup: remember it by email for this app session (lost on reload).
   const usernames = new Map<string, string>();
   const displayName = (email: string) =>
     usernames.get(email.toLowerCase()) ?? email.split('@')[0] ?? '';
@@ -160,7 +202,12 @@ export function createGhoomoApi(baseUrl: string): Api {
         // `username` isn't accepted by POST /signup yet; kept locally until it is.
         await request('/signup', {
           method: 'POST',
-          body: { user_name: input.email, password: input.password, confirmPassword: input.password },
+          body: {
+          user_name: input.email,
+          password: input.password,
+          confirmPassword: input.password,
+          verificationToken: input.verificationToken,
+        },
         });
         usernames.set(input.email.trim().toLowerCase(), input.username.trim());
         return {};
@@ -174,9 +221,30 @@ export function createGhoomoApi(baseUrl: string): Api {
           email: input.email,
           password: input.password,
           confirmPassword: input.password,
+          verificationToken: input.verificationToken,
         },
       });
       return { loginCode: storeKey(name) };
+    },
+
+    async sendEmailCode(input) {
+      const res = await request<{ message: string; devCode?: string }>('/email/send-code', {
+        method: 'POST',
+        body: { ...input, email: input.email.trim() },
+      });
+      return { message: res!.message, devCode: res!.devCode };
+    },
+
+    async verifyEmailCode(input) {
+      const res = await request<{ verificationToken: string }>('/email/verify-code', {
+        method: 'POST',
+        body: { ...input, email: input.email.trim(), code: input.code.trim() },
+      });
+      return res!.verificationToken;
+    },
+
+    async resetPassword(input) {
+      await request('/password/reset', { method: 'POST', body: input });
     },
 
     async login(credentials): Promise<Session> {
@@ -477,33 +545,42 @@ export function createGhoomoApi(baseUrl: string): Api {
       return getOwnStore(locCode);
     },
     async getUserProfile() {
-      const { userId, userName } = claims<GhoomoUserClaims>();
-      const local = userProfiles.get(userId);
-      // The server knows whether the admin made the account inactive; name and mobile edited in
-      // this app session win over the server's copy.
+      const { userName } = claims<GhoomoUserClaims>();
       // Only customer tokens may read it (a store gets 403), so stores skip the call.
       const isStore = 'locCode' in claims<GhoomoUserClaims | GhoomoLocationClaims>();
-      const res = isStore
-        ? null
-        : await request<{ profile: { name?: string; mobile?: string; inactive?: boolean } }>(
-            '/traveller/profile',
-          ).catch(() => null);
+      const res = isStore ? null : await request<ProfileResponse>('/traveller/profile').catch(() => null);
       const server = res?.profile;
       return {
-        name: local?.name ?? (server?.name || (userName ? displayName(userName) : '')),
-        mobile: local?.mobile ?? (server?.mobile || API_DEFAULTS.userMobile),
+        name: server?.name || (userName ? displayName(userName) : ''),
+        mobile: server?.mobile || API_DEFAULTS.userMobile,
+        photoUrl: server?.photoUrl ?? '',
         inactive: !!server?.inactive,
       };
     },
 
+    async uploadImage(kind, image) {
+      const form = new FormData();
+      form.append('kind', kind);
+      form.append('file', image.file, 'picture.jpg');
+      return postImage(baseUrl, form);
+    },
+
     async deleteAccount(password) {
       await request('/account', { method: 'DELETE', body: { password } });
-      userProfiles.delete(claims<GhoomoUserClaims>().userId);
     },
 
     async updateUserProfile(profile) {
-      userProfiles.set(claims<GhoomoUserClaims>().userId, profile);
-      return profile;
+      const res = await request<ProfileResponse>('/traveller/profile', {
+        method: 'PUT',
+        body: { name: profile.name, mobile: profile.mobile, photoUrl: profile.photoUrl },
+      });
+      const server = res?.profile;
+      return {
+        name: server?.name || profile.name,
+        mobile: server?.mobile ?? profile.mobile,
+        photoUrl: server?.photoUrl ?? '',
+        inactive: !!server?.inactive,
+      };
     },
   };
 }

@@ -5,13 +5,14 @@ import { errorMessage } from '@/api';
 import { USE_REAL_API } from '@/api/config';
 import { Banner, type BannerMessage } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
+import { ImageField, UPLOADS_OFF_HINT } from '@/components/ui/image-field';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { StoreMap } from '@/features/profile/store-map';
 import { useUpdateStoreProfile } from '@/hooks/queries';
 import type { Store, StoreProfile } from '@/types/domain';
 
-type TextKey = Exclude<keyof StoreProfile, 'lat' | 'lng'>;
+type TextKey = Exclude<keyof StoreProfile, 'lat' | 'lng' | 'photoUrl'>;
 
 type Field = {
   key: TextKey;
@@ -62,6 +63,21 @@ export function StoreProfileForm({ store }: { store: Store }) {
     <View style={styles.form}>
       <StoreMap name={store.name} profile={store.profile} />
       <Banner message={message} />
+      <ImageField
+        label="Store photo"
+        kind="store"
+        value={draft.photoUrl}
+        onChange={(photoUrl) => {
+          setDraft((d) => ({ ...d, photoUrl }));
+          setMessage(null);
+        }}
+        disabled={!store.uploadsEnabled}
+        hint={
+          store.uploadsEnabled
+            ? 'Shown on your store card and to customers who pick your store. Save to keep it.'
+            : UPLOADS_OFF_HINT
+        }
+      />
       {FIELDS.map((field) => (
         <TextField
           key={field.key}

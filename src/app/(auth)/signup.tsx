@@ -7,6 +7,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
+import { EmailVerifyField } from '@/features/auth/email-verify-field';
 import {
   AuthFormLayout,
   MIN_PASSWORD_LENGTH,
@@ -31,6 +32,7 @@ export default function SignupScreen() {
   const [username, setUsername] = useState('');
   const [locationName, setLocationName] = useState('');
   const [email, setEmail] = useState('');
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -54,7 +56,7 @@ export default function SignupScreen() {
       role: role ? undefined : 'Choose an account type.',
       username: role === 'user' ? validateUsername(username) : undefined,
       locationName: isStore ? validateStoreName(locationName) : undefined,
-      email: validateEmail(email),
+      email: validateEmail(email) ?? (verificationToken ? undefined : 'Verify your email to continue.'),
       password:
         password.length < MIN_PASSWORD_LENGTH
           ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
@@ -62,11 +64,11 @@ export default function SignupScreen() {
       confirm: confirm !== password ? 'Passwords do not match.' : undefined,
     };
     setErrors(next);
-    if (!role || Object.values(next).some(Boolean)) return;
+    if (!role || !verificationToken || Object.values(next).some(Boolean)) return;
     signup.mutate(
       role === 'store'
-        ? { role: 'store', locationName: normalizeStoreName(locationName), email: email.trim(), password }
-        : { role: 'user', username: username.trim(), email: email.trim(), password },
+        ? { role: 'store', locationName: normalizeStoreName(locationName), email: email.trim(), password, verificationToken }
+        : { role: 'user', username: username.trim(), email: email.trim(), password, verificationToken },
     );
   };
 
@@ -85,6 +87,8 @@ export default function SignupScreen() {
         value={role}
         options={ROLE_OPTIONS}
         onChange={(value) => {
+          // A verified email is tied to the account type.
+          if (value !== role) setVerificationToken(null);
           setRole(value);
           setErrors((e) => ({ ...e, role: undefined }));
         }}
@@ -120,15 +124,21 @@ export default function SignupScreen() {
           textContentType="username"
         />
       ) : null}
-      <TextField
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
+      <EmailVerifyField
+        key={role ?? 'none'}
+        role={role}
+        purpose="signup"
+        email={email}
+        onChangeEmail={(value) => {
+          setEmail(value);
+          setErrors((e) => ({ ...e, email: undefined }));
+        }}
+        token={verificationToken}
+        onVerified={(token) => {
+          setVerificationToken(token);
+          setErrors((e) => ({ ...e, email: undefined }));
+        }}
         error={errors.email}
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-        textContentType="emailAddress"
       />
       <TextField
         label="Password"

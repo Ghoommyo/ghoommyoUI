@@ -34,11 +34,34 @@ export type Credentials =
   | { role: 'user'; email: string; password: string }
   | { role: 'store'; /** Email, or store name in any case/spacing. */ login: string; password: string };
 
+/** `verificationToken` proves the email was verified with a code (`verifyEmailCode`). */
 export type SignupInput =
   /** `username` is a display name and may be shared by several users. */
-  | { role: 'user'; username: string; email: string; password: string }
+  | { role: 'user'; username: string; email: string; password: string; verificationToken: string }
   /** `locationName` is unique per store once normalized (see `storeKey`). */
-  | { role: 'store'; locationName: string; email: string; password: string };
+  | { role: 'store'; locationName: string; email: string; password: string; verificationToken: string };
+
+/** What an emailed 6-digit code is for. */
+export type CodePurpose = 'signup' | 'reset';
+
+export interface EmailCodeRequest {
+  email: string;
+  purpose: CodePurpose;
+  role: Role;
+}
+
+export interface EmailCodeSent {
+  message: string;
+  /** Only from a local server without email settings (or the dummy backend): the code itself. */
+  devCode?: string;
+}
+
+export interface PasswordReset {
+  role: Role;
+  /** From `verifyEmailCode` with `purpose: 'reset'`. */
+  verificationToken: string;
+  password: string;
+}
 
 export interface SignupResult {
   /** For stores: the code to log in with. */
@@ -68,6 +91,8 @@ export interface StoreSettings {
   openDays: number[];
   /** The admin made the store inactive (only known for the signed-in store's own record). */
   inactive?: boolean;
+  /** The app admin lets the store upload pictures; off by default (only known for the store's own record). */
+  uploadsEnabled?: boolean;
   /** How many of each service a booking may include, for services without their own limit. */
   maxServiceQty: number;
 }
@@ -84,6 +109,8 @@ export interface StoreProfile {
   lng?: number;
   /** Navigation link set by the store (Ghoomo `loc_nav`). */
   mapUrl?: string;
+  /** The store's photo; `''` when none. */
+  photoUrl: string;
 }
 
 /** Average stars (1 decimal; null when unrated) and how many ratings. */
@@ -128,6 +155,19 @@ export interface ServiceInput {
   productType: string | null;
 }
 
+/** What a picture is for: a store's item or its photo (stores, when the admin allows it), or a user's photo. */
+export type ImageKind = 'item' | 'store' | 'user';
+
+/**
+ * A picked picture, ready to upload: `{ uri, name, type }` is what React Native's FormData sends
+ * as a file; on web it's a `Blob`. `previewUri` shows it before upload.
+ */
+export interface PickedImage {
+  /** A web Blob, or an expo-file-system File on iOS/Android. */
+  file: Blob;
+  previewUri: string;
+}
+
 /** Service id → quantity picked for a booking. */
 export type ServicePicks = Record<string, number>;
 
@@ -142,6 +182,8 @@ export interface BookedService {
 export interface UserProfile {
   name: string;
   mobile: string;
+  /** Profile photo; `''` when none. */
+  photoUrl: string;
   /** The admin made the account inactive: no new or changed bookings. Read-only. */
   inactive?: boolean;
 }

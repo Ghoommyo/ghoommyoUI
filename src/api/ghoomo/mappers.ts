@@ -141,7 +141,7 @@ export function daySummaryFromCalendar(
   }));
 }
 
-type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'open_days' | 'store_inactive'>;
+type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'open_days' | 'store_inactive' | 'uploads_on'>;
 /** Settings columns, which are null on browse rows for locations that never opened settings. */
 type SettingsInput = { [K in keyof SettingsFields]?: SettingsFields[K] | null };
 
@@ -167,6 +167,7 @@ export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'>
     storeCategory: row.store_cat || null,
     openDays: toOpenDays(row.open_days),
     inactive: Number(row.store_inactive ?? 0) === 1,
+    uploadsEnabled: Number(row.uploads_on ?? 0) === 1,
   };
 }
 
@@ -193,6 +194,7 @@ export const EMPTY_PROFILE: StoreProfile = {
   state: API_DEFAULTS.state,
   country: '',
   bio: '',
+  photoUrl: '',
 };
 
 export function profileToStore(row: GhoomoProfile | null | undefined): StoreProfile {
@@ -205,12 +207,17 @@ export function profileToStore(row: GhoomoProfile | null | undefined): StoreProf
     country: row.loc_country ?? '',
     bio: row.loc_info ?? '',
     mapUrl: row.loc_nav ?? undefined,
+    photoUrl: row.loc_profile_url ?? '',
   };
 }
 
-/** PUT body for a profile. The API ignores empty strings, so cleared fields can't be blanked yet. */
+/**
+ * PUT body for a profile. The API ignores empty strings, so cleared fields can't be blanked yet;
+ * the photo can (`locProfileUrl: ""` removes it).
+ */
 export function profileToRequest(profile: StoreProfile) {
   return {
+    locProfileUrl: profile.photoUrl,
     locAddress: profile.address,
     locPinCode: profile.pin,
     locCity: profile.city,
@@ -269,6 +276,7 @@ function addressFromRow(row: GhoomoLocation): StoreProfile {
     pin: row.loc_pin_code ?? '',
     country: row.loc_country ?? '',
     mapUrl: row.loc_nav || undefined,
+    photoUrl: row.loc_profile_url ?? '',
   };
 }
 

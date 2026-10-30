@@ -9,6 +9,7 @@ import type {
   SavedAddress,
   AddressInput,
   AppNotification,
+  CodePurpose,
   Booking,
   NotificationKind,
   ReminderSettings,
@@ -38,6 +39,13 @@ interface Account {
   profile: UserProfile;
 }
 
+/** The dummy backend's emailed code is always this. */
+const MOCK_CODE = '123456';
+const RESET_SENT = "If an account uses this email, we've sent it a code.";
+/** Codes waiting to be entered, by `codeKey`. */
+const codes = new Map<string, { attempts: number }>();
+const codeKey = (email: string, purpose: CodePurpose, role: Role) => `${purpose} ${role} ${email.trim().toLowerCase()}`;
+
 const LATENCY_MS = 250;
 const delay = () => new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -50,7 +58,7 @@ const accounts: Account[] = [
     email: 'user@ghoomyo.app',
     password: 'password123',
     role: 'user',
-    profile: { name: 'Asha Verma', mobile: '9876543210' },
+    profile: { name: 'Asha Verma', mobile: '9876543210', photoUrl: '' },
   },
   {
     id: 's1',
@@ -58,7 +66,7 @@ const accounts: Account[] = [
     password: 'password123',
     role: 'store',
     locCode: 'raju_tailor',
-    profile: { name: 'Raju Tailor', mobile: '9123456780' },
+    profile: { name: 'Raju Tailor', mobile: '9123456780', photoUrl: '' },
   },
 ];
 
@@ -81,6 +89,8 @@ const stores: StoreRecord[] = [
     serviceType: null,
     storeCategory: null,
     openDays: [...ALL_DAYS],
+    // The admin turned picture uploads on for Raju Tailor only.
+    uploadsEnabled: true,
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -90,6 +100,7 @@ const stores: StoreRecord[] = [
       bio: 'Custom tailoring and alterations since 1998.',
       lat: 22.7196,
       lng: 75.8577,
+      photoUrl: '',
     },
   },
   {
@@ -116,6 +127,7 @@ const stores: StoreRecord[] = [
       bio: 'Haircuts, styling and grooming.',
       lat: 22.7533,
       lng: 75.8937,
+      photoUrl: '',
     },
   },
   {
@@ -144,6 +156,7 @@ const stores: StoreRecord[] = [
       bio: 'Fresh produce delivered from local farms.',
       lat: 22.7244,
       lng: 75.8839,
+      photoUrl: '',
     },
   },
 ];
@@ -369,9 +382,51 @@ function requireStoreOwner(storeId: string) {
 }
 
 export const mockApi: Api = {
+  async sendEmailCode({ email, purpose, role }) {
+    await delay();
+    const normalized = email.trim().toLowerCase();
+    const exists = accounts.some((a) => a.role === role && a.email === normalized);
+    if (purpose === 'signup' && exists) {
+      throw new ApiError('An account with this email already exists. Log in or reset your password.', 409);
+    }
+    if (purpose === 'reset' && !exists) return { message: RESET_SENT };
+    codes.set(codeKey(email, purpose, role), { attempts: 0 });
+    console.log(`[mock] ${purpose} code for ${email}: ${MOCK_CODE}`);
+    return { message: purpose === 'reset' ? RESET_SENT : "We've sent a code to your email.", devCode: MOCK_CODE };
+  },
+
+  async verifyEmailCode({ email, purpose, role, code }) {
+    await delay();
+    const key = codeKey(email, purpose, role);
+    const entry = codes.get(key);
+    if (!entry || entry.attempts >= 5) throw new ApiError('This code has expired. Ask for a new one.', 400);
+    if (code.trim() !== MOCK_CODE) {
+      entry.attempts += 1;
+      const left = 5 - entry.attempts;
+      throw new ApiError(left > 0 ? `That code isn't right. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many wrong tries. Ask for a new code.', 400);
+    }
+    codes.delete(key);
+    return `mockverify ${key}`;
+  },
+
+  async resetPassword({ role, verificationToken, password }) {
+    await delay();
+    const [kind, purpose, tokenRole, email] = verificationToken.split(' ');
+    if (kind !== 'mockverify' || purpose !== 'reset' || tokenRole !== role) {
+      throw new ApiError('Your code has expired. Start again to get a new one.', 400);
+    }
+    if (password.length < 8) throw new ApiError('Password must be at least 8 characters.', 400);
+    const matches = accounts.filter((a) => a.role === role && a.email === email);
+    if (!matches.length) throw new ApiError('No account uses this email.', 404);
+    for (const account of matches) account.password = password;
+  },
+
   async signup(input) {
     await delay();
     const email = input.email.trim().toLowerCase();
+    if (input.verificationToken !== `mockverify ${codeKey(email, 'signup', input.role)}`) {
+      throw new ApiError('Verify your email first.', 400);
+    }
     if (input.role === 'user') {
       // Users log in by email, so it must be unique; usernames may repeat.
       if (accounts.some((a) => a.role === 'user' && a.email === email)) {
@@ -382,7 +437,7 @@ export const mockApi: Api = {
         email,
         password: input.password,
         role: 'user',
-        profile: { name: input.username.trim(), mobile: '' },
+        profile: { name: input.username.trim(), mobile: '', photoUrl: '' },
       });
       return {};
     }
@@ -399,7 +454,7 @@ export const mockApi: Api = {
       throw new ApiError('Email already registered', 409);
     }
     const id = newId('s');
-    accounts.push({ id, email, password: input.password, role: 'store', locCode, profile: { name, mobile: '' } });
+    accounts.push({ id, email, password: input.password, role: 'store', locCode, profile: { name, mobile: '', photoUrl: '' } });
     stores.push({
       id,
       name,
@@ -424,7 +479,9 @@ export const mockApi: Api = {
         bio: '',
         lat: 22.7196,
         lng: 75.8577,
+        photoUrl: '',
       },
+      uploadsEnabled: false,
     });
     return { loginCode: locCode };
   },
@@ -812,6 +869,8 @@ export const mockApi: Api = {
       throw new ApiError('openDays must list 1 to 7 different whole numbers from 0 (Sunday) to 6 (Saturday)', 400);
     }
     Object.assign(store, settings, {
+      // Only the app admin changes this.
+      uploadsEnabled: store.uploadsEnabled,
       openDays: [...settings.openDays].sort((a, b) => a - b),
       serviceType: settings.serviceType && addServiceType(settings.serviceType),
       storeCategory: settings.storeCategory && addStoreCategory(settings.storeCategory),
@@ -827,6 +886,19 @@ export const mockApi: Api = {
     const store = findStore(storeId);
     store.profile = { ...profile };
     return clone(withRating(store));
+  },
+
+  // Pictures stay on the device: the returned link is the local one, so they last until reload.
+  async uploadImage(kind, image) {
+    await delay();
+    const account = currentAccount();
+    if (kind === 'user') {
+      if (account.role !== 'user') throw new ApiError('Forbidden: user login required', 403);
+    } else {
+      if (account.role !== 'store') throw new ApiError('Forbidden: location login required', 403);
+      if (!findStore(account.id).uploadsEnabled) throw new ApiError("Picture uploads aren't enabled for this store", 403);
+    }
+    return image.previewUri;
   },
 
   async getUserProfile() {

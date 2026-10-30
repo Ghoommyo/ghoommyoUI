@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { RatingBadge } from '@/components/ui/stars';
+import { StorePhoto } from '@/components/ui/store-photo';
 import { Spacing } from '@/constants/theme';
 import { UserEventsTabs } from '@/features/events/user-events-tabs';
 import { ServicesModal } from '@/features/services/services-modal';
@@ -185,10 +186,13 @@ export function UserDashboard() {
         />
       </View>
       {store ? (
-        <ThemedText type="default" themeColor="textSecondary">
-          Max Count : {store.maxPerSlot} {store.isDarkStore ? 'orders ' : ''}per {LIMIT_UNIT_LABEL[store.limitUnit]}
-          {' · '}Open: {openDaysLabel(store.openDays)}
-        </ThemedText>
+        <View style={styles.storeInfo}>
+          <StorePhoto uri={store.profile.photoUrl} name={store.name} style={styles.storePhoto} />
+          <ThemedText type="default" themeColor="textSecondary" style={styles.flex}>
+            Max Count : {store.maxPerSlot} {store.isDarkStore ? 'orders ' : ''}per {LIMIT_UNIT_LABEL[store.limitUnit]}
+            {' · '}Open: {openDaysLabel(store.openDays)}
+          </ThemedText>
+        </View>
       ) : null}
       {stores.isError ? (
         <Banner message={{ type: 'error', text: errorMessage(stores.error) }} />
@@ -301,6 +305,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+  },
+  storeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  storePhoto: {
+    width: 64,
+    height: 64,
+    borderRadius: Spacing.three,
   },
   card: {
     borderRadius: Spacing.four,

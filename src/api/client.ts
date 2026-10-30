@@ -8,9 +8,14 @@ import type {
   Credentials,
   DateKey,
   DaySummary,
+  EmailCodeRequest,
+  EmailCodeSent,
   NewBooking,
+  PasswordReset,
   ReminderSettings,
   ReviewsPage,
+  ImageKind,
+  PickedImage,
   ServiceInput,
   Session,
   SignupInput,
@@ -38,6 +43,11 @@ export class ApiError extends Error {
 export interface Api {
   signup(input: SignupInput): Promise<SignupResult>;
   login(credentials: Credentials): Promise<Session>;
+  /** Emails a 6-digit code to verify an email (signup) or reset a password. */
+  sendEmailCode(input: EmailCodeRequest): Promise<EmailCodeSent>;
+  /** Checks the code; returns the `verificationToken` for `signup` or `resetPassword`. */
+  verifyEmailCode(input: EmailCodeRequest & { code: string }): Promise<string>;
+  resetPassword(input: PasswordReset): Promise<void>;
 
   listStores(): Promise<Store[]>;
   getStore(storeId: string): Promise<Store>;
@@ -85,6 +95,11 @@ export interface Api {
 
   updateStoreSettings(storeId: string, settings: StoreSettings): Promise<Store>;
   updateStoreProfile(storeId: string, profile: StoreProfile): Promise<Store>;
+  /**
+   * Uploads a picture and returns its URL, which is then saved on an item, the store profile or the
+   * user profile. `item`/`store` need a store whose uploads the admin turned on.
+   */
+  uploadImage(kind: ImageKind, image: PickedImage): Promise<string>;
   getUserProfile(): Promise<UserProfile>;
   updateUserProfile(profile: UserProfile): Promise<UserProfile>;
   /**

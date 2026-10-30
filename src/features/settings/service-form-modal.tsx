@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { errorMessage } from '@/api';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { ServiceImage } from '@/components/ui/service-image';
+import { ImageField, UPLOADS_OFF_HINT } from '@/components/ui/image-field';
 import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { TextField } from '@/components/ui/text-field';
@@ -23,6 +23,8 @@ type ServiceFormModalProps = {
   item: string;
   /** Product stores can tag items with a product type. */
   isProductStore: boolean;
+  /** The app admin lets the store upload pictures; otherwise only a pasted link works. */
+  uploadsEnabled: boolean;
   onClose(): void;
   onSaved(service: StoreService): void;
 };
@@ -36,6 +38,7 @@ export function ServiceFormModal({
   defaultMaxQty,
   item,
   isProductStore,
+  uploadsEnabled,
   onClose,
   onSaved,
 }: ServiceFormModalProps) {
@@ -115,22 +118,24 @@ export function ServiceFormModal({
         keyboardType="decimal-pad"
         placeholder="0"
       />
-      <View style={styles.imageRow}>
-        <ServiceImage uri={draft.imageUrl.trim()} />
-        <View style={styles.flex}>
-          <TextField
-            label="Image URL"
-            value={draft.imageUrl}
-            onChangeText={set('imageUrl')}
-            error={errors.imageUrl}
-            keyboardType="url"
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder="https://…"
-            hint="Optional. A placeholder is shown without one."
-          />
-        </View>
-      </View>
+      <ImageField
+        label="Photo"
+        kind="item"
+        value={draft.imageUrl.trim()}
+        onChange={set('imageUrl')}
+        disabled={!uploadsEnabled}
+        hint={uploadsEnabled ? 'Optional. A placeholder is shown without one.' : UPLOADS_OFF_HINT}
+      />
+      <TextField
+        label="Or paste an image link"
+        value={draft.imageUrl}
+        onChangeText={set('imageUrl')}
+        error={errors.imageUrl}
+        keyboardType="url"
+        autoCapitalize="none"
+        autoCorrect={false}
+        placeholder="https://…"
+      />
       <TextField
         label="Limit per booking"
         value={draft.maxQty}
@@ -149,13 +154,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: Spacing.two,
-  },
-  imageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.three,
-  },
-  flex: {
-    flex: 1,
   },
 });

@@ -6,13 +6,19 @@ Reference for building a UI against the Ghoomo backend (the `/apis/*` routes of 
 
 ---
 
+## 0. Client signature (required on every request)
+
+Only our own apps may call the API. Every request carries `X-Client-Id` (`android`, `ios`, or `web` for the browser build), `X-Timestamp` (Unix ms) and `X-Signature` = lowercase hex `HMAC-SHA256(clientKey, "<timestamp>.<METHOD>.<path and query>")`, e.g. `1793260000000.GET./apis/location`. The body isn't signed, and the timestamp must be within 5 minutes of the server's clock. The app signs in `src/api/ghoomo/signature.ts` (keys `EXPO_PUBLIC_*_APP_KEY`, see `.env.example`).
+
+A bad or expired signature returns 401 `{"error":"This app isn't allowed to use the API","code":"CLIENT_NOT_ALLOWED","serverTime":<ms>}`. The app then corrects its clock from `serverTime` and retries once; if it still fails it's reported as 403 so the session isn't signed out. The local stub (`npm run stub:api`) doesn't check signatures.
+
 ## 1. Basics
 
 | Item           | Value                                                                                                                                                     |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Base URL       | `https://ghoommyo-eight.vercel.app/apis` (deployed; production data). Local server: `http://localhost:3000/apis`. Note `/apis`, not `/api`              |
+| Base URL       | `https://www.ghoomyo.in/apis` (deployed; production data; the old `https://ghoommyo-eight.vercel.app/apis` still works). Local server: `http://localhost:3000/apis`. Note `/apis`, not `/api`              |
 | Body format    | JSON. Send `Content-Type: application/json` on POST/PUT                                                                                                   |
-| CORS           | Any origin is allowed (`Access-Control-Allow-Origin: *`). Preflight `OPTIONS` returns 204                                                                 |
+| CORS           | Only the server's `ALLOWED_ORIGINS` get browser access; the phone apps send no `Origin`, so CORS doesn't apply to them. Preflight `OPTIONS` returns 204 |
 | Auth header    | `Authorization: Bearer <jwt>`. The sign-in responses return the token **already prefixed** with `Bearer `, so send the `token` string exactly as received |
 | Token lifetime | Set by the server's `JWT_EXPIRES_IN` (currently 1 day). An expired or invalid token returns 401; send the user back to sign-in                            |
 | Sign-out       | Stateless. Delete the token on the client. `GET /signout` exists but does nothing server-side                                                             |
@@ -47,7 +53,7 @@ Errors are JSON with **either** an `error` or a `message` key, so read both:
 ### Shell setup for the curl examples
 
 ```bash
-BASE=https://ghoommyo-eight.vercel.app/apis   # or http://localhost:3000/apis for a local server
+BASE=https://www.ghoomyo.in/apis   # or http://localhost:3000/apis for a local server
 # After signing in, store the token exactly as returned (it already includes "Bearer "):
 USER_TOKEN="Bearer eyJ..."   # from POST /signin
 LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
@@ -59,11 +65,11 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 
 | #   | Method | Path                           | Auth                 | Purpose                                              |
 | --- | ------ | ------------------------------ | -------------------- | ---------------------------------------------------- |
-| 1   | POST   | `/signup`                      | none                 | Register a customer                                  |
+| 1   | POST   | `/signup`                      | none                 | Register a customer (needs `verificationToken`)      |
 | 2   | POST   | `/signin`                      | none                 | Customer login → user token                          |
 | 3   | GET    | `/signout`                     | none                 | No-op                                                |
 | 4   | GET    | `/traveller`                   | User                 | Decoded current-user info                            |
-| 5   | POST   | `/location/signup`             | none                 | Register a shop or place                             |
+| 5   | POST   | `/location/signup`             | none                 | Register a shop or place (needs `verificationToken`) |
 | 6   | POST   | `/location/signin`             | none                 | Owner login → location token                         |
 | 7   | GET    | `/location`                    | none                 | All active locations (SHOP + PLACE) with settings    |
 | 8   | GET    | `/shop`                        | any token            | All active SHOP locations with settings              |
@@ -96,8 +102,13 @@ LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin
 | 37  | DELETE | `/account`                     | User or Location     | Delete the signed-in account (§5.1)                  |
 | 35  | GET    | `/store-categories`            | none                 | Categories a PRODUCT location can pick (§5.4a)       |
 | 36  | GET    | `/product-types`               | none                 | Types a location can give its products (§5.4a)       |
+| 38  | GET, PUT | `/traveller/profile`         | User                 | Customer's name, mobile and photo                    |
+| 39  | POST   | `/uploads`                     | User or Location     | Upload a picture → its URL (§5.4b)                   |
+| 40  | POST   | `/email/send-code`             | none                 | Email a 6-digit code: signup or password reset (§5.0) |
+| 41  | POST   | `/email/verify-code`           | none                 | Check the code → `verificationToken` (§5.0)          |
+| 42  | POST   | `/password/reset`              | none                 | New password with a reset `verificationToken` (§5.0) |
 
-The admin console's routes (`/admin/*`, admin token only) are web only and aren't used by this app; see the server's `docs/API.md` §5.8.
+The admin console's routes (`/admin/*`, admin token only) are web only and aren't used by this app; see the server's `docs/API.md` §5.8. The admin turns picture uploads on per location there (A13).
 
 **Do not use:** `GET /shop/{shopCode}`, `GET|PUT /shop/profile`, `GET|PUT /shop/settings`. These are broken legacy copies of the `/location/{locCode}/*` routes and respond 403 to location tokens. Use rows 9–13 instead.
 
@@ -167,6 +178,23 @@ The admin console's routes (`/admin/*`, admin token only) are web only and aren'
 
 ## 5. Endpoint details
 
+### 5.0 Email codes: verify an email, reset a password
+
+Signup and forgot password both use a 6-digit code sent by email. The flow is the same for customers (`role: "user"`, matched on `user_name`) and owners (`role: "store"`, matched on `email`):
+
+1. `POST /email/send-code` `{email, purpose: "signup" | "reset", role: "user" | "store"}` emails a code.
+2. `POST /email/verify-code` `{email, purpose, role, code}` returns `{verificationToken}`, valid for 30 minutes.
+3. Pass the token to `POST /signup` / `POST /location/signup`, or to `POST /password/reset` `{role, verificationToken, password}`.
+
+Rules and responses:
+
+- **Codes:** a code lasts 10 minutes, and 5 wrong tries use it up. Wait 60 s between codes, and send at most 5 per email per hour.
+- **Send errors:** 429 `{"error":"Wait 42 seconds…","retryAfter":42}`; 409 when signing up with an email that already has an account of that role.
+- **Reset doesn't reveal accounts:** `send-code` for a reset always answers `{"message":"If an account uses this email, we've sent it a code."}`.
+- **Wrong or expired code:** 400 `{"error":"That code isn't right. 4 tries left."}` · `"Too many wrong tries. Ask for a new code."` · `"This code has expired. Ask for a new one."`
+- **The token** is tied to the email, purpose and role, and isn't a login token. Send it without `Bearer`.
+- **`devCode`:** a local server without email settings (and the stub, whose code is always `123456`) also returns it, so testing needs no inbox. The app shows it under the Code field.
+
 ### 5.1 Customer auth
 
 #### POST /signup
@@ -175,17 +203,18 @@ Register a customer. `user_name` is used as the login and as the email that PLAC
 
 ```bash
 curl -X POST "$BASE/signup" -H "Content-Type: application/json" \
-  -d '{"user_name":"asha@example.com","password":"Secret@123","confirmPassword":"Secret@123"}'
+  -d '{"user_name":"asha@example.com","password":"Secret@123","confirmPassword":"Secret@123","verificationToken":"eyJ…"}'
 ```
 
-| Field           | Type   | Req | Notes                 |
-| --------------- | ------ | --- | --------------------- |
-| user_name       | string | ✔   | email recommended     |
-| password        | string | ✔   |                       |
-| confirmPassword | string | ✔   | must equal `password` |
+| Field             | Type   | Req | Notes                                                        |
+| ----------------- | ------ | --- | ------------------------------------------------------------ |
+| user_name         | string | ✔   | email recommended                                            |
+| password          | string | ✔   |                                                              |
+| confirmPassword   | string | ✔   | must equal `password`                                        |
+| verificationToken | string | ✔   | §5.0, `purpose: "signup"`, `role: "user"` for this user_name |
 
 - 201 `{"message":"Sign-up successful"}`
-- 400 `{"message":"Invalid sign-up data"}` (missing fields or the passwords don't match)
+- 400 `{"error":"Verify your email first."}` · `{"message":"Invalid sign-up data"}` (missing fields or the passwords don't match)
 - 409 `{"error":"User name already exists"}`
 
 #### POST /signin
@@ -259,7 +288,7 @@ PUT replaces the label and address; DELETE removes it (soft delete; bookings kee
 
 ```bash
 curl -X POST "$BASE/location/signup" -H "Content-Type: application/json" \
-  -d '{"location_name":"Raju Tailor","location_type":"SHOP","email":"raju@example.com","password":"Secret@123","confirmPassword":"Secret@123"}'
+  -d '{"location_name":"Raju Tailor","location_type":"SHOP","email":"raju@example.com","password":"Secret@123","confirmPassword":"Secret@123","verificationToken":"eyJ…"}'
 ```
 
 | Field                      | Type              | Req | Notes              |
@@ -268,9 +297,10 @@ curl -X POST "$BASE/location/signup" -H "Content-Type: application/json" \
 | location_type              | `SHOP` \| `PLACE` | ✔   |                    |
 | email                      | string            | ✔   |                    |
 | password / confirmPassword | string            | ✔   | must match         |
+| verificationToken          | string            | ✔   | §5.0, `purpose: "signup"`, `role: "store"` for this email |
 
 - 201 `{"message":"Location Sign-up successful"}`
-- 400 `{"message":"Invalid Location sign-up data"}` · 409 `{"error":"Location already exists"}`
+- 400 `{"error":"Verify your email first."}` · `{"message":"Invalid Location sign-up data"}` · 409 `{"error":"Location already exists"}`
 
 #### POST /location/signin
 
@@ -397,7 +427,7 @@ curl "$BASE/location/raju_tailor/profile" -H "Authorization: $LOC_TOKEN"
 
 #### PUT /location/{locCode}/profile
 
-All fields are optional. Only the fields you send are changed, and empty strings are ignored. Call GET first so that the profile exists (otherwise 404).
+All fields are optional. Only the fields you send are changed, and empty strings are ignored, except `locProfileUrl` (the location's photo, §5.4b), where `""` removes it. Call GET first so that the profile exists (otherwise 404). A replaced or removed uploaded photo is deleted from storage; `loc_profile_url` is also on the `GET /location` rows.
 
 ```bash
 curl -X PUT "$BASE/location/raju_tailor/profile" -H "Authorization: $LOC_TOKEN" -H "Content-Type: application/json" \
@@ -442,11 +472,15 @@ curl "$BASE/location/raju_tailor/settings" -H "Authorization: $LOC_TOKEN"
       "created_by": "Raju Tailor",
       "updated_on": "...",
       "updated_by": "Raju Tailor",
-      "active": 1
+      "active": 1,
+      "store_inactive": 0,
+      "uploads_on": 0
     }
   ]
 }
 ```
+
+- `uploads_on`: `1` when the app admin lets this location upload pictures (§5.4b). Off by default; the location can't change it.
 
 #### PUT /location/{locCode}/settings
 
@@ -531,6 +565,24 @@ Public. The types of service a `SERVICE` location can pick in its settings: 34 s
 Public. `{"storeCategories":["Food","Beverages","Grocery", …]}` (44 standard categories, then ones locations added) and `{"productTypes":[…]}` (managed by the admin). A service's `productType` (POST/PUT) must be one of the product types (any case) or `null` → otherwise 400 `{"error":"productType must be one of the product types"}`.
 
 ---
+
+### 5.4b Picture uploads
+
+Pictures for items (`kind` `item`), the location's photo (`store`) and the customer's photo (`user`). Upload first, then save the returned URL: an item's `imageUrl`, the profile's `locProfileUrl`, or `photoUrl` on `PUT /traveller/profile` (`{ name, mobile, photoUrl }`; `""` removes it, absent keeps it). Needs the server's migration `012_image_uploads.sql`. Pictures are stored on Cloudinary (or, on a local server without Cloudinary keys, under its `.uploads/` folder).
+
+#### POST /uploads
+
+`multipart/form-data` with `kind` and `file`.
+
+```bash
+curl -X POST "$BASE/uploads" -H "Authorization: $LOC_TOKEN" -F kind=item -F file=@cake.jpg
+```
+
+- `item` and `store` need a location token **and** `uploads_on` (the admin's switch); `user` needs a user token.
+- JPEG, PNG or WebP (checked from the bytes), up to 2 MB. The app sends JPEGs of at most 1280 px.
+- 200 `{"url":"https://res.cloudinary.com/<cloud>/image/upload/v…/ghoomo/item/<locationId>/<uuid>.jpg"}`
+- 400 bad `kind`, no file, not an image · 401 · 403 `{"error":"Picture uploads aren't enabled for this store"}` (or the wrong kind of token) · 413 over 2 MB
+- When a saved picture is replaced or removed (item update/delete, profile PUTs, account deletion), the old uploaded file is deleted. Other links are never touched.
 
 ### 5.5 Calendar (availability)
 

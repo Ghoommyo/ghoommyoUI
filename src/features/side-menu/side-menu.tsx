@@ -20,6 +20,7 @@ type Item = { label: string; href: Href; route?: string };
 const MORE: ({ label: string; href: Href; route: string } | { label: string; site: string })[] = [
   { label: 'About', href: '/about', route: 'about' },
   { label: 'Help & FAQ', site: '/help' },
+  { label: 'Support', site: '/support' },
   { label: 'Contact us', href: '/contact', route: 'contact' },
   { label: 'Privacy policy', site: '/privacy' },
   { label: 'Terms of service', site: '/terms' },
@@ -38,6 +39,8 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
     session?.role === 'store'
       ? (store.data?.name ?? session.name ?? session.email)
       : (profile.data?.name || session?.name || session?.email || 'Guest');
+
+  const photoUrl = session?.role === 'store' ? store.data?.profile.photoUrl : profile.data?.photoUrl;
 
   const items: Item[] = session
     ? [
@@ -71,7 +74,7 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
     <ThemedView type="backgroundElement" style={styles.fill}>
       <SafeAreaView style={styles.fill}>
         <View style={[styles.profile, { borderBottomColor: theme.border }]}>
-          <Avatar name={displayName} />
+          <Avatar name={displayName} uri={photoUrl || undefined} />
           <View style={styles.flex}>
             <ThemedText type="smallBold" numberOfLines={1} style={styles.name}>
               {displayName}
