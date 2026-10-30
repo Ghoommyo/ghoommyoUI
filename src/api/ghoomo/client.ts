@@ -346,6 +346,11 @@ export function createGhoomoApi(baseUrl: string): Api {
       return res?.productTypes ?? [];
     },
 
+    async getAppConfig() {
+      const res = await request<{ adsEnabled: boolean }>('/app-config');
+      return { adsEnabled: res?.adsEnabled === true };
+    },
+
     async getServiceTypes() {
       const res = await request<{ serviceTypes: string[] }>('/service-types');
       return res?.serviceTypes ?? [];

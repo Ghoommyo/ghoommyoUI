@@ -60,7 +60,7 @@ export function StoreDashboard() {
 
   if (!storeId || store.isLoading) {
     return (
-      <Screen>
+      <Screen ads>
         <AppHeader />
         <ActivityIndicator color={theme.primary} />
       </Screen>
@@ -68,7 +68,7 @@ export function StoreDashboard() {
   }
 
   return (
-    <Screen>
+    <Screen ads>
       <AppHeader />
       {store.data?.inactive ? <Banner message={{ type: 'error', text: INACTIVE_STORE_HINT }} /> : null}
       {store.data ? (

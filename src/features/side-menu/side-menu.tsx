@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,6 +12,7 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Spacing } from '@/constants/theme';
 import { useMyProfile, useStore } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
+import { privacyChoicesRequired, showPrivacyChoices } from '@/lib/ads';
 import { openSitePage } from '@/lib/site';
 
 type Item = { label: string; href: Href; route?: string };
@@ -34,6 +35,11 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
   const profile = useMyProfile();
   const store = useStore(session?.role === 'store' ? session.accountId : undefined);
   const activeRoute = state.routes[state.index]?.name;
+  // Google's ad privacy choices, offered only where the law needs it (EU/UK users).
+  const [privacyChoices, setPrivacyChoices] = useState(false);
+  useEffect(() => {
+    privacyChoicesRequired().then(setPrivacyChoices);
+  }, []);
 
   const displayName =
     session?.role === 'store'
@@ -125,6 +131,16 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
               }}
             />
           ))}
+          {privacyChoices && (
+            <MenuItem
+              label="Privacy choices"
+              small
+              onPress={() => {
+                navigation.closeDrawer();
+                showPrivacyChoices();
+              }}
+            />
+          )}
         </ScrollView>
       </SafeAreaView>
 

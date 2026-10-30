@@ -32,6 +32,7 @@ export const queryKeys = {
   storeReviews: (storeId: string) => ['stores', storeId, 'reviews'] as const,
   storeServices: (storeId: string) => ['stores', storeId, 'services'] as const,
   serviceTypes: ['service-types'] as const,
+  appConfig: ['app-config'] as const,
   storeCategories: ['store-categories'] as const,
   productTypes: ['product-types'] as const,
   notifications: (accountId: string) => ['me', accountId, 'notifications'] as const,
@@ -117,6 +118,11 @@ export function useStoreCategories() {
 
 export function useProductTypes() {
   return useQuery({ queryKey: queryKeys.productTypes, queryFn: () => api.getProductTypes() });
+}
+
+/** Whether to show ads (the admin's "Show ads" switch); refreshed at most once a minute. */
+export function useAppConfig() {
+  return useQuery({ queryKey: queryKeys.appConfig, queryFn: () => api.getAppConfig(), staleTime: 60_000, retry: false });
 }
 
 export function useServiceTypes() {

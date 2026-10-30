@@ -4,7 +4,7 @@ import { UserEventsTabs } from '@/features/events/user-events-tabs';
 
 export default function EventsScreen() {
   return (
-    <Screen>
+    <Screen ads>
       <AppHeader title="Events" />
       <UserEventsTabs />
     </Screen>

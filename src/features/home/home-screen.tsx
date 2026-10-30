@@ -32,7 +32,7 @@ export function HomeScreen() {
   ];
 
   return (
-    <Screen>
+    <Screen ads>
       <AppHeader title="Home" />
       <ThemedText themeColor="textSecondary">Find a store by what it offers. The best rated ones are at the top.</ThemedText>
       {stores.isLoading ? (

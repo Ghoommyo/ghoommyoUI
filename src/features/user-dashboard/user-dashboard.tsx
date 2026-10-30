@@ -148,7 +148,7 @@ export function UserDashboard() {
   };
 
   return (
-    <Screen>
+    <Screen ads>
       <AppHeader />
 
       <View style={styles.storeRow}>

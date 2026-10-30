@@ -606,6 +606,11 @@ export const mockApi: Api = {
     return [...productTypes].sort((a, b) => a.localeCompare(b));
   },
 
+  async getAppConfig() {
+    await delay();
+    return { adsEnabled: true };
+  },
+
   async getServiceTypes() {
     await delay();
     return [...STANDARD_SERVICE_TYPES, ...[...addedServiceTypes].sort((a, b) => a.localeCompare(b))];

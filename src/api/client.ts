@@ -57,6 +57,8 @@ export interface Api {
   getStoreBookings(storeId: string, dates: DateKey[]): Promise<Booking[]>;
   /** A store's active services, in the order they were added. Public. */
   getStoreServices(storeId: string): Promise<StoreService[]>;
+  /** App-wide switches the admin sets (for now, whether to show ads). Public. */
+  getAppConfig(): Promise<{ adsEnabled: boolean }>;
   /** Types of service a service store can pick: the standard trades, then ones stores added (A–Z). Public. */
   getServiceTypes(): Promise<string[]>;
   /** Categories a product store can pick: the standard ones, then ones stores added (A–Z). Public. */

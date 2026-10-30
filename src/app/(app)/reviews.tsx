@@ -6,6 +6,7 @@ import { useSession } from '@/auth/session';
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AdBanner } from '@/components/ui/ad-banner';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { ReviewsList } from '@/features/reviews/reviews-list';
@@ -41,6 +42,7 @@ export default function ReviewsScreen() {
             </View>
           }
         />
+        <AdBanner />
       </SafeAreaView>
     </ThemedView>
   );
