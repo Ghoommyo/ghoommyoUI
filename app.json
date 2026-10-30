@@ -73,6 +73,23 @@
           "cameraPermission": "Ghoomyo uses the camera so you can take pictures of your store, its products and yourself.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": [
+              "en",
+              "hi",
+              "mr"
+            ],
+            "android": [
+              "en",
+              "hi",
+              "mr"
+            ]
+          }
+        }
       ]
     ],
     "experiments": {
