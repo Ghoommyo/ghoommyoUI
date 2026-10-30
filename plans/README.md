@@ -62,7 +62,7 @@ Decisions:
 - **SHOP locations only.** PLACE locations, which are booked by whole day through `/event` and `/traveller/*`, are hidden for now.
 - **Hardcoded values for missing fields.** The API has nowhere to store some fields, so in API mode they get hardcoded values from `API_DEFAULTS` until the API supports them: max people per booking, store-name edits, state, map coordinates, and the user's name and mobile.
 - **Verification uses a stub server** (`scripts/ghoomo-stub.mjs`) built from Api.md, because the real backend can't be run here.
-- **Vercel by default (2026-10-17).** The API is deployed at `https://ghoommyo-eight.vercel.app/apis`, so the real API is now on unless `EXPO_PUBLIC_USE_REAL_API=false`, and `EXPO_PUBLIC_API_URL` defaults to Vercel. Local servers and the stub are opt-in via `EXPO_PUBLIC_API_URL`.
+- **Vercel by default (2026-10-17).** The API is deployed at `https://ghoommyo-eight.vercel.app/apis`, so the real API is now on unless `EXPO_PUBLIC_USE_REAL_API=false`, and `EXPO_PUBLIC_API_URL` defaults to Vercel. Since 2026-10-30 the default is the domain `https://ghoomyo.in/apis`; apps built before keep using the Vercel address, which still serves the API. Local servers and the stub are opt-in via `EXPO_PUBLIC_API_URL`.
 
 - [x] [API phase 1: Branch, flag and plan docs](api-phase-1-flag.md)
 - [x] [API phase 2: Ghoomo client foundation and stub server](api-phase-2-client.md)
