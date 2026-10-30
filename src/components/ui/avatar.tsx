@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n/language-provider';
 
 function initials(name: string) {
   const parts = name.trim().split(/[\s@._-]+/).filter(Boolean);
@@ -12,6 +13,7 @@ function initials(name: string) {
 
 /** A round photo, or the name's initials when there's none or it fails to load. */
 export function Avatar({ name, uri, size = 56 }: { name: string; uri?: string; size?: number }) {
+  const { t } = useT();
   const theme = useTheme();
   // Remember which link failed, so a new link is tried again.
   const [failed, setFailed] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export function Avatar({ name, uri, size = 56 }: { name: string; uri?: string; s
         source={{ uri }}
         onError={() => setFailed(uri)}
         contentFit="cover"
-        accessibilityLabel={`${name} photo`}
+        accessibilityLabel={t('common.photoOf', { name })}
         accessibilityIgnoresInvertColors
         style={[circle, { backgroundColor: theme.backgroundSelected }]}
       />
@@ -31,7 +33,7 @@ export function Avatar({ name, uri, size = 56 }: { name: string; uri?: string; s
   }
   return (
     <View
-      accessibilityLabel={`${name} avatar`}
+      accessibilityLabel={t('app.avatarOf', { name })}
       style={[styles.circle, circle, { backgroundColor: theme.primary }]}>
       <ThemedText style={{ color: theme.onPrimary, fontSize: size * 0.38, fontWeight: 700 }}>
         {initials(name)}

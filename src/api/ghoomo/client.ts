@@ -32,6 +32,8 @@ import type {
   GhoomoUserClaims,
 } from '@/api/ghoomo/types';
 import { adoptServerTime, CLIENT_NOT_ALLOWED, signatureHeaders } from '@/api/ghoomo/signature';
+import { isLanguage } from '@/i18n/languages';
+import { say } from '@/i18n/translate';
 import { decodeJwt } from '@/lib/jwt';
 import { normalizeStoreName, storeKey } from '@/lib/store-name';
 import { parseDateKey } from '@/lib/date';
@@ -68,7 +70,7 @@ export function createRequest(baseUrl: string): GhoomoRequest {
         body: body === undefined ? undefined : JSON.stringify(body),
       });
     } catch {
-      throw new ApiError('Could not reach the server. Check your connection and API URL.', 0);
+      throw new ApiError(say('app.offline'), 0);
     }
     if (emptyOn.includes(response.status)) return null;
 
@@ -78,7 +80,7 @@ export function createRequest(baseUrl: string): GhoomoRequest {
       if (response.status === 401 && !retried && adoptServerTime(data)) {
         return request<T>(path, { method, body, emptyOn }, true);
       }
-      throw apiError(data, response.status, `Request failed (${response.status})`);
+      throw apiError(data, response.status, say('app.requestFailed', { status: response.status }));
     }
     return data as T;
   };
@@ -108,19 +110,19 @@ async function postImage(baseUrl: string, form: FormData, retried = false): Prom
       body: form,
     });
   } catch {
-    throw new ApiError('Could not reach the server. Check your connection and API URL.', 0);
+    throw new ApiError(say('app.offline'), 0);
   }
   const data = await response.json().catch(() => null);
   if (response.status === 401 && !retried && adoptServerTime(data)) return postImage(baseUrl, form, true);
   if (!response.ok || !data?.url) {
-    throw apiError(data, response.status, `Upload failed (${response.status})`);
+    throw apiError(data, response.status, say('app.uploadFailed', { status: response.status }));
   }
   return data.url as string;
 }
 
 type ProfileResponse = { profile: { name?: string; mobile?: string; photoUrl?: string; inactive?: boolean } };
 
-type TokenResponse = { message: string; token: string };
+type TokenResponse = { message: string; token: string; language?: string | null };
 type EventsResponse = { success: boolean; data: GhoomoAppointment[] };
 
 export function createGhoomoApi(baseUrl: string): Api {
@@ -129,7 +131,7 @@ export function createGhoomoApi(baseUrl: string): Api {
   /** Claims of the signed-in account; endpoints that need them are only reachable signed in. */
   function claims<T extends GhoomoUserClaims | GhoomoLocationClaims>(): T {
     const token = getAuthToken();
-    if (!token) throw new ApiError('Please log in again.', 401);
+    if (!token) throw new ApiError(say('app.loginAgain'), 401);
     return decodeJwt<T>(token);
   }
 
@@ -156,7 +158,7 @@ export function createGhoomoApi(baseUrl: string): Api {
 
   function requireOwnLocCode(): string {
     const locCode = ownLocCode();
-    if (!locCode) throw new ApiError('Log in as a store to change its details.', 403);
+    if (!locCode) throw new ApiError(say('app.storeOnly'), 403);
     return locCode;
   }
 
@@ -169,7 +171,7 @@ export function createGhoomoApi(baseUrl: string): Api {
       request<{ locationList: GhoomoProfile[] }>(`${base}/profile`),
     ]);
     const row = location?.locationList[0];
-    if (!row) throw new ApiError('Store not found.', 404);
+    if (!row) throw new ApiError(say('app.storeNotFound'), 404);
     return {
       id: row.user_id,
       name: row.loc_name,
@@ -185,7 +187,7 @@ export function createGhoomoApi(baseUrl: string): Api {
     if (locCode && claims<GhoomoLocationClaims>().userId === storeId) return getOwnStore(locCode);
 
     const store = (await listShops()).find((s) => s.id === storeId);
-    if (!store) throw new ApiError('Store not found.', 404);
+    if (!store) throw new ApiError(say('app.storeNotFound'), 404);
     return store;
   }
 
@@ -260,14 +262,12 @@ export function createGhoomoApi(baseUrl: string): Api {
           accountId: claims.userId,
           email: claims.userName,
           name: displayName(claims.userName),
+          language: isLanguage(res!.language) ? res!.language : null,
         };
       }
       // POST /location/signin only takes the location code for now; email login needs the API fix.
       if (credentials.login.includes('@')) {
-        throw new ApiError(
-          "Logging in with email isn't supported by the server yet. Use your store name.",
-          400,
-        );
+        throw new ApiError(say('app.emailLoginUnsupported'), 400);
       }
       const res = await request<TokenResponse>('/location/signin', {
         method: 'POST',
@@ -275,7 +275,7 @@ export function createGhoomoApi(baseUrl: string): Api {
       });
       const claims = decodeJwt<GhoomoLocationClaims>(res!.token);
       if (claims.locType !== 'SHOP') {
-        throw new ApiError('Only shop accounts can use this app for now.', 403);
+        throw new ApiError(say('app.shopsOnly'), 403);
       }
       return {
         token: res!.token,
@@ -284,7 +284,12 @@ export function createGhoomoApi(baseUrl: string): Api {
         email: claims.locCode, // the location token carries no email
         name: claims.locName,
         locCode: claims.locCode,
+        language: isLanguage(res!.language) ? res!.language : null,
       };
+    },
+
+    async setLanguage(language) {
+      await request('/account/language', { method: 'PUT', body: { language } });
     },
 
     listStores: listShops,

@@ -3,8 +3,9 @@ import { addDays, makeDateKey, todayKey } from '@/lib/date';
 import { needsDeliveryAddress, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
 import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
 import { STANDARD_STORE_CATEGORIES } from '@/lib/store-categories';
-import { ALL_DAYS, buildSlotStarts, daysInMonth, visitorCount, WEEK } from '@/lib/slots';
+import { ALL_DAYS, buildSlotStarts, daysInMonth, visitorCount, weekDays } from '@/lib/slots';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
+import { translate, type Translate } from '@/i18n/translate';
 import type {
   SavedAddress,
   AddressInput,
@@ -20,6 +21,9 @@ import type {
   StoreService,
   UserProfile,
 } from '@/types/domain';
+
+// The mock answers like the server, which speaks English.
+const english: Translate = (key, vars) => translate('en', key, vars);
 
 /**
  * In-memory backend used until a real API exists. Data resets on reload;
@@ -442,7 +446,7 @@ export const mockApi: Api = {
       return {};
     }
 
-    const nameError = validateStoreName(input.locationName);
+    const nameError = validateStoreName(input.locationName, english);
     if (nameError) throw new ApiError(nameError, 400);
     const name = normalizeStoreName(input.locationName);
     const locCode = storeKey(name);
@@ -606,6 +610,10 @@ export const mockApi: Api = {
     return [...productTypes].sort((a, b) => a.localeCompare(b));
   },
 
+  async setLanguage() {
+    await delay();
+  },
+
   async getAppConfig() {
     await delay();
     return { adsEnabled: true };
@@ -655,7 +663,7 @@ export const mockApi: Api = {
     }
     const weekday = new Date(`${input.slotStart.slice(0, 10)}T12:00`).getDay();
     if (!store.openDays.includes(weekday)) {
-      throw new ApiError(`The store is closed on ${WEEK.find((w) => w.day === weekday)!.long}s`, 400);
+      throw new ApiError(`The store is closed on ${weekDays(english).find((w) => w.day === weekday)!.long}s`, 400);
     }
     // Dark-store orders and home visits count as 1, whatever the head count.
     const people = store.isDarkStore || input.orderType === 'homeVisit' ? 1 : input.people;

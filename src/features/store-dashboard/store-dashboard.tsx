@@ -16,9 +16,10 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatDayLong, todayKey } from '@/lib/date';
 import { dayCapacity } from '@/lib/slots';
 import type { DateKey } from '@/types/domain';
-import { INACTIVE_STORE_HINT } from '@/lib/account-status';
+import { useT } from '@/i18n/language-provider';
 
 export function StoreDashboard() {
+  const { t, language } = useT();
   const theme = useTheme();
   const { session } = useSession();
   const storeId = session?.accountId;
@@ -52,7 +53,7 @@ export function StoreDashboard() {
 
   const search = () => {
     if (selected.size === 0) {
-      setMessage({ type: 'error', text: 'Select one or more days first.' });
+      setMessage({ type: 'error', text: t('store.selectDaysFirst') });
       return;
     }
     setSearchDates([...selected].sort());
@@ -70,14 +71,14 @@ export function StoreDashboard() {
   return (
     <Screen ads>
       <AppHeader />
-      {store.data?.inactive ? <Banner message={{ type: 'error', text: INACTIVE_STORE_HINT }} /> : null}
+      {store.data?.inactive ? <Banner message={{ type: 'error', text: t('hint.inactiveStore') }} /> : null}
       {store.data ? (
         <View style={styles.subheader}>
           <ThemedText type="default" style={styles.storeName}>
             {store.data.name}
           </ThemedText>
           <ThemedText type="default" themeColor="textSecondary">
-            Max Count : {dayCapacity(store.data)} {store.data.isDarkStore ? 'orders ' : ''}per day
+            {t(store.data.isDarkStore ? 'store.maxOrdersPerDay' : 'store.maxPerDay', { count: dayCapacity(store.data) })}
           </ThemedText>
         </View>
       ) : (
@@ -100,13 +101,11 @@ export function StoreDashboard() {
       <Banner message={message} />
       <View style={styles.searchRow}>
         <ThemedText type="small" themeColor="textSecondary" style={styles.flex}>
-          {selected.size === 0
-            ? 'Tap days to select them.'
-            : `${selected.size} day${selected.size === 1 ? '' : 's'} selected`}
+          {selected.size === 0 ? t('store.tapDays') : t('store.daysSelected', { count: selected.size })}
         </ThemedText>
         {selected.size > 0 ? (
           <Button
-            label="Clear"
+            label={t('store.clear')}
             variant="secondary"
             onPress={() => {
               setSelected(new Set());
@@ -114,13 +113,13 @@ export function StoreDashboard() {
             }}
           />
         ) : null}
-        <Button label="Search" variant="success" onPress={search} />
+        <Button label={t('store.search')} variant="success" onPress={search} />
       </View>
 
       <StoreBookings
         storeId={storeId}
         dates={searchDates ?? todayDates}
-        caption={searchDates ? `Bookings for ${searchDates.map(formatDayLong).join(', ')}` : "Today's bookings"}
+        searchedDays={searchDates ? searchDates.map((date) => formatDayLong(date, language)).join(', ') : null}
         isDarkStore={store.data?.isDarkStore}
         catalogType={store.data?.catalogType}
       />

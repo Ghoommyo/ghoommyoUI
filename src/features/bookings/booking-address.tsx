@@ -7,6 +7,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { SavedAddress, StoreProfile } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 /** The "Other…" choice in the delivery address list. */
 export const OTHER_ADDRESS = '__other__';
@@ -20,14 +21,15 @@ export function addressOptionLabel(address: SavedAddress): string {
 
 /** Where the customer goes for Book table / Pickup / Book appointment. */
 export function StoreAddressCard({ storeName, profile }: { storeName: string; profile: StoreProfile }) {
+  const { t } = useT();
   const theme = useTheme();
   const place = [[profile.city, profile.pin].filter(Boolean).join(' '), profile.country].filter(Boolean).join(', ');
   return (
     <View
       style={[styles.card, { backgroundColor: theme.backgroundElement }]}
-      accessibilityLabel="Store address">
+      accessibilityLabel={t('booking.storeAddress')}>
       <ThemedText type="smallBold" themeColor="textSecondary">
-        Store address
+        {t('booking.storeAddress')}
       </ThemedText>
       <ThemedText type="smallBold">{storeName}</ThemedText>
       <ThemedText>{profile.address}</ThemedText>
@@ -39,7 +41,7 @@ export function StoreAddressCard({ storeName, profile }: { storeName: string; pr
           hitSlop={8}
           style={styles.link}>
           <ThemedText type="smallBold" style={{ color: theme.primary }}>
-            Open in maps
+            {t('book.openInMaps')}
           </ThemedText>
         </Pressable>
       ) : null}
@@ -75,18 +77,19 @@ export function DeliveryAddressField({
   onSave,
   error,
 }: DeliveryAddressFieldProps) {
-  const label = isHomeVisit ? 'Visit address' : 'Delivery address';
+  const { t } = useT();
+  const label = isHomeVisit ? t('book.visitAddress') : t('book.deliveryAddress');
   const isOther = choice === OTHER_ADDRESS;
   return (
     <View style={styles.field}>
       {loading || saved.length ? (
         <Select
           label={label}
-          placeholder={loading ? 'Loading your addresses…' : undefined}
+          placeholder={loading ? t('book.loadingAddresses') : undefined}
           value={loading ? undefined : choice}
           options={[
             ...saved.map((address) => ({ label: addressOptionLabel(address), value: address.id })),
-            { label: 'Other…', value: OTHER_ADDRESS },
+            { label: t('book.otherAddress'), value: OTHER_ADDRESS },
           ]}
           onChange={onChoice}
           error={isOther ? undefined : error}
@@ -95,14 +98,14 @@ export function DeliveryAddressField({
       {!loading && isOther ? (
         <>
           <TextField
-            label={saved.length ? 'Address' : label}
+            label={saved.length ? t('book.address') : label}
             value={other}
             onChangeText={onOther}
-            placeholder="House or flat, street, area, city, PIN code"
+            placeholder={t('book.addressPlaceholder')}
             error={error}
             multiline
           />
-          <Checkbox label="Save this address" checked={save} onChange={onSave} />
+          <Checkbox label={t('book.saveAddress')} checked={save} onChange={onSave} />
         </>
       ) : null}
     </View>

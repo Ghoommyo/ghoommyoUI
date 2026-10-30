@@ -1,7 +1,9 @@
 import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
 
+import { api } from '@/api';
 import { setAuthToken } from '@/api/client';
 import { storage } from '@/auth/storage';
+import { useT } from '@/i18n/language-provider';
 import type { Session } from '@/types/domain';
 
 const SESSION_KEY = 'ghoomyo.session';
@@ -23,6 +25,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [hasSeenIntro, setHasSeenIntro] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const { language, setLanguage } = useT();
 
   useEffect(() => {
     Promise.all([storage.get(SESSION_KEY), storage.get(INTRO_KEY)])
@@ -44,6 +47,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
     async signIn(next) {
       setAuthToken(next.token);
       setSession(next);
+      // The account's language wins; an account without one takes the language in use now.
+      if (next.language) setLanguage(next.language);
+      else api.setLanguage(language).catch(() => {});
       await storage.set(SESSION_KEY, JSON.stringify(next));
     },
     async signOut() {

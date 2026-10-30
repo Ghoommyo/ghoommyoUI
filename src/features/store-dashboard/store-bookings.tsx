@@ -12,14 +12,16 @@ import { Spacing } from '@/constants/theme';
 import { useSetBookingStatus, useStoreBookings } from '@/hooks/queries';
 import { showsPeople } from '@/lib/order-types';
 import type { Booking, BookingStatus, CatalogType, DateKey } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
+import type { Translate } from '@/i18n/translate';
 
 type TabKey = 'open' | 'accepted' | 'rejected' | 'all';
 
-const TABS: Tab<TabKey>[] = [
-  { key: 'open', label: 'Open' },
-  { key: 'accepted', label: 'Accepted' },
-  { key: 'rejected', label: 'Rejected' },
-  { key: 'all', label: 'All' },
+const tabs = (t: Translate): Tab<TabKey>[] => [
+  { key: 'open', label: t('store.tabOpen') },
+  { key: 'accepted', label: t('store.tabAccepted') },
+  { key: 'rejected', label: t('store.tabRejected') },
+  { key: 'all', label: t('store.tabAll') },
 ];
 
 const TAB_STATUS: Record<Exclude<TabKey, 'all'>, BookingStatus> = {
@@ -32,14 +34,15 @@ type StoreBookingsProps = {
   storeId: string;
   /** Today until the store searches, then the searched days. */
   dates: DateKey[];
-  /** What the list covers, e.g. "Today's bookings". */
-  caption: string;
+  /** The searched days, or null while the list shows today. */
+  searchedDays: string | null;
   isDarkStore?: boolean;
   catalogType?: CatalogType;
 };
 
 /** Bookings for the shown days, split by status, with accept/reject; tap a row for details. */
-export function StoreBookings({ storeId, dates, caption, isDarkStore, catalogType }: StoreBookingsProps) {
+export function StoreBookings({ storeId, dates, searchedDays, isDarkStore, catalogType }: StoreBookingsProps) {
+  const { t } = useT();
   const [tab, setTab] = useState<TabKey>('open');
   const [open, setOpen] = useState<Booking | null>(null);
   const bookings = useStoreBookings(storeId, dates);
@@ -56,7 +59,7 @@ export function StoreBookings({ storeId, dates, caption, isDarkStore, catalogTyp
         {tab === 'all' ? <StatusChip status={booking.status} /> : null}
         {booking.status !== 'accepted' ? (
           <Button
-            label="✓ Accept"
+            label={t('booking.accept')}
             variant="success"
             size="sm"
             loading={busy && setStatus.variables?.status === 'accepted'}
@@ -66,7 +69,7 @@ export function StoreBookings({ storeId, dates, caption, isDarkStore, catalogTyp
         ) : null}
         {booking.status !== 'rejected' ? (
           <Button
-            label="✕ Reject"
+            label={t('booking.reject')}
             variant="danger"
             size="sm"
             loading={busy && setStatus.variables?.status === 'rejected'}
@@ -82,18 +85,18 @@ export function StoreBookings({ storeId, dates, caption, isDarkStore, catalogTyp
     <View style={styles.container}>
       <View style={styles.header}>
         <ThemedText type="default" style={styles.caption}>
-          {caption}
+          {searchedDays ? t('store.bookingsFor', { days: searchedDays }) : t('store.todaysBookings')}
         </ThemedText>
         <Button
-          label="↻ Refresh"
+          label={`↻ ${t('common.refresh')}`}
           variant="secondary"
           size="sm"
-          accessibilityLabel="Refresh bookings"
+          accessibilityLabel={t('events.refresh')}
           loading={bookings.isFetching && !bookings.isLoading}
           onPress={() => bookings.refetch()}
         />
       </View>
-      <SegmentedTabs tabs={TABS} value={tab} onChange={setTab} />
+      <SegmentedTabs tabs={tabs(t)} value={tab} onChange={setTab} />
       <Banner
         message={setStatus.isError ? { type: 'error', text: errorMessage(setStatus.error) } : null}
       />
@@ -102,7 +105,7 @@ export function StoreBookings({ storeId, dates, caption, isDarkStore, catalogTyp
       ) : bookings.isError ? (
         <Banner message={{ type: 'error', text: errorMessage(bookings.error) }} />
       ) : visible.length === 0 ? (
-        <Empty text={caption === "Today's bookings" ? 'No bookings here for today.' : 'No bookings here for the selected days.'} />
+        <Empty text={searchedDays ? t('store.noneSelected') : t('store.noneToday')} />
       ) : (
         visible.map((b) => (
           <EventCard

@@ -10,10 +10,12 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
-import { AuthFormLayout, ROLE_OPTIONS, validateEmail } from '@/features/auth/auth-form';
+import { AuthFormLayout, roleOptions, validateEmail } from '@/features/auth/auth-form';
 import type { Credentials, Role } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 export default function LoginScreen() {
+  const { t } = useT();
   const { signIn } = useSession();
   // Set by signup (and forgot password): show a confirmation and, for stores, prefill the store name.
   const params = useLocalSearchParams<{ registered?: string; passwordReset?: string; role?: Role; store?: string }>();
@@ -36,9 +38,9 @@ export default function LoginScreen() {
       identifier: isStore
         ? identifier.trim()
           ? undefined
-          : 'Enter your email or store name.'
-        : validateEmail(identifier),
-      password: password ? undefined : 'Password is required.',
+          : t('auth.enterEmailOrStore')
+        : validateEmail(identifier, t),
+      password: password ? undefined : t('auth.passwordRequired'),
     };
     setErrors(next);
     if (next.identifier || next.password) return;
@@ -51,14 +53,14 @@ export default function LoginScreen() {
 
   const registeredText =
     params.role === 'store'
-      ? 'Account created. Log in with your email or store name.'
-      : 'Account created. Please log in.';
+      ? t('auth.storeCreated')
+      : t('auth.userCreated');
 
   return (
     <AuthFormLayout
-      title="Login"
-      footerText="Not a member?"
-      footerLinkText="Click to signup"
+      title={t('auth.login')}
+      footerText={t('auth.notMember')}
+      footerLinkText={t('auth.toSignup')}
       footerHref="/signup">
       <Banner
         message={
@@ -67,14 +69,14 @@ export default function LoginScreen() {
             : params.registered
               ? { type: 'success', text: registeredText }
               : params.passwordReset
-                ? { type: 'success', text: 'Password changed. Log in with your new password.' }
+                ? { type: 'success', text: t('auth.passwordChanged') }
                 : null
         }
       />
       <Select
-        label="Type"
+        label={t('auth.type')}
         value={role}
-        options={ROLE_OPTIONS}
+        options={roleOptions(t)}
         onChange={(value) => {
           // Users log in by email only; don't carry a store name over (or vice versa).
           if (value !== role) setIdentifier('');
@@ -85,11 +87,11 @@ export default function LoginScreen() {
       />
       {isStore ? (
         <TextField
-          label="Email or store name"
+          label={t('auth.emailOrStore')}
           value={identifier}
           onChangeText={setIdentifier}
           error={errors.identifier}
-          placeholder="you@example.com or Raju Tailor"
+          placeholder={t('auth.emailOrStorePlaceholder')}
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="username"
@@ -97,7 +99,7 @@ export default function LoginScreen() {
         />
       ) : (
         <TextField
-          label="Email"
+          label={t('auth.email')}
           value={identifier}
           onChangeText={setIdentifier}
           error={errors.identifier}
@@ -108,7 +110,7 @@ export default function LoginScreen() {
         />
       )}
       <TextField
-        label="Password"
+        label={t('auth.password')}
         value={password}
         onChangeText={setPassword}
         error={errors.password}
@@ -118,9 +120,9 @@ export default function LoginScreen() {
         onSubmitEditing={submit}
       />
       <Link href={{ pathname: '/forgot-password', params: { role } }} style={styles.forgot}>
-        <ThemedText type="linkPrimary">Forgot password?</ThemedText>
+        <ThemedText type="linkPrimary">{t('auth.forgot')}</ThemedText>
       </Link>
-      <Button label="Login" onPress={submit} loading={login.isPending} fullWidth />
+      <Button label={t('auth.login')} onPress={submit} loading={login.isPending} fullWidth />
     </AuthFormLayout>
   );
 }

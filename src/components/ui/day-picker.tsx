@@ -3,7 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { WEEK } from '@/lib/slots';
+import { weekDays } from '@/lib/slots';
+import { useT } from '@/i18n/language-provider';
 
 type DayPickerProps = {
   label: string;
@@ -16,6 +17,7 @@ type DayPickerProps = {
 
 /** Seven toggle buttons, Monday to Sunday (44px tall, primary when on). */
 export function DayPicker({ label, value, onChange, error, hint }: DayPickerProps) {
+  const { t } = useT();
   const theme = useTheme();
   const toggle = (day: number) =>
     onChange(value.includes(day) ? value.filter((d) => d !== day) : [...value, day].sort((a, b) => a - b));
@@ -24,7 +26,7 @@ export function DayPicker({ label, value, onChange, error, hint }: DayPickerProp
     <View style={styles.field} role="group" aria-label={label}>
       <ThemedText type="smallBold">{label}</ThemedText>
       <View style={styles.row}>
-        {WEEK.map(({ day, short, long }) => {
+        {weekDays(t).map(({ day, short, long }) => {
           const on = value.includes(day);
           return (
             <Pressable

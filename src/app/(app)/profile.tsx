@@ -8,13 +8,15 @@ import { Screen } from '@/components/ui/screen';
 import { StoreProfileForm } from '@/features/profile/store-profile-form';
 import { UserProfileForm } from '@/features/profile/user-profile-form';
 import { useMyProfile, useStore } from '@/hooks/queries';
+import { useT } from '@/i18n/language-provider';
 
 export default function ProfileScreen() {
+  const { t } = useT();
   const { session } = useSession();
 
   return (
     <Screen>
-      <AppHeader title="Profile" />
+      <AppHeader title={t('profile.title')} />
       {session?.role === 'store' ? <StoreProfile storeId={session.accountId} /> : <UserProfile />}
     </Screen>
   );

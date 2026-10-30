@@ -11,9 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { ReviewsList } from '@/features/reviews/reviews-list';
 import { useStores } from '@/hooks/queries';
+import { useT } from '@/i18n/language-provider';
 
 /** `/reviews?storeId=…` shows any store's reviews; a signed-in store without the param sees its own. */
 export default function ReviewsScreen() {
+  const { t } = useT();
   const { storeId: param } = useLocalSearchParams<{ storeId?: string }>();
   const { session } = useSession();
   const storeId = param || (session?.role === 'store' ? session.accountId : undefined);
@@ -32,12 +34,12 @@ export default function ReviewsScreen() {
           storeId={storeId}
           header={
             <View style={styles.header}>
-              <AppHeader title="Reviews" />
+              <AppHeader title={t('reviewsPage.title')} />
               <View style={styles.nameRow}>
                 <ThemedText type="default" style={styles.name}>
-                  {name ?? 'Store'}
+                  {name ?? t('reviewsPage.store')}
                 </ThemedText>
-                <Button label="← Dashboard" variant="secondary" size="sm" onPress={() => router.navigate('/dashboard')} />
+                <Button label={t('app.backToDashboard')} variant="secondary" size="sm" onPress={() => router.navigate('/dashboard')} />
               </View>
             </View>
           }

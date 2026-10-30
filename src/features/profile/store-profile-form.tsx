@@ -5,18 +5,20 @@ import { errorMessage } from '@/api';
 import { USE_REAL_API } from '@/api/config';
 import { Banner, type BannerMessage } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { ImageField, UPLOADS_OFF_HINT } from '@/components/ui/image-field';
+import { ImageField } from '@/components/ui/image-field';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { StoreMap } from '@/features/profile/store-map';
 import { useUpdateStoreProfile } from '@/hooks/queries';
 import type { Store, StoreProfile } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
+import type { MessageKey } from '@/i18n/messages';
 
 type TextKey = Exclude<keyof StoreProfile, 'lat' | 'lng' | 'photoUrl'>;
 
 type Field = {
   key: TextKey;
-  label: string;
+  label: MessageKey;
   multiline?: boolean;
   numeric?: boolean;
   url?: boolean;
@@ -25,16 +27,17 @@ type Field = {
 };
 
 const FIELDS: Field[] = [
-  { key: 'address', label: 'Address' },
-  { key: 'pin', label: 'PIN code', numeric: true },
-  { key: 'city', label: 'City' },
-  { key: 'state', label: 'State', localOnly: true },
-  { key: 'country', label: 'Country' },
-  { key: 'mapUrl', label: 'Map link', url: true },
-  { key: 'bio', label: 'Bio', multiline: true },
+  { key: 'address', label: 'profile.address' },
+  { key: 'pin', label: 'profile.pin', numeric: true },
+  { key: 'city', label: 'profile.city' },
+  { key: 'state', label: 'profile.state', localOnly: true },
+  { key: 'country', label: 'profile.country' },
+  { key: 'mapUrl', label: 'profile.mapLink', url: true },
+  { key: 'bio', label: 'profile.bio', multiline: true },
 ];
 
 export function StoreProfileForm({ store }: { store: Store }) {
+  const { t } = useT();
   const [draft, setDraft] = useState(store.profile);
   const [errors, setErrors] = useState<Partial<Record<TextKey, string>>>({});
   const [message, setMessage] = useState<BannerMessage | null>(null);
@@ -44,9 +47,9 @@ export function StoreProfileForm({ store }: { store: Store }) {
     const pin = draft.pin.trim();
     const mapUrl = draft.mapUrl?.trim();
     const next = {
-      pin: !pin || /^\d{4,10}$/.test(pin) ? undefined : 'PIN code should be 4–10 digits.',
+      pin: !pin || /^\d{4,10}$/.test(pin) ? undefined : t('profile.pinInvalid'),
       mapUrl:
-        !mapUrl || /^https?:\/\/\S+$/.test(mapUrl) ? undefined : 'Enter a link starting with https://',
+        !mapUrl || /^https?:\/\/\S+$/.test(mapUrl) ? undefined : t('profile.linkInvalid'),
     };
     setErrors(next);
     if (next.pin || next.mapUrl) return;
@@ -54,7 +57,7 @@ export function StoreProfileForm({ store }: { store: Store }) {
       Object.entries(draft).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v]),
     ) as StoreProfile;
     update.mutate(trimmed, {
-      onSuccess: () => setMessage({ type: 'success', text: 'Profile saved.' }),
+      onSuccess: () => setMessage({ type: 'success', text: t('profile.saved') }),
       onError: (e) => setMessage({ type: 'error', text: errorMessage(e) }),
     });
   };
@@ -64,7 +67,7 @@ export function StoreProfileForm({ store }: { store: Store }) {
       <StoreMap name={store.name} profile={store.profile} />
       <Banner message={message} />
       <ImageField
-        label="Store photo"
+        label={t('profile.storePhoto')}
         kind="store"
         value={draft.photoUrl}
         onChange={(photoUrl) => {
@@ -74,14 +77,14 @@ export function StoreProfileForm({ store }: { store: Store }) {
         disabled={!store.uploadsEnabled}
         hint={
           store.uploadsEnabled
-            ? 'Shown on your store card and to customers who pick your store. Save to keep it.'
-            : UPLOADS_OFF_HINT
+            ? t('app.storePhotoHint')
+            : t('upload.off')
         }
       />
       {FIELDS.map((field) => (
         <TextField
           key={field.key}
-          label={field.label}
+          label={t(field.label)}
           value={draft[field.key] ?? ''}
           onChangeText={(value) => {
             setDraft((d) => ({ ...d, [field.key]: value }));
@@ -95,13 +98,13 @@ export function StoreProfileForm({ store }: { store: Store }) {
           editable={!(USE_REAL_API && field.localOnly)}
           hint={
             USE_REAL_API && field.localOnly
-              ? "Can't be changed yet — the server doesn't support it."
+              ? t('hint.readOnly')
               : undefined
           }
         />
       ))}
       <View style={styles.actions}>
-        <Button label="Save" variant="success" onPress={save} loading={update.isPending} />
+        <Button label={t('common.save')} variant="success" onPress={save} loading={update.isPending} />
       </View>
     </View>
   );

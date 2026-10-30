@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { errorMessage } from '@/api';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { ImageField, UPLOADS_OFF_HINT } from '@/components/ui/image-field';
+import { ImageField } from '@/components/ui/image-field';
 import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { TextField } from '@/components/ui/text-field';
@@ -12,6 +12,7 @@ import { Spacing } from '@/constants/theme';
 import { useCreateService, useProductTypes, useUpdateService } from '@/hooks/queries';
 import { validateService } from '@/lib/services';
 import type { StoreService } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 type ServiceFormModalProps = {
   storeId: string;
@@ -42,6 +43,7 @@ export function ServiceFormModal({
   onClose,
   onSaved,
 }: ServiceFormModalProps) {
+  const { t } = useT();
   const productTypes = useProductTypes();
   const [productType, setProductType] = useState<string | null>(service?.productType ?? null);
   // A removed type the item still uses stays selectable.
@@ -67,7 +69,7 @@ export function ServiceFormModal({
   };
 
   const save = () => {
-    const next = validateService(draft);
+    const next = validateService(draft, t);
     setErrors(next);
     if (Object.values(next).some(Boolean)) return;
     const input = {
@@ -85,33 +87,33 @@ export function ServiceFormModal({
   return (
     <Sheet
       visible
-      title={service ? `Edit ${item}` : `Add ${item}`}
+      title={service ? t('items.editTitle', { item }) : t('items.addTitle', { item })}
       onClose={onClose}
       footer={
         <View style={styles.actions}>
-          <Button label="Cancel" variant="secondary" onPress={onClose} />
-          <Button label="Save" variant="success" loading={mutation.isPending} onPress={save} />
+          <Button label={t('common.cancel')} variant="secondary" onPress={onClose} />
+          <Button label={t('common.save')} variant="success" loading={mutation.isPending} onPress={save} />
         </View>
       }>
       <Banner message={mutation.isError ? { type: 'error', text: errorMessage(mutation.error) } : null} />
-      <TextField label="Name" value={draft.name} onChangeText={set('name')} error={errors.name} />
+      <TextField label={t('profile.name')} value={draft.name} onChangeText={set('name')} error={errors.name} />
       <TextField
-        label="Description"
+        label={t('booking.description')}
         value={draft.description}
         onChangeText={set('description')}
-        placeholder="Shown under the name"
+        placeholder={t('app.shownUnderName')}
         multiline
       />
       {isProductStore && typeNames.length ? (
         <Select
-          label="Product type"
+          label={t('items.productType')}
           value={productType ?? ''}
-          options={[{ label: 'None', value: '' }, ...typeNames.map((name) => ({ label: name, value: name }))]}
+          options={[{ label: t('items.noType'), value: '' }, ...typeNames.map((name) => ({ label: name, value: name }))]}
           onChange={(value) => setProductType(value || null)}
         />
       ) : null}
       <TextField
-        label="Price (₹)"
+        label={t('items.price')}
         value={draft.price}
         onChangeText={set('price')}
         error={errors.price}
@@ -119,15 +121,15 @@ export function ServiceFormModal({
         placeholder="0"
       />
       <ImageField
-        label="Photo"
+        label={t('items.photo')}
         kind="item"
         value={draft.imageUrl.trim()}
         onChange={set('imageUrl')}
         disabled={!uploadsEnabled}
-        hint={uploadsEnabled ? 'Optional. A placeholder is shown without one.' : UPLOADS_OFF_HINT}
+        hint={uploadsEnabled ? t('items.photoHint') : t('upload.off')}
       />
       <TextField
-        label="Or paste an image link"
+        label={t('items.imageLink')}
         value={draft.imageUrl}
         onChangeText={set('imageUrl')}
         error={errors.imageUrl}
@@ -137,13 +139,13 @@ export function ServiceFormModal({
         placeholder="https://…"
       />
       <TextField
-        label="Limit per booking"
+        label={t('items.limit')}
         value={draft.maxQty}
         onChangeText={set('maxQty')}
         error={errors.maxQty}
         keyboardType="number-pad"
-        placeholder={`Default (${defaultMaxQty})`}
-        hint={`How many of this ${item} one booking can include. Leave empty for the store default.`}
+        placeholder={t('items.limitDefault', { count: defaultMaxQty })}
+        hint={t('items.limitHint', { item })}
       />
     </Sheet>
   );

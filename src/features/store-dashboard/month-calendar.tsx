@@ -3,10 +3,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { MONTHS, parseDateKey, WEEKDAYS } from '@/lib/date';
-import { countNoun } from '@/lib/order-types';
+import { formatDayLong, formatMonthYear, parseDateKey, weekdayNames } from '@/lib/date';
+import { countLabel } from '@/lib/order-types';
 import { monthGrid, slotState } from '@/lib/slots';
 import type { DateKey } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 type MonthCalendarProps = {
   year: number;
@@ -35,6 +36,7 @@ export function MonthCalendar({
   onPrev,
   onNext,
 }: MonthCalendarProps) {
+  const { t, language } = useT();
   const cells = monthGrid(year, month);
   const weeks = Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
 
@@ -42,16 +44,16 @@ export function MonthCalendar({
     <View style={styles.container}>
       <View style={styles.header}>
         <ThemedText style={styles.monthLabel}>
-          {MONTHS[month]}, {year}
+          {formatMonthYear(year, month, language)}
         </ThemedText>
         <View style={styles.arrows}>
-          <ArrowButton label="Previous month" glyph="‹" onPress={onPrev} />
-          <ArrowButton label="Next month" glyph="›" onPress={onNext} />
+          <ArrowButton label={t('calendar.previous')} glyph="‹" onPress={onPrev} />
+          <ArrowButton label={t('calendar.next')} glyph="›" onPress={onNext} />
         </View>
       </View>
 
       <View style={styles.week}>
-        {WEEKDAYS.map((d) => (
+        {weekdayNames(language).map((d) => (
           <ThemedText key={d} type="smallBold" themeColor="textSecondary" style={styles.weekday}>
             {d}
           </ThemedText>
@@ -118,16 +120,20 @@ function DayCell({
   isSelected,
   onPress,
 }: DayCellProps) {
+  const { t, language } = useT();
   const theme = useTheme();
   const { day } = parseDateKey(date);
   const state = count ? slotState(count, capacity) : 'ok';
   const pillColor = { ok: theme.success, full: theme.warning, over: theme.danger }[state];
-  const stateLabel = state === 'ok' ? '' : state === 'full' ? ', full' : ', over capacity';
+  const stateLabel = state === 'ok' ? '' : `, ${t(state === 'full' ? 'schedule.full' : 'app.overCapacity')}`;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${date}, ${count ?? 0} ${countNoun(isDarkStore, count ?? 0)}${stateLabel}${isToday ? ', today' : ''}`}
+      accessibilityLabel={`${t(isToday ? 'calendar.dayLabelToday' : 'calendar.dayLabel', {
+        day: formatDayLong(date, language),
+        count: countLabel(t, isDarkStore, count ?? 0),
+      })}${stateLabel}`}
       accessibilityState={{ selected: isSelected }}
       onPress={onPress}
       style={({ pressed }) => [

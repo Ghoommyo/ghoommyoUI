@@ -12,6 +12,7 @@ import { Spacing } from '@/constants/theme';
 import { useAddresses, useDeleteAddress, useSaveAddress } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import type { SavedAddress } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 const MAX_ADDRESS_LENGTH = 500;
 const MAX_LABEL_LENGTH = 40;
@@ -19,6 +20,7 @@ const MAX_ADDRESSES = 20;
 
 /** The customer's saved delivery addresses: list, add, edit and delete. */
 export function AddressBook() {
+  const { t } = useT();
   const theme = useTheme();
   const addresses = useAddresses();
   const remove = useDeleteAddress();
@@ -33,14 +35,14 @@ export function AddressBook() {
       <View style={styles.header}>
         <View style={styles.flex}>
           <ThemedText type="smallBold" accessibilityRole="header">
-            Saved addresses
+            {t('addresses.saved')}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Where stores deliver Porter orders and make home visits.
+            {t('addresses.intro')}
           </ThemedText>
         </View>
         <Button
-          label="Add address"
+          label={t('addresses.addTitle')}
           disabled={full}
           onPress={() => {
             setMessage(null);
@@ -50,7 +52,7 @@ export function AddressBook() {
       </View>
       {full ? (
         <ThemedText type="small" themeColor="textSecondary">
-          You can save up to {MAX_ADDRESSES} addresses. Delete one to add another.
+          {t('addresses.full', { count: MAX_ADDRESSES })}
         </ThemedText>
       ) : null}
       <Banner message={remove.isError ? { type: 'error', text: errorMessage(remove.error) } : message} />
@@ -61,8 +63,7 @@ export function AddressBook() {
         <Banner message={{ type: 'error', text: errorMessage(addresses.error) }} />
       ) : !addresses.data?.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-          No saved addresses yet. Add one here, or tick &quot;Save this address&quot; when you book a Porter
-          order or a home visit.
+          {t('addresses.empty')}
         </ThemedText>
       ) : (
         addresses.data.map((address) => (
@@ -71,20 +72,20 @@ export function AddressBook() {
             <ThemedText>{address.address}</ThemedText>
             <View style={styles.rowActions}>
               <Button
-                label="Edit"
+                label={t('common.edit')}
                 variant="secondary"
                 size="sm"
-                accessibilityLabel={`Edit ${address.label || 'address'}`}
+                accessibilityLabel={t('app.editNamed', { name: address.label || t('profile.address') })}
                 onPress={() => {
                   setMessage(null);
                   setEditing(address);
                 }}
               />
               <Button
-                label="Delete"
+                label={t('common.delete')}
                 variant="danger"
                 size="sm"
-                accessibilityLabel={`Delete ${address.label || 'address'}`}
+                accessibilityLabel={t('app.deleteNamed', { name: address.label || t('profile.address') })}
                 loading={remove.isPending && remove.variables === address.id}
                 onPress={() => {
                   setMessage(null);
@@ -101,23 +102,23 @@ export function AddressBook() {
           address={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={() => {
-            setMessage({ type: 'success', text: editing === 'new' ? 'Address added.' : 'Address saved.' });
+            setMessage({ type: 'success', text: editing === 'new' ? t('addresses.added') : t('addresses.savedMessage') });
             setEditing(null);
           }}
         />
       ) : null}
       <ConfirmModal
         visible={!!deleting}
-        title="Delete this address?"
-        message={`${deleting?.label || deleting?.address.slice(0, 60) || ''} will be removed. Bookings keep the address they were made with.`}
-        confirmLabel="Delete"
+        title={t('addresses.deleteTitle')}
+        message={t('addresses.deleteMessage', { name: deleting?.label || deleting?.address.slice(0, 60) || '' })}
+        confirmLabel={t('common.delete')}
         destructive
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           const address = deleting!;
           setDeleting(null);
           remove.mutate(address.id, {
-            onSuccess: () => setMessage({ type: 'success', text: 'Address deleted.' }),
+            onSuccess: () => setMessage({ type: 'success', text: t('addresses.deleted') }),
           });
         }}
       />
@@ -135,6 +136,7 @@ function AddressFormSheet({
   onClose(): void;
   onSaved(): void;
 }) {
+  const { t } = useT();
   const save = useSaveAddress();
   const [label, setLabel] = useState(address?.label ?? '');
   const [text, setText] = useState(address?.address ?? '');
@@ -142,11 +144,11 @@ function AddressFormSheet({
 
   const submit = () => {
     const next = {
-      label: label.trim().length > MAX_LABEL_LENGTH ? `Use at most ${MAX_LABEL_LENGTH} characters.` : undefined,
+      label: label.trim().length > MAX_LABEL_LENGTH ? t('book.addressTooLong', { count: MAX_LABEL_LENGTH }) : undefined,
       address: !text.trim()
-        ? 'Address is required.'
+        ? t('addresses.required')
         : text.trim().length > MAX_ADDRESS_LENGTH
-          ? `Use at most ${MAX_ADDRESS_LENGTH} characters.`
+          ? t('book.addressTooLong', { count: MAX_ADDRESS_LENGTH })
           : undefined,
     };
     setErrors(next);
@@ -157,34 +159,34 @@ function AddressFormSheet({
   return (
     <Sheet
       visible
-      title={address ? 'Edit address' : 'Add address'}
+      title={address ? t('addresses.editTitle') : t('addresses.addTitle')}
       onClose={onClose}
       footer={
         <View style={styles.actions}>
-          <Button label="Cancel" variant="secondary" onPress={onClose} />
-          <Button label="Save" variant="success" loading={save.isPending} onPress={submit} />
+          <Button label={t('common.cancel')} variant="secondary" onPress={onClose} />
+          <Button label={t('common.save')} variant="success" loading={save.isPending} onPress={submit} />
         </View>
       }>
       <Banner message={save.isError ? { type: 'error', text: errorMessage(save.error) } : null} />
       <TextField
-        label="Label"
+        label={t('addresses.label')}
         value={label}
         onChangeText={(value) => {
           setLabel(value);
           setErrors((e) => ({ ...e, label: undefined }));
         }}
-        placeholder="Home, Office…"
-        hint="Optional. Shown in the address list when you book."
+        placeholder={t('addresses.labelPlaceholder')}
+        hint={t('addresses.labelHint')}
         error={errors.label}
       />
       <TextField
-        label="Address"
+        label={t('profile.address')}
         value={text}
         onChangeText={(value) => {
           setText(value);
           setErrors((e) => ({ ...e, address: undefined }));
         }}
-        placeholder="House or flat, street, area, city, PIN code"
+        placeholder={t('book.addressPlaceholder')}
         error={errors.address}
         multiline
       />

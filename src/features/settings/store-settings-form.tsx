@@ -13,22 +13,21 @@ import { Spacing } from '@/constants/theme';
 import { useServiceTypes, useStoreCategories, useUpdateStoreSettings } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { timeOptions, toMinutes } from '@/lib/date';
-import { catalogWords, ORDER_TYPE_LABEL, orderTypeChoices } from '@/lib/order-types';
+import { catalogLabels, orderTypeChoices, orderTypeLabel } from '@/lib/order-types';
 import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH } from '@/lib/service-types';
-import type { CatalogType, LimitUnit, Store, StoreSettings } from '@/types/domain';
+import type { CatalogType, LimitUnit, OrderType, Store, StoreSettings } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
+import type { Translate } from '@/i18n/translate';
 
-// Fields the Ghoomo API can't store yet are shown read-only in API mode (see API_DEFAULTS).
-const NOT_SAVED_HINT = "Can't be changed yet — the server doesn't support it.";
-
-const LIMIT_UNITS: SelectOption<LimitUnit>[] = [
-  { label: 'Day', value: 'day' },
-  { label: 'Hour', value: 'hour' },
-  { label: 'Half hour', value: 'halfHour' },
+const limitUnits = (t: Translate): SelectOption<LimitUnit>[] => [
+  { label: t('storeSettings.unitDay'), value: 'day' },
+  { label: t('storeSettings.unitHour'), value: 'hour' },
+  { label: t('storeSettings.unitHalfHour'), value: 'halfHour' },
 ];
 
-const CATALOG_TYPES: SelectOption<CatalogType>[] = [
-  { label: 'Product', value: 'product' },
-  { label: 'Service', value: 'service' },
+const catalogTypes = (t: Translate): SelectOption<CatalogType>[] => [
+  { label: t('catalog.Product'), value: 'product' },
+  { label: t('catalog.Service'), value: 'service' },
 ];
 
 // The "Other" choice in the type-of-service and category lists; the store then types its own.
@@ -62,11 +61,11 @@ type FieldErrors = Partial<
 const choiceValue = (value: string | null, other: string) => (value === OTHER ? cleanServiceType(other) : value);
 
 /** The error for the Other text box, if Other is chosen. */
-function otherError(value: string | null, other: string, noun: string) {
+function otherError(value: string | null, other: string, noun: string, t: Translate) {
   if (value !== OTHER) return undefined;
-  if (!cleanServiceType(other)) return `Enter your ${noun}.`;
+  if (!cleanServiceType(other)) return t('storeSettings.enterOther', { noun });
   return cleanServiceType(other).length > MAX_SERVICE_TYPE_LENGTH
-    ? `Use at most ${MAX_SERVICE_TYPE_LENGTH} characters.`
+    ? t('book.addressTooLong', { count: MAX_SERVICE_TYPE_LENGTH })
     : undefined;
 }
 
@@ -91,13 +90,15 @@ const toDraft = (store: Store): Draft => ({
 const positiveInt = (value: string) => (/^\d+$/.test(value) && Number(value) >= 1 ? Number(value) : null);
 
 export function StoreSettingsForm({ store }: { store: Store }) {
+  const { t, language } = useT();
   const [draft, setDraft] = useState(() => toDraft(store));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<BannerMessage | null>(null);
   const update = useUpdateStoreSettings(store.id);
   const serviceTypes = useServiceTypes();
   const storeCategories = useStoreCategories();
-  const words = catalogWords(draft.catalogType);
+  const words = catalogLabels(t, draft.catalogType);
+  const typeNames = (types: OrderType[]) => types.map((type) => orderTypeLabel(t, type));
   const isService = draft.catalogType === 'service';
   // Visit types (Book table, Pickup, Book appointment) need the store's address.
   const offered = orderTypeChoices({ ...draft, profile: store.profile });
@@ -113,20 +114,20 @@ export function StoreSettingsForm({ store }: { store: Store }) {
     const maxPerBooking = positiveInt(draft.maxPerBooking);
     const maxServiceQty = positiveInt(draft.maxServiceQty);
     const next: FieldErrors = {
-      name: draft.name.trim() ? undefined : 'Store name is required.',
-      maxPerSlot: maxPerSlot ? undefined : 'Enter a whole number of at least 1.',
-      maxPerBooking: maxPerBooking ? undefined : 'Enter a whole number of at least 1.',
-      maxServiceQty: maxServiceQty ? undefined : 'Enter a whole number of at least 1.',
+      name: draft.name.trim() ? undefined : t('validation.storeNameRequired'),
+      maxPerSlot: maxPerSlot ? undefined : t('storeSettings.wholeNumber'),
+      maxPerBooking: maxPerBooking ? undefined : t('storeSettings.wholeNumber'),
+      maxServiceQty: maxServiceQty ? undefined : t('storeSettings.wholeNumber'),
       closeAt:
         toMinutes(draft.closeAt) > toMinutes(draft.openAt)
           ? undefined
-          : 'Closing time must be after opening time.',
-      openDays: draft.openDays.length ? undefined : 'Choose at least one day.',
+          : t('storeSettings.closeAfterOpen'),
+      openDays: draft.openDays.length ? undefined : t('storeSettings.chooseDay'),
       // Service stores need a type of service, product stores a category (each may be their own: Other).
-      serviceType: !isService || draft.serviceType ? undefined : 'Choose the type of service you provide.',
-      otherType: isService ? otherError(draft.serviceType, draft.otherType, 'type of service') : undefined,
-      storeCategory: isService || draft.storeCategory ? undefined : "Choose your store's category.",
-      otherCategory: isService ? undefined : otherError(draft.storeCategory, draft.otherCategory, 'category'),
+      serviceType: !isService || draft.serviceType ? undefined : t('storeSettings.chooseServiceType'),
+      otherType: isService ? otherError(draft.serviceType, draft.otherType, t('storeSettings.nounServiceType'), t) : undefined,
+      storeCategory: isService || draft.storeCategory ? undefined : t('storeSettings.chooseCategory'),
+      otherCategory: isService ? undefined : otherError(draft.storeCategory, draft.otherCategory, t('storeSettings.nounCategory'), t),
     };
     setErrors(next);
     if (!maxPerSlot || !maxPerBooking || !maxServiceQty || Object.values(next).some(Boolean)) return;
@@ -155,7 +156,7 @@ export function StoreSettingsForm({ store }: { store: Store }) {
             storeCategory: saved.storeCategory,
             otherCategory: '',
           }));
-          setMessage({ type: 'success', text: 'Settings saved.' });
+          setMessage({ type: 'success', text: t('storeSettings.saved') });
         },
         onError: (error) => setMessage({ type: 'error', text: errorMessage(error) }),
       },
@@ -172,17 +173,17 @@ export function StoreSettingsForm({ store }: { store: Store }) {
     <View style={styles.form}>
       <Banner message={message} />
       <TextField
-        label="Store name"
+        label={t('storeSettings.storeName')}
         value={draft.name}
         onChangeText={(v) => set('name', v)}
         error={errors.name}
         editable={!USE_REAL_API}
-        hint={USE_REAL_API ? NOT_SAVED_HINT : undefined}
+        hint={USE_REAL_API ? t('hint.readOnly') : undefined}
       />
       <View style={styles.row}>
         <View style={styles.flex}>
           <TextField
-            label={draft.isDarkStore ? 'Max orders per unit' : 'Max limit per unit'}
+            label={draft.isDarkStore ? t('storeSettings.maxOrdersPerUnit') : t('storeSettings.maxPerUnit')}
             value={draft.maxPerSlot}
             onChangeText={(v) => set('maxPerSlot', v)}
             error={errors.maxPerSlot}
@@ -190,67 +191,67 @@ export function StoreSettingsForm({ store }: { store: Store }) {
           />
         </View>
         <Select
-          label="Limit unit"
+          label={t('storeSettings.limitUnit')}
           value={draft.limitUnit}
-          options={LIMIT_UNITS}
+          options={limitUnits(t)}
           onChange={(v) => set('limitUnit', v)}
           style={styles.flex}
         />
       </View>
       <TextField
-        label="Max limit per booking"
+        label={t('storeSettings.maxPerBooking')}
         value={draft.maxPerBooking}
         onChangeText={(v) => set('maxPerBooking', v)}
         error={errors.maxPerBooking}
         keyboardType="number-pad"
         editable={!USE_REAL_API}
-        hint={USE_REAL_API ? NOT_SAVED_HINT : undefined}
+        hint={USE_REAL_API ? t('hint.readOnly') : undefined}
       />
       <View style={styles.row}>
         <Select
-          label="Open at"
+          label={t('storeSettings.openAt')}
           value={draft.openAt}
-          options={timeOptions(0, 1410)}
+          options={timeOptions(0, 1410, t, language)}
           onChange={(v) => set('openAt', v)}
           style={styles.flex}
         />
         <Select
-          label="Close at"
+          label={t('storeSettings.closeAt')}
           value={draft.closeAt}
-          options={timeOptions(30, 1440)}
+          options={timeOptions(30, 1440, t, language)}
           onChange={(v) => set('closeAt', v)}
           error={errors.closeAt}
           style={styles.flex}
         />
       </View>
       <DayPicker
-        label="Open days"
+        label={t('storeSettings.openDays')}
         value={draft.openDays}
         onChange={(v) => {
           set('openDays', v);
           setErrors((e) => ({ ...e, openDays: undefined }));
         }}
         error={errors.openDays}
-        hint="Customers can only book on these days."
+        hint={t('storeSettings.openDaysHint')}
       />
       <View style={styles.field}>
         <Select
-          label="Store type"
+          label={t('storeSettings.storeType')}
           value={draft.catalogType}
-          options={CATALOG_TYPES}
+          options={catalogTypes(t)}
           onChange={(v) => set('catalogType', v)}
         />
         <ThemedText type="small" themeColor="textSecondary">
-          Customers see {words.items} and can choose: {offered.map((type) => ORDER_TYPE_LABEL[type]).join(', ')}.
+          {t('storeSettings.typeHint', { items: words.items, types: typeNames(offered).join(', ') })}
           {needAddress.length
-            ? ` Add your address in Profile to offer ${needAddress.map((type) => ORDER_TYPE_LABEL[type]).join(' and ')}.`
+            ? ` ${t('storeSettings.typeHintAddress', { types: typeNames(needAddress).join(t('storeSettings.and')) })}`
             : ''}
         </ThemedText>
       </View>
       {isService ? (
         <ListChoice
-          label="Type of service"
-          otherLabel="Your type of service"
+          label={t('storeSettings.typeOfService')}
+          otherLabel={t('storeSettings.yourTypeOfService')}
           names={serviceTypes.data}
           loading={serviceTypes.isLoading}
           loadError={serviceTypes.isError ? errorMessage(serviceTypes.error) : undefined}
@@ -270,8 +271,8 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         />
       ) : (
         <ListChoice
-          label="Category"
-          otherLabel="Your category"
+          label={t('storeSettings.category')}
+          otherLabel={t('storeSettings.yourCategory')}
           names={storeCategories.data}
           loading={storeCategories.isLoading}
           loadError={storeCategories.isError ? errorMessage(storeCategories.error) : undefined}
@@ -291,30 +292,30 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         />
       )}
       <TextField
-        label={`Max of each ${words.item} per booking`}
+        label={t('storeSettings.maxEach', { item: words.item })}
         value={draft.maxServiceQty}
         onChangeText={(v) => set('maxServiceQty', v)}
         error={errors.maxServiceQty}
         keyboardType="number-pad"
-        hint={`1 means one of each ${words.item}. Used for ${words.items} without their own limit.`}
+        hint={t('storeSettings.maxEachHint', { item: words.item, items: words.items })}
       />
       <SwitchRow
-        label="Auto approve"
-        description="Accept new bookings without reviewing them."
+        label={t('storeSettings.autoApprove')}
+        description={t('storeSettings.autoApproveHint')}
         value={draft.autoApprove}
         onChange={(v) => set('autoApprove', v)}
       />
       <SwitchRow
-        label="Dark store"
-        description={`No dine-in. Customers don't say how many people are coming, slots count orders, and they can only choose ${
-          draft.catalogType === 'service' ? 'Book home visit' : 'Pickup or Porter'
-        }.`}
+        label={t('storeSettings.darkStore')}
+        description={t(
+          draft.catalogType === 'service' ? 'storeSettings.darkStoreHintService' : 'storeSettings.darkStoreHintProduct',
+        )}
         value={draft.isDarkStore}
         onChange={(v) => set('isDarkStore', v)}
       />
       <View style={styles.actions}>
-        <Button label="Cancel" variant="secondary" onPress={cancel} />
-        <Button label="Save" variant="success" onPress={save} loading={update.isPending} />
+        <Button label={t('common.cancel')} variant="secondary" onPress={cancel} />
+        <Button label={t('common.save')} variant="success" onPress={save} loading={update.isPending} />
       </View>
     </View>
   );
@@ -369,6 +370,7 @@ function ListChoice({
   error,
   otherError,
 }: ListChoiceProps) {
+  const { t } = useT();
   const listed = names ?? [];
   const options: SelectOption<string>[] = [...(saved && !listed.includes(saved) ? [saved] : []), ...listed].map(
     (name) => ({ label: name, value: name }),
@@ -378,15 +380,15 @@ function ListChoice({
       <View style={styles.field}>
         <Select
           label={label}
-          placeholder={loading ? 'Loading…' : 'Choose one'}
+          placeholder={loading ? t('storeSettings.loading') : t('storeSettings.chooseOne')}
           value={value ?? undefined}
-          options={[...options, { label: 'Other…', value: OTHER }]}
+          options={[...options, { label: t('storeSettings.other'), value: OTHER }]}
           onChange={onChange}
           error={error}
         />
         {!error ? (
           <ThemedText type="small" themeColor="textSecondary">
-            {loadError ? `The list couldn't be loaded: ${loadError}` : 'Shown to customers with your store.'}
+            {loadError ? t('storeSettings.listFailed', { error: loadError }) : t('storeSettings.listHint')}
           </ThemedText>
         ) : null}
       </View>
@@ -396,7 +398,7 @@ function ListChoice({
           value={other}
           onChangeText={onOther}
           error={otherError}
-          hint="It's added to the list for every store."
+          hint={t('storeSettings.otherHint')}
         />
       ) : null}
     </>

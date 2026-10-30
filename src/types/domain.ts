@@ -1,3 +1,5 @@
+import type { Language } from '@/i18n/languages';
+
 export type Role = 'user' | 'store';
 
 export type LimitUnit = 'day' | 'hour' | 'halfHour';
@@ -27,6 +29,8 @@ export interface Session {
   name?: string;
   /** Store login code (Ghoomo `loc_code`); owner endpoints are addressed by it. */
   locCode?: string;
+  /** The language saved on the account at sign-in; null when it has none yet. */
+  language?: Language | null;
 }
 
 /** Users sign in with their email; stores with their email or store name. */

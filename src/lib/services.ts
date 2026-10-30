@@ -1,3 +1,4 @@
+import type { Translate } from '@/i18n/translate';
 import type { BookedService, ServicePicks, StoreService } from '@/types/domain';
 
 const INR = new Intl.NumberFormat('en-IN', {
@@ -72,19 +73,19 @@ export function replaceServicesBlock(description: string, oldBlock: string, newB
 const SERVICE_IMAGE_PATTERN = /^https?:\/\/\S+$/;
 
 /** Field errors for a service form; the server applies the same rules. */
-export function validateService(input: { name: string; price: string; imageUrl: string; maxQty: string }) {
+export function validateService(input: { name: string; price: string; imageUrl: string; maxQty: string }, t: Translate) {
   const price = Number(input.price);
   return {
-    name: input.name.trim() ? undefined : 'Name is required.',
+    name: input.name.trim() ? undefined : t('book.nameRequired'),
     price:
-      input.price.trim() && Number.isFinite(price) && price >= 0 ? undefined : 'Enter a price of 0 or more.',
+      input.price.trim() && Number.isFinite(price) && price >= 0 ? undefined : t('items.priceInvalid'),
     imageUrl:
       !input.imageUrl.trim() || SERVICE_IMAGE_PATTERN.test(input.imageUrl.trim())
         ? undefined
-        : 'Enter a link starting with https://',
+        : t('profile.linkInvalid'),
     maxQty:
       !input.maxQty.trim() || (/^\d+$/.test(input.maxQty.trim()) && Number(input.maxQty) >= 1)
         ? undefined
-        : 'Leave empty, or enter a whole number of at least 1.',
+        : t('items.limitInvalid'),
   };
 }

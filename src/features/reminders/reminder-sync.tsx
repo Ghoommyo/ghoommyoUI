@@ -11,6 +11,7 @@ import {
 } from '@/features/reminders/reminders';
 import { useReminderSettings } from '@/features/reminders/use-reminder-settings';
 import { useReminderBookings } from '@/hooks/queries';
+import { useT } from '@/i18n/language-provider';
 import type { Role } from '@/types/domain';
 
 /**
@@ -33,6 +34,7 @@ export function ReminderSync() {
 }
 
 function AccountReminders({ role }: { role: Role }) {
+  const { language } = useT();
   const settings = useReminderSettings();
   const enabled = !!settings.data?.enabled;
   const bookings = useReminderBookings(enabled);
@@ -41,10 +43,11 @@ function AccountReminders({ role }: { role: Role }) {
   useEffect(() => {
     if (!settings.data) return;
     if (enabled && !bookings.data) return; // wait for the bookings
-    syncReminders(bookings.data ?? [], settings.data, role).catch((error) =>
+    // A new language rewrites the scheduled reminders in it.
+    syncReminders(bookings.data ?? [], settings.data, role, language).catch((error) =>
       console.warn('Scheduling reminders failed', error),
     );
-  }, [settings.data, enabled, bookings.data, role]);
+  }, [settings.data, enabled, bookings.data, role, language]);
 
   // Bookings can be accepted while the app is in the background: refresh on return.
   useEffect(() => {

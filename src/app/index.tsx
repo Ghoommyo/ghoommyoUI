@@ -8,24 +8,19 @@ import { Brand } from '@/components/ui/brand';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Spacing } from '@/constants/theme';
+import { useT } from '@/i18n/language-provider';
+import type { MessageKey } from '@/i18n/messages';
+import { LanguagePicker } from '@/components/language-picker';
 
-const FEATURES = [
-  {
-    title: 'Book appointments',
-    body: 'Pick a store, choose a time slot and reserve your visit in a few taps.',
-  },
-  {
-    title: 'Skip the crowd',
-    body: 'See how many people are visiting each hour before you go.',
-  },
-  {
-    title: 'Stores near you',
-    body: 'Find nearby stores, then order or schedule with them directly.',
-  },
+const FEATURES: { title: MessageKey; body: MessageKey }[] = [
+  { title: 'intro.bookTitle', body: 'intro.bookBody' },
+  { title: 'intro.crowdTitle', body: 'intro.crowdBody' },
+  { title: 'intro.nearTitle', body: 'intro.nearBody' },
 ];
 
 /** First-launch intro explaining the app; skipped once dismissed. */
 export default function IntroScreen() {
+  const { t } = useT();
   const { hasSeenIntro, markIntroSeen } = useSession();
 
   if (hasSeenIntro) return <Redirect href="/dashboard" />;
@@ -40,22 +35,23 @@ export default function IntroScreen() {
       <View style={styles.hero}>
         <Brand size={48} />
         <ThemedText type="default" themeColor="textSecondary" style={styles.tagline}>
-          Scheduling and booking for the places you visit.
+          {t('intro.tagline')}
         </ThemedText>
       </View>
 
       {FEATURES.map((feature) => (
         <ThemedView key={feature.title} type="backgroundElement" style={styles.card}>
           <ThemedText type="smallBold" style={styles.cardTitle}>
-            {feature.title}
+            {t(feature.title)}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {feature.body}
+            {t(feature.body)}
           </ThemedText>
         </ThemedView>
       ))}
 
-      <Button label="Get started" onPress={start} fullWidth />
+      <Button label={t('intro.start')} onPress={start} fullWidth />
+      <LanguagePicker />
     </Screen>
   );
 }

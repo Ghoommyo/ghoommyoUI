@@ -11,13 +11,15 @@ import { Spacing } from '@/constants/theme';
 import { ServiceFormModal } from '@/features/settings/service-form-modal';
 import { useDeleteService, useStoreServices } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { catalogWords, storeTypeLabel } from '@/lib/order-types';
+import { catalogLabels, storeTypeLabel } from '@/lib/order-types';
 import { formatPrice } from '@/lib/services';
 import type { Store, StoreService } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 /** The store's products or services, which users can add to a booking: list, add, edit, delete. */
 export function StoreServices({ store }: { store: Store }) {
-  const words = catalogWords(store.catalogType);
+  const { t } = useT();
+  const words = catalogLabels(t, store.catalogType);
   const theme = useTheme();
   const services = useStoreServices(store.id);
   const remove = useDeleteService(store.id);
@@ -35,16 +37,16 @@ export function StoreServices({ store }: { store: Store }) {
           </ThemedText>
           {storeTypeLabel(store) ? (
             <ThemedText type="small">
-              {store.catalogType === 'service' ? 'Type of service' : 'Category'}:{' '}
+              {store.catalogType === 'service' ? t('items.typeOfService') : t('items.category')}:{' '}
               <ThemedText type="smallBold">{storeTypeLabel(store)}</ThemedText>
             </ThemedText>
           ) : null}
           <ThemedText type="small" themeColor="textSecondary">
-            Customers can add these to a booking.
+            {t('items.whatCustomersPick')}
           </ThemedText>
         </View>
         <Button
-          label={`Add ${words.item}`}
+          label={t('items.add', { item: words.item })}
           onPress={() => {
             setMessage(null);
             setEditing('new');
@@ -60,7 +62,7 @@ export function StoreServices({ store }: { store: Store }) {
         <Banner message={{ type: 'error', text: errorMessage(services.error) }} />
       ) : !services.data?.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-          No {words.items} yet. Tap Add {words.item} to offer one.
+          {t('items.empty', { items: words.items })}
         </ThemedText>
       ) : (
         services.data.map((service, i) => (
@@ -82,24 +84,25 @@ export function StoreServices({ store }: { store: Store }) {
                 </ThemedText>
               ) : null}
               <ThemedText type="small" themeColor="textSecondary">
-                Up to {service.maxQty} per booking{service.maxQtyOverride == null ? ' (store default)' : ''}
+                {t('items.upTo', { count: service.maxQty })}
+                {service.maxQtyOverride == null ? t('items.default') : ''}
               </ThemedText>
               <View style={styles.rowActions}>
               <Button
-                label="Edit"
+                label={t('common.edit')}
                 variant="secondary"
                 size="sm"
-                accessibilityLabel={`Edit ${service.name}`}
+                accessibilityLabel={t('app.editNamed', { name: service.name })}
                 onPress={() => {
                   setMessage(null);
                   setEditing(service);
                 }}
               />
               <Button
-                label="Delete"
+                label={t('common.delete')}
                 variant="danger"
                 size="sm"
-                accessibilityLabel={`Delete ${service.name}`}
+                accessibilityLabel={t('app.deleteNamed', { name: service.name })}
                 loading={remove.isPending && remove.variables === service.id}
                 onPress={() => {
                   setMessage(null);
@@ -123,23 +126,23 @@ export function StoreServices({ store }: { store: Store }) {
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
             setEditing(null);
-            setMessage({ type: 'success', text: `${saved.name} saved.` });
+            setMessage({ type: 'success', text: t('app.itemSaved', { name: saved.name }) });
           }}
         />
       ) : null}
 
       <ConfirmModal
         visible={!!deleting}
-        title={`Delete ${deleting?.name ?? words.item}?`}
-        message="Customers won't be able to pick it any more. Existing bookings keep it."
-        confirmLabel="Delete"
+        title={t('items.deleteTitle', { item: words.item })}
+        message={t('items.deleteMessage', { name: deleting?.name ?? '' })}
+        confirmLabel={t('common.delete')}
         destructive
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           const service = deleting!;
           setDeleting(null);
           remove.mutate(service.id, {
-            onSuccess: () => setMessage({ type: 'success', text: `${service.name} deleted.` }),
+            onSuccess: () => setMessage({ type: 'success', text: t('app.itemDeleted', { name: service.name }) }),
             onError: (error) => setMessage({ type: 'error', text: errorMessage(error) }),
           });
         }}

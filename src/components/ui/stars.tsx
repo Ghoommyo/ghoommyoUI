@@ -4,16 +4,18 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { RatingSummary } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 /** Read-only stars, e.g. ★★★★☆ for 4 (rounded to the nearest whole star). */
 export function Stars({ value, size = 16 }: { value: number; size?: number }) {
+  const { t } = useT();
   const theme = useTheme();
   const filled = Math.round(value);
   return (
     <View
       accessible
       accessibilityRole="image"
-      accessibilityLabel={`${Number.isInteger(value) ? value : value.toFixed(1)} out of 5 stars`}
+      accessibilityLabel={t('stars.outOf5', { value: Number.isInteger(value) ? value : value.toFixed(1) })}
       style={styles.row}>
       {[1, 2, 3, 4, 5].map((n) => (
         <ThemedText key={n} style={{ fontSize: size, lineHeight: size * 1.25, color: n <= filled ? theme.warning : theme.border }}>
@@ -26,11 +28,12 @@ export function Stars({ value, size = 16 }: { value: number; size?: number }) {
 
 /** Compact `★ 4.3 (12)`, or "No reviews". */
 export function RatingBadge({ rating, color }: { rating: RatingSummary; color?: string }) {
+  const { t } = useT();
   const theme = useTheme();
   if (!rating.count || rating.average === null) {
     return (
       <ThemedText type="small" style={{ color: color ?? theme.textSecondary }}>
-        No reviews
+        {t('stars.noReviews')}
       </ThemedText>
     );
   }
@@ -38,7 +41,7 @@ export function RatingBadge({ rating, color }: { rating: RatingSummary; color?: 
     <ThemedText
       type="small"
       style={{ color: color ?? theme.textSecondary }}
-      accessibilityLabel={`${rating.average.toFixed(1)} out of 5 from ${rating.count} reviews`}>
+      accessibilityLabel={t('stars.badgeLabel', { value: rating.average.toFixed(1), count: rating.count })}>
       <ThemedText type="small" style={{ color: theme.warning }}>
         ★
       </ThemedText>{' '}
@@ -49,6 +52,7 @@ export function RatingBadge({ rating, color }: { rating: RatingSummary; color?: 
 
 /** Pick 1–5 stars. Each star is a 44pt radio button. */
 export function StarInput({ value, onChange, label, error }: { value: number; onChange(stars: number): void; label: string; error?: string }) {
+  const { t } = useT();
   const theme = useTheme();
   return (
     <View style={styles.input}>
@@ -59,7 +63,7 @@ export function StarInput({ value, onChange, label, error }: { value: number; on
             key={stars}
             accessibilityRole="radio"
             accessibilityState={{ checked: value === stars }}
-            accessibilityLabel={`${stars} ${stars === 1 ? 'star' : 'stars'}`}
+            accessibilityLabel={t('stars.count', { count: stars })}
             onPress={() => onChange(stars)}
             style={({ pressed }) => [styles.star, pressed && styles.pressed]}>
             <ThemedText style={{ fontSize: 32, lineHeight: 40, color: stars <= value ? theme.warning : theme.border }}>★</ThemedText>

@@ -28,6 +28,7 @@ import {
   asksPeople as asksPeopleFor,
   needsDeliveryAddress,
   visitsStore,
+  catalogLabels,
   catalogWords,
   defaultOrderType,
   orderTypeOptions,
@@ -42,7 +43,7 @@ import {
   servicesDescription,
 } from '@/lib/services';
 import type { OrderType, ServicePicks, Store, StoreService } from '@/types/domain';
-import { INACTIVE_USER_HINT } from '@/lib/account-status';
+import { useT } from '@/i18n/language-provider';
 
 const MOBILE_PATTERN = /^\+?\d{10,15}$/;
 
@@ -57,6 +58,7 @@ type FieldErrors = {
 const MAX_ADDRESS_LENGTH = 500;
 
 export default function BookingScreen() {
+  const { t } = useT();
   const params = useLocalSearchParams<{ storeId: string; slotStart: string; services?: string }>();
   const { storeId, slotStart } = params;
   const picks = parseServices(params.services);
@@ -79,10 +81,10 @@ export default function BookingScreen() {
         <Banner
           message={{
             type: 'error',
-            text: store.error ? errorMessage(store.error) : 'This booking link is incomplete.',
+            text: store.error ? errorMessage(store.error) : t('book.incompleteLink'),
           }}
         />
-        <Button label="Back to dashboard" onPress={() => router.back()} />
+        <Button label={t('book.backToDashboard')} onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -127,11 +129,14 @@ function BookingForm({
   initialMobile,
   inactive,
 }: BookingFormProps) {
+  const { t, language } = useT();
   const [picks, setPicks] = useState(initialPicks);
   const [servicesOpen, setServicesOpen] = useState(false);
   // Picked items that still exist, numbered as in the store's list and clamped to their limits.
   const picked = resolvePicks(services, picks);
-  const words = catalogWords(store.catalogType);
+  const words = catalogLabels(t, store.catalogType);
+  // The description's block heading stays English (the server and edits match it).
+  const heading = catalogWords(store.catalogType).Items;
   const [name, setName] = useState(initialName);
   const [mobile, setMobile] = useState(initialMobile);
   const [people, setPeople] = useState<number>();
@@ -143,7 +148,7 @@ function BookingForm({
   const [description, setDescription] = useState(() =>
     servicesDescription(
       resolvePicks(services, initialPicks),
-      catalogWords(store.catalogType).Items,
+      heading,
     ),
   );
   // Porter / home visit: a saved address (newest by default) or Other with its own text.
@@ -166,17 +171,17 @@ function BookingForm({
   const confirm = () => {
     const cleanMobile = mobile.replace(/[\s-]/g, '');
     const next: FieldErrors = {
-      name: name.trim() ? undefined : 'Name is required.',
-      mobile: MOBILE_PATTERN.test(cleanMobile) ? undefined : 'Enter a valid mobile number.',
-      people: !asksPeople || people ? undefined : 'Choose how many people are coming.',
+      name: name.trim() ? undefined : t('book.nameRequired'),
+      mobile: MOBILE_PATTERN.test(cleanMobile) ? undefined : t('booking.invalidMobile'),
+      people: !asksPeople || people ? undefined : t('book.choosePeople'),
       // The server rejects bookings without a description.
-      description: description.trim() ? undefined : 'Description is required.',
+      description: description.trim() ? undefined : t('book.descriptionRequired'),
       address: !needsAddress
         ? undefined
         : !deliveryAddress
-          ? 'Enter the address the store should come to.'
+          ? t('book.enterAddress')
           : deliveryAddress.length > MAX_ADDRESS_LENGTH
-            ? `Use at most ${MAX_ADDRESS_LENGTH} characters.`
+            ? t('book.addressTooLong', { count: MAX_ADDRESS_LENGTH })
             : undefined,
     };
     setErrors(next);
@@ -220,8 +225,8 @@ function BookingForm({
     setDescription((d) =>
       replaceServicesBlock(
         d,
-        servicesDescription(picked, words.Items),
-        servicesDescription(nextPicked, words.Items),
+        servicesDescription(picked, heading),
+        servicesDescription(nextPicked, heading),
       ),
     );
     setErrors((e) => ({ ...e, description: undefined }));
@@ -235,7 +240,7 @@ function BookingForm({
         <ThemedText type="smallBold" themeColor="textSecondary">
           {store.name}
         </ThemedText>
-        <ThemedText type="subtitle">{formatSlotStart(slotStart)}</ThemedText>
+        <ThemedText type="subtitle">{formatSlotStart(slotStart, language)}</ThemedText>
       </View>
 
       <Banner
@@ -243,9 +248,9 @@ function BookingForm({
           createBooking.isError
             ? { type: 'error', text: errorMessage(createBooking.error) }
             : inactive
-              ? { type: 'error', text: INACTIVE_USER_HINT }
+              ? { type: 'error', text: t('hint.inactiveUser') }
               : servicesError
-              ? { type: 'error', text: `Your ${words.items} couldn't be loaded: ${servicesError}` }
+              ? { type: 'error', text: t('app.itemsFailed', { items: words.items, error: servicesError }) }
               : null
         }
       />
@@ -263,7 +268,7 @@ function BookingForm({
                 </ThemedText>
               ) : null}
               <ThemedText type="small" themeColor="textSecondary">
-                You can select {words.items} by clicking here
+                {t('book.selectHint', { items: words.items })}
               </ThemedText>
             </View>
             <Button
@@ -291,7 +296,7 @@ function BookingForm({
           {picked.length ? (
             <View style={[styles.serviceLine, styles.total, { borderTopColor: theme.border }]}>
               <ThemedText type="smallBold" style={styles.flex}>
-                Total
+                {t('booking.total')}
               </ThemedText>
               <ThemedText type="smallBold">
                 {formatPrice(picked.reduce((sum, s) => sum + s.price * s.qty, 0))}
@@ -302,7 +307,7 @@ function BookingForm({
       ) : null}
 
       <TextField
-        label="Name"
+        label={t('book.name')}
         value={name}
         onChangeText={setName}
         error={errors.name}
@@ -310,7 +315,7 @@ function BookingForm({
         textContentType="name"
       />
       <TextField
-        label="Contact (mobile)"
+        label={t('booking.contactMobile')}
         value={mobile}
         onChangeText={setMobile}
         error={errors.mobile}
@@ -319,9 +324,9 @@ function BookingForm({
         textContentType="telephoneNumber"
       />
       <Select
-        label="Order type"
+        label={t('booking.orderType')}
         value={orderType}
-        options={orderTypeOptions(store)}
+        options={orderTypeOptions(store, t)}
         onChange={(next) => {
           setOrderType(next);
           // The people or address field may have just gone away.
@@ -351,8 +356,8 @@ function BookingForm({
       ) : null}
       {asksPeople ? (
         <Select
-          label="How many people are coming"
-          placeholder={`1 to ${store.maxPerBooking}`}
+          label={t('booking.howManyPeople')}
+          placeholder={t('book.peopleRange', { max: store.maxPerBooking })}
           value={people}
           options={Array.from({ length: store.maxPerBooking }, (_, i) => ({
             label: String(i + 1),
@@ -366,22 +371,22 @@ function BookingForm({
         />
       ) : null}
       <TextField
-        label="Description"
+        label={t('booking.description')}
         value={description}
         onChangeText={(value) => {
           setDescription(value);
           setErrors((e) => ({ ...e, description: undefined }));
         }}
-        placeholder="Anything the store should know"
-        hint="Tell the store what you need."
+        placeholder={t('book.descriptionPlaceholder')}
+        hint={t('book.descriptionHint')}
         error={errors.description}
         multiline
       />
 
       <View style={styles.actions}>
-        <Button label="Cancel" variant="secondary" onPress={() => setConfirmCancel(true)} />
+        <Button label={t('common.cancel')} variant="secondary" onPress={() => setConfirmCancel(true)} />
         <Button
-          label="Confirm"
+          label={t('book.confirm')}
           variant="success"
           onPress={confirm}
           loading={createBooking.isPending}
@@ -402,10 +407,10 @@ function BookingForm({
       ) : null}
       <ConfirmModal
         visible={confirmCancel}
-        title="Discard this booking?"
-        message="Nothing will be saved."
-        confirmLabel="Discard"
-        cancelLabel="Keep editing"
+        title={t('book.discardTitle')}
+        message={t('book.discardMessage')}
+        confirmLabel={t('book.discard')}
+        cancelLabel={t('book.keepEditing')}
         destructive
         onCancel={() => setConfirmCancel(false)}
         onConfirm={() => {

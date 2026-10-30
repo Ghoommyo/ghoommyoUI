@@ -5,9 +5,10 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatTime } from '@/lib/date';
-import { countNoun } from '@/lib/order-types';
+import { countLabel, countWord } from '@/lib/order-types';
 import { slotState } from '@/lib/slots';
 import type { LimitUnit, Slot, SlotStart } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 type SlotGridProps = {
   slots: Slot[];
@@ -32,6 +33,7 @@ export function SlotGrid({
   now,
   onSelect,
 }: SlotGridProps) {
+  const { t, language } = useT();
   const [width, setWidth] = useState(0);
   const columns = limitUnit === 'day' ? 1 : width >= 520 ? 4 : 3;
   const itemWidth = width ? (width - GAP * (columns - 1)) / columns : 0;
@@ -43,7 +45,7 @@ export function SlotGrid({
           <SlotBlock
             key={slot.start}
             slot={slot}
-            label={limitUnit === 'day' ? 'All day' : formatTime(slot.start.slice(11, 16))}
+            label={limitUnit === 'day' ? t('schedule.allDay') : formatTime(slot.start.slice(11, 16), language)}
             max={maxPerSlot}
             isDarkStore={isDarkStore}
             width={itemWidth}
@@ -77,6 +79,7 @@ function SlotBlock({
   past,
   onPress,
 }: SlotBlockProps) {
+  const { t } = useT();
   const theme = useTheme();
   const state = slotState(slot.count, max);
   const palette = {
@@ -84,12 +87,12 @@ function SlotBlock({
     full: [theme.slotFull, theme.slotFullBorder],
     over: [theme.slotOver, theme.slotOverBorder],
   }[state];
-  const stateLabel = state === 'ok' ? '' : state === 'full' ? ', full' : ', over capacity';
+  const stateLabel = state === 'ok' ? '' : `, ${t(state === 'full' ? 'schedule.full' : 'app.overCapacity')}`;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}, ${slot.count} ${countNoun(isDarkStore, slot.count)}${stateLabel}`}
+      accessibilityLabel={`${label}, ${countLabel(t, isDarkStore, slot.count)}${stateLabel}`}
       accessibilityState={{ selected, disabled: past }}
       disabled={past}
       onPress={onPress}
@@ -108,7 +111,7 @@ function SlotBlock({
       </ThemedText>
       <ThemedText style={[styles.count, { color: theme.cardText }]}>{slot.count}</ThemedText>
       <ThemedText type="small" style={{ color: theme.cardTextSecondary }}>
-        {countNoun(isDarkStore, 2)}
+        {countWord(t, isDarkStore)}
       </ThemedText>
     </Pressable>
   );

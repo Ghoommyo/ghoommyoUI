@@ -1,6 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import type { Language } from '@/i18n/languages';
+import { currentLanguage, translate, type Translate } from '@/i18n/translate';
 import { formatSlotStart, slotStartToDate } from '@/lib/date';
 import type { Booking, ReminderSettings, Role } from '@/types/domain';
 
@@ -40,10 +42,25 @@ export async function setupReminders() {
       shouldShowList: true,
     }),
   });
+  await labelReminders(currentLanguage());
+  if (Platform.OS === 'android') {
+    await Notifications.registerTaskAsync(ACTION_TASK).catch((e) => console.warn('Reminder action task not registered', e));
+  }
+  // An action tap that launched the app (cold start) is handled once here.
+  const last = await Notifications.getLastNotificationResponseAsync();
+  if (last) {
+    await handleReminderResponse(last);
+    await Notifications.clearLastNotificationResponseAsync();
+  }
+}
+
+/** The Android alarm channel and the Snooze/Close buttons, in `language`. Called again when it changes. */
+async function labelReminders(language: Language) {
+  const t: Translate = (key, vars) => translate(language, key, vars);
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(CHANNEL, {
-      name: 'Booking reminders',
-      description: 'Alarms before your accepted bookings',
+      name: t('reminder.channel'),
+      description: t('reminder.channelHint'),
       importance: Notifications.AndroidImportance.MAX,
       sound: SOUND,
       vibrationPattern: [0, 400, 250, 400, 250, 400],
@@ -55,18 +72,13 @@ export async function setupReminders() {
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     });
   }
-  if (Platform.OS === 'android') {
-    await Notifications.registerTaskAsync(ACTION_TASK).catch((e) => console.warn('Reminder action task not registered', e));
-  }
-  // An action tap that launched the app (cold start) is handled once here.
-  const last = await Notifications.getLastNotificationResponseAsync();
-  if (last) {
-    await handleReminderResponse(last);
-    await Notifications.clearLastNotificationResponseAsync();
-  }
   await Notifications.setNotificationCategoryAsync(CATEGORY, [
-    { identifier: SNOOZE_ACTION, buttonTitle: `Snooze ${SNOOZE_MINUTES} min`, options: { opensAppToForeground: false } },
-    { identifier: CLOSE_ACTION, buttonTitle: 'Close', options: { opensAppToForeground: false, isDestructive: true } },
+    {
+      identifier: SNOOZE_ACTION,
+      buttonTitle: t('reminder.snooze', { minutes: SNOOZE_MINUTES }),
+      options: { opensAppToForeground: false },
+    },
+    { identifier: CLOSE_ACTION, buttonTitle: t('reminder.close'), options: { opensAppToForeground: false, isDestructive: true } },
   ]);
 }
 
@@ -90,15 +102,24 @@ async function cancelScheduledReminders() {
   );
 }
 
-function content(booking: Booking, role: Role, hoursBefore: number): Notifications.NotificationContentInput {
-  const when = formatSlotStart(booking.slotStart);
-  const lead = `in ${hoursBefore} ${hoursBefore === 1 ? 'hour' : 'hours'}`;
+function content(
+  booking: Booking,
+  role: Role,
+  hoursBefore: number,
+  language: Language,
+): Notifications.NotificationContentInput {
+  const when = formatSlotStart(booking.slotStart, language);
+  const lead = translate(language, 'reminder.lead', { count: hoursBefore });
   return {
-    title: 'Booking reminder',
+    title: translate(language, 'reminder.title'),
     body:
       role === 'store'
-        ? `${booking.name || 'A customer'} is booked for ${when} (${lead}).`
-        : `Your visit to ${booking.storeName} is at ${when} (${lead}).`,
+        ? translate(language, 'reminder.storeBody', {
+            name: booking.name || translate(language, 'reminder.aCustomer'),
+            when,
+            lead,
+          })
+        : translate(language, 'reminder.userBody', { store: booking.storeName, when, lead }),
     sound: SOUND,
     categoryIdentifier: CATEGORY,
     data: { kind: KIND, bookingId: booking.id },
@@ -108,10 +129,12 @@ function content(booking: Booking, role: Role, hoursBefore: number): Notificatio
 
 /**
  * Replaces the scheduled reminders: one per accepted booking, `hoursBefore` its start, for the
- * soonest bookings whose reminder time is still ahead. Nothing is scheduled when reminders are off.
+ * soonest bookings whose reminder time is still ahead, written in `language`. Nothing is scheduled
+ * when reminders are off.
  */
-export async function syncReminders(bookings: Booking[], settings: ReminderSettings, role: Role) {
+export async function syncReminders(bookings: Booking[], settings: ReminderSettings, role: Role, language: Language) {
   await setupReminders();
+  await labelReminders(language);
   await cancelScheduledReminders();
   if (!settings.enabled) return 0;
   const now = Date.now() + 5_000;
@@ -123,7 +146,7 @@ export async function syncReminders(bookings: Booking[], settings: ReminderSetti
     .slice(0, MAX_SCHEDULED);
   for (const { booking, at } of due) {
     await Notifications.scheduleNotificationAsync({
-      content: content(booking, role, settings.hoursBefore),
+      content: content(booking, role, settings.hoursBefore, language),
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(at), channelId: CHANNEL },
     });
   }
@@ -145,7 +168,7 @@ export async function handleReminderResponse(response: Notifications.Notificatio
   if (response.actionIdentifier === SNOOZE_ACTION) {
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: request.content.title ?? 'Booking reminder',
+        title: request.content.title ?? translate(currentLanguage(), 'reminder.title'),
         body: request.content.body ?? '',
         sound: SOUND,
         categoryIdentifier: CATEGORY,

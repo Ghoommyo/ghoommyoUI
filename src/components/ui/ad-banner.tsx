@@ -7,12 +7,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { queryKeys, useAppConfig } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { AD_REQUEST, BANNER_ID, startAds } from '@/lib/ads';
+import { useT } from '@/i18n/language-provider';
 
 /**
  * A Google banner pinned under the screen's content, while the admin has ads switched on.
  * It takes no space until an ad has loaded, and none if it fails (offline, nothing to show).
  */
 export function AdBanner() {
+  const { t } = useT();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -41,7 +43,7 @@ export function AdBanner() {
   if (!enabled || !ready || !BANNER_ID) return null;
   return (
     <View
-      accessibilityLabel="Advertisement"
+      accessibilityLabel={t('common.advertisement')}
       style={loaded ? [styles.shown, { paddingBottom: insets.bottom, backgroundColor: theme.background }] : styles.loading}>
       <BannerAd
         unitId={BANNER_ID}

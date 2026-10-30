@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n/language-provider';
 
 // react-native-web can leave an animating modal stuck on screen if navigation happens mid-animation.
 const ANIMATION = Platform.OS === 'web' ? 'none' : 'slide';
@@ -34,6 +35,7 @@ type SheetProps = {
 
 /** Modal with a title, a close button, a scrolling body and an optional fixed footer. */
 export function Sheet({ visible, title, onClose, footer, headerAction, variant = 'sheet', children }: SheetProps) {
+  const { t } = useT();
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const wide = width >= WIDE;
@@ -53,7 +55,7 @@ export function Sheet({ visible, title, onClose, footer, headerAction, variant =
           variant === 'panel' ? styles.alignEnd : wide ? styles.alignCenter : styles.alignBottom,
         ]}>
         {/* Tapping outside the sheet closes it. */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.close')} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={[containerStyle, { backgroundColor: theme.backgroundElement }]}>
@@ -65,7 +67,7 @@ export function Sheet({ visible, title, onClose, footer, headerAction, variant =
               {headerAction}
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={t('common.close')}
                 onPress={onClose}
                 hitSlop={8}
                 style={({ pressed }) => [styles.close, pressed && { backgroundColor: theme.backgroundSelected }]}>

@@ -3,9 +3,11 @@ import { useState } from 'react';
 import type { ImageStyle, StyleProp } from 'react-native';
 
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n/language-provider';
 
 /** A store's photo; renders nothing when it has none or the link is broken. */
 export function StorePhoto({ uri, name, style }: { uri: string; name: string; style: StyleProp<ImageStyle> }) {
+  const { t } = useT();
   const theme = useTheme();
   // Remember which link failed, so a new link is tried again.
   const [failed, setFailed] = useState<string | null>(null);
@@ -15,7 +17,7 @@ export function StorePhoto({ uri, name, style }: { uri: string; name: string; st
       source={{ uri }}
       onError={() => setFailed(uri)}
       contentFit="cover"
-      accessibilityLabel={`${name} photo`}
+      accessibilityLabel={t('common.photoOf', { name })}
       accessibilityIgnoresInvertColors
       style={[{ backgroundColor: theme.backgroundSelected }, style]}
     />

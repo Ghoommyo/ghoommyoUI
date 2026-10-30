@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n/language-provider';
 
 // react-native-web can leave a fading modal stuck on screen if navigation happens mid-fade.
 const MODAL_ANIMATION = Platform.OS === 'web' ? 'none' : 'fade';
@@ -24,13 +25,16 @@ export function ConfirmModal({
   visible,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   destructive = false,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const { t } = useT();
   const theme = useTheme();
+  confirmLabel ??= t('app.confirm');
+  cancelLabel ??= t('common.cancel');
 
   return (
     <Modal visible={visible} transparent animationType={MODAL_ANIMATION} onRequestClose={onCancel}>

@@ -28,6 +28,8 @@ import type {
   UserProfile,
   SavedAddress,
 } from '@/types/domain';
+import type { Language } from '@/i18n/languages';
+import { say } from '@/i18n/translate';
 
 export class ApiError extends Error {
   constructor(
@@ -48,6 +50,8 @@ export interface Api {
   /** Checks the code; returns the `verificationToken` for `signup` or `resetPassword`. */
   verifyEmailCode(input: EmailCodeRequest & { code: string }): Promise<string>;
   resetPassword(input: PasswordReset): Promise<void>;
+  /** Saves the screens' language on the signed-in account (user or store). */
+  setLanguage(language: Language): Promise<void>;
 
   listStores(): Promise<Store[]>;
   getStore(storeId: string): Promise<Store>;
@@ -124,5 +128,5 @@ export function getAuthToken() {
 
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
-  return 'Something went wrong. Please try again.';
+  return say('error.generic');
 }

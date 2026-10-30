@@ -8,18 +8,15 @@ import { Stars } from '@/components/ui/stars';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useStoreReviews } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { MONTHS } from '@/lib/date';
-
-const formatDate = (iso: string) => {
-  const d = new Date(iso);
-  return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`;
-};
+import { formatDate } from '@/lib/date';
+import { useT } from '@/i18n/language-provider';
 
 /**
  * A store's reviews with the rating summary. Loads 10 at a time; the next 10 load as the end of
  * the list comes into view. It is the screen's scroller, so `header` goes above the summary.
  */
 export function ReviewsList({ storeId, header }: { storeId: string; header: ReactElement }) {
+  const { t, language } = useT();
   const theme = useTheme();
   const reviews = useStoreReviews(storeId);
   const summary = reviews.data?.pages[0]?.summary;
@@ -44,7 +41,7 @@ export function ReviewsList({ storeId, header }: { storeId: string; header: Reac
               <View style={styles.summaryText}>
                 <Stars value={summary.average} size={22} />
                 <ThemedText type="small" themeColor="textSecondary">
-                  {summary.count} {summary.count === 1 ? 'review' : 'reviews'}
+                  {t('reviews.count', { count: summary.count })}
                 </ThemedText>
               </View>
             </View>
@@ -58,7 +55,7 @@ export function ReviewsList({ storeId, header }: { storeId: string; header: Reac
               {item.name}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              {formatDate(item.createdAt)}
+              {formatDate(new Date(item.createdAt), language)}
             </ThemedText>
           </View>
           <Stars value={item.stars} size={14} />
@@ -70,7 +67,7 @@ export function ReviewsList({ storeId, header }: { storeId: string; header: Reac
           <ActivityIndicator style={styles.empty} />
         ) : reviews.isError ? null : (
           <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-            No reviews yet.
+            {t('reviews.none')}
           </ThemedText>
         )
       }
@@ -79,7 +76,7 @@ export function ReviewsList({ storeId, header }: { storeId: string; header: Reac
           <ActivityIndicator style={styles.footer} />
         ) : list.length > 0 && !reviews.hasNextPage ? (
           <ThemedText type="small" themeColor="textSecondary" style={styles.footer}>
-            That&apos;s all the reviews.
+            {t('reviews.allShown')}
           </ThemedText>
         ) : null
       }

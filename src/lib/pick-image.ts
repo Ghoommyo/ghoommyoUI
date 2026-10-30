@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
 import type { PickedImage } from '@/types/domain';
+import { say } from '@/i18n/translate';
 
 /** Longest side of an uploaded picture; the server accepts up to 2 MB. */
 const MAX_SIDE = 1280;
@@ -16,7 +17,7 @@ const QUALITY = 0.8;
 export async function pickImage(source: 'library' | 'camera'): Promise<PickedImage | null> {
   if (source === 'camera') {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) throw new Error('Allow camera access in Settings to take a photo.');
+    if (!permission.granted) throw new Error(say('app.cameraPermission'));
   }
   const options: ImagePicker.ImagePickerOptions = { mediaTypes: 'images', quality: 1 };
   let result: ImagePicker.ImagePickerResult;
@@ -29,9 +30,7 @@ export async function pickImage(source: 'library' | 'camera'): Promise<PickedIma
           // which works everywhere and offers the same photos.
           await ImagePicker.launchImageLibraryAsync({ ...options, legacy: true });
   } catch {
-    throw new Error(
-      source === 'camera' ? "Couldn't open the camera on this device." : "Couldn't open your photos on this device.",
-    );
+    throw new Error(say(source === 'camera' ? 'app.cameraFailed' : 'app.photosFailed'));
   }
   const asset = result.canceled ? null : result.assets?.[0];
   if (!asset) return null;
