@@ -54,6 +54,11 @@ export function LanguageProvider({ children }: PropsWithChildren) {
   return <LanguageContext value={value}>{children}</LanguageContext>;
 }
 
+/** The chosen language, or English outside the provider (e.g. an error screen above it). */
+export function useLanguage(): Language {
+  return use(LanguageContext)?.language ?? 'en';
+}
+
 /** `t('key', vars)` in the chosen language, plus the language itself. */
 export function useT() {
   const value = use(LanguageContext);

@@ -3,6 +3,7 @@
   "main": "index.ts",
   "version": "1.0.0",
   "dependencies": {
+    "@expo-google-fonts/noto-sans-devanagari": "^0.4.2",
     "@expo/ui": "~57.0.21",
     "@noble/hashes": "^1.8.0",
     "@tanstack/react-query": "^5.104.1",

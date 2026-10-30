@@ -64,8 +64,8 @@ export function AppHeader({ title }: { title?: string }) {
               { backgroundColor: theme.primary },
               pressed && styles.pressed,
             ]}>
-            <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-              ≡ Menu
+            <ThemedText type="smallBold" style={{ color: theme.onPrimary }} numberOfLines={1}>
+              ≡ {t('common.menu')}
             </ThemedText>
           </Pressable>
         </View>

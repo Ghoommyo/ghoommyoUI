@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Fonts } from '@/constants/theme';
 
 /** The app icon and the bold wide wordmark, as in the logo sheet. */
 export function Brand({ size = 40 }: { size?: number }) {
@@ -28,6 +29,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   wordmark: {
+    // The system font in every language (on Android, Hindi and Marathi text otherwise switches to Noto Sans Devanagari).
+    fontFamily: Platform.OS === 'android' ? Fonts.sans : undefined,
     fontWeight: 900,
     letterSpacing: 4,
   },
