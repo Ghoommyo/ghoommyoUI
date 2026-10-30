@@ -16,7 +16,7 @@ A bad or expired signature returns 401 `{"error":"This app isn't allowed to use 
 
 | Item           | Value                                                                                                                                                     |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Base URL       | `https://ghoomyo.in/apis` (deployed; production data; the old `https://ghoommyo-eight.vercel.app/apis` still works). Local server: `http://localhost:3000/apis`. Note `/apis`, not `/api`              |
+| Base URL       | `https://www.ghoomyo.in/apis` (deployed; production data; the old `https://ghoommyo-eight.vercel.app/apis` still works). Local server: `http://localhost:3000/apis`. Note `/apis`, not `/api`              |
 | Body format    | JSON. Send `Content-Type: application/json` on POST/PUT                                                                                                   |
 | CORS           | Only the server's `ALLOWED_ORIGINS` get browser access; the phone apps send no `Origin`, so CORS doesn't apply to them. Preflight `OPTIONS` returns 204 |
 | Auth header    | `Authorization: Bearer <jwt>`. The sign-in responses return the token **already prefixed** with `Bearer `, so send the `token` string exactly as received |
@@ -53,7 +53,7 @@ Errors are JSON with **either** an `error` or a `message` key, so read both:
 ### Shell setup for the curl examples
 
 ```bash
-BASE=https://ghoomyo.in/apis   # or http://localhost:3000/apis for a local server
+BASE=https://www.ghoomyo.in/apis   # or http://localhost:3000/apis for a local server
 # After signing in, store the token exactly as returned (it already includes "Bearer "):
 USER_TOKEN="Bearer eyJ..."   # from POST /signin
 LOC_TOKEN="Bearer eyJ..."    # from POST /location/signin

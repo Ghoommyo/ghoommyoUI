@@ -32,7 +32,7 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
 ### Backend
 
 - Screens call the `Api` interface (`src/api/client.ts`) through `api` from `@/api`. Which backend that is depends on a flag in `src/api/config.ts`, set in `.env.local` (see `.env.example`). Restart `expo start` after changing it; `--clear` is safest.
-- **Default:** `api` is the Ghoomo client (below), pointed at the production API `https://ghoomyo.in/apis` (on Vercel; the website and its Privacy/Terms/Help pages are on `https://ghoomyo.in`, derived in `src/lib/site.ts`). That's the production database: test against it read-only, or with your own accounts.
+- **Default:** `api` is the Ghoomo client (below), pointed at the production API `https://www.ghoomyo.in/apis` (on Vercel; the website and its Privacy/Terms/Help pages are on `https://www.ghoomyo.in`, derived in `src/lib/site.ts`). That's the production database: test against it read-only, or with your own accounts.
 - **`EXPO_PUBLIC_USE_REAL_API=false`:** `api` is the in-memory dummy backend (`src/api/mock.ts`), which resets on every reload.
   - Seeded logins (password `password123`): user `user@ghoomyo.app`; store `store@ghoomyo.app`, which also accepts the store name `Raju Tailor` or `raju_tailor`.
   - Seeded bookings are dated relative to today.

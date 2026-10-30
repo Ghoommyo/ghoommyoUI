@@ -20,6 +20,7 @@ type Item = { label: string; href: Href; route?: string };
 const MORE: ({ label: string; href: Href; route: string } | { label: string; site: string })[] = [
   { label: 'About', href: '/about', route: 'about' },
   { label: 'Help & FAQ', site: '/help' },
+  { label: 'Support', site: '/support' },
   { label: 'Contact us', href: '/contact', route: 'contact' },
   { label: 'Privacy policy', site: '/privacy' },
   { label: 'Terms of service', site: '/terms' },
