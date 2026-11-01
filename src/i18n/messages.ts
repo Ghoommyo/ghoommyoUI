@@ -9,6 +9,7 @@ import { profile } from './messages/profile';
 import { screens } from './messages/screens';
 import { settings } from './messages/settings';
 import { shared } from './messages/shared';
+import { stores } from './messages/stores';
 
 /**
  * Every message, by key. The files in messages/ are the website's (ghoomo repo, app/i18n/messages),
@@ -25,6 +26,7 @@ export const MESSAGES = {
   ...settings,
   ...profile,
   ...screens,
+  ...stores,
   ...app,
 };
 

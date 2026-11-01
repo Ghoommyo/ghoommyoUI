@@ -11,6 +11,7 @@ import { Banner, type BannerMessage } from '@/components/ui/banner';
 import { Screen } from '@/components/ui/screen';
 import { Spacing } from '@/constants/theme';
 import { ReminderSettingsSection } from '@/features/reminders/reminder-settings-form';
+import { StoreGallery } from '@/features/settings/store-gallery';
 import { StoreServices } from '@/features/settings/store-services';
 import { StoreSettingsForm } from '@/features/settings/store-settings-form';
 import { useStore } from '@/hooks/queries';
@@ -42,6 +43,7 @@ function StoreSettings({ storeId }: { storeId: string }) {
       {store.data.inactive ? <Banner message={{ type: 'error', text: t('hint.inactiveStore') }} /> : null}
       <StoreSettingsForm store={store.data} />
       <StoreServices store={store.data} />
+      {store.data.galleryEnabled ? <StoreGallery store={store.data} /> : null}
     </>
   );
 }

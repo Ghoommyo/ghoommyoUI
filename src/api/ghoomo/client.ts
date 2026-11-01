@@ -16,15 +16,19 @@ import {
   settingsToStore,
   slotKey,
   slotsFromCalendar,
+  galleryToImage,
+  publicStoreToPage,
 } from '@/api/ghoomo/mappers';
 import type {
   GhoomoAddress,
   GhoomoAppointment,
   GhoomoCalendar,
+  GhoomoGalleryImage,
   GhoomoLocation,
   GhoomoLocationClaims,
   GhoomoNotification,
   GhoomoProfile,
+  GhoomoPublicStore,
   GhoomoReminderSettings,
   GhoomoReviewsResponse,
   GhoomoService,
@@ -46,6 +50,20 @@ type RequestOptions = {
   /** Statuses that mean "nothing there" for this call; they resolve to `null` instead of throwing. */
   emptyOn?: number[];
 };
+
+/**
+ * A query string written the way the server reads it back (`+` for spaces, `!'()*` escaped, as
+ * URLSearchParams does): the request signature covers the query exactly (Api.md §5.3a).
+ */
+export function formQuery(params: Record<string, string>): string {
+  const encode = (text: string) =>
+    encodeURIComponent(text)
+      .replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+      .replace(/%20/g, '+');
+  return Object.entries(params)
+    .map(([key, value]) => `${encode(key)}=${encode(value)}`)
+    .join('&');
+}
 
 export type GhoomoRequest = <T>(path: string, options?: RequestOptions) => Promise<T | null>;
 
@@ -322,6 +340,42 @@ export function createGhoomoApi(baseUrl: string): Api {
     async getStoreServices(storeId) {
       const res = await request<{ services: GhoomoService[] }>(`/services/${encodeURIComponent(storeId)}`);
       return (res?.services ?? []).map(serviceToStore);
+    },
+
+    async searchStores(query, cursor) {
+      const params = formQuery({ limit: '20', ...(query.trim() ? { q: query.trim() } : {}), ...(cursor ? { cursor } : {}) });
+      const res = await request<{ stores: GhoomoPublicStore[]; nextCursor: string | null }>(`/stores?${params}`);
+      return { stores: (res?.stores ?? []).map(publicStoreToPage), nextCursor: res?.nextCursor ?? null };
+    },
+
+    async getStorePage(storeId) {
+      const res = await request<{ store: GhoomoPublicStore }>(`/stores/${encodeURIComponent(storeId)}`);
+      return publicStoreToPage(res!.store);
+    },
+
+    async getGallery(storeId) {
+      const res = await request<{ images: GhoomoGalleryImage[] }>(`/stores/${encodeURIComponent(storeId)}/gallery`);
+      return (res?.images ?? []).map(galleryToImage);
+    },
+
+    async getMyGallery() {
+      const locCode = requireOwnLocCode();
+      const res = await request<{ images: GhoomoGalleryImage[] }>(`/location/${encodeURIComponent(locCode)}/gallery`);
+      return (res?.images ?? []).map(galleryToImage);
+    },
+
+    async saveGalleryImage(_storeId, input, imageId) {
+      const locCode = requireOwnLocCode();
+      const res = await request<{ image: GhoomoGalleryImage }>(
+        `/location/${encodeURIComponent(locCode)}/gallery${imageId ? `/${encodeURIComponent(imageId)}` : ''}`,
+        { method: imageId ? 'PUT' : 'POST', body: input },
+      );
+      return galleryToImage(res!.image);
+    },
+
+    async deleteGalleryImage(_storeId, imageId) {
+      const locCode = requireOwnLocCode();
+      await request(`/location/${encodeURIComponent(locCode)}/gallery/${encodeURIComponent(imageId)}`, { method: 'DELETE' });
     },
 
     async getAddresses() {

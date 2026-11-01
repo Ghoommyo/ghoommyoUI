@@ -60,7 +60,7 @@ export function daysInMonth(year: number, month: number): number {
 export const ALL_DAYS: readonly number[] = [0, 1, 2, 3, 4, 5, 6];
 // Weekday names by `Date.getDay()` (0 = Sunday).
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
-const shortDay = (t: Translate, day: number) => t(`day.${DAY_KEYS[day]}` as MessageKey);
+export const shortDay = (t: Translate, day: number) => t(`day.${DAY_KEYS[day]}` as MessageKey);
 const longDay = (t: Translate, day: number) => t(`day.${DAY_KEYS[day]}Long` as MessageKey);
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 

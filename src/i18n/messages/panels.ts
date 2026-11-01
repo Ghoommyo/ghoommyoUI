@@ -18,7 +18,6 @@ export const panels = defineMessages({
   "storePicker.select": { en: "Select a store", hi: "स्टोर चुनें", mr: "स्टोअर निवडा" },
   "storePicker.list": { en: "Stores", hi: "स्टोर", mr: "स्टोअर" },
   "storePicker.none": { en: "No stores yet.", hi: "अभी कोई स्टोर नहीं।", mr: "अजून स्टोअर नाहीत." },
-  "storePicker.seeReviews": { en: "See reviews for {name}", hi: "{name} के रिव्यू देखें", mr: "{name} चे रिव्ह्यू पाहा" },
 
   "events.coming": { en: "Coming Events", hi: "आने वाली बुकिंग", mr: "येणारी बुकिंग" },
   "events.comingEmpty": { en: "No upcoming events. Book a visit from the dashboard.", hi: "कोई आने वाली बुकिंग नहीं। डैशबोर्ड से बुक करें।", mr: "येणारी बुकिंग नाही. डॅशबोर्डवरून बुक करा." },

@@ -7,6 +7,9 @@ import { ALL_DAYS, buildSlotStarts, daysInMonth, visitorCount, weekDays } from '
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import { translate, type Translate } from '@/i18n/translate';
 import type {
+  GalleryImage,
+  OrderType,
+  StorePage,
   SavedAddress,
   AddressInput,
   AppNotification,
@@ -74,6 +77,15 @@ const accounts: Account[] = [
   },
 ];
 
+/** Every order type auto-approved (`true`) or none. */
+function approveAll(on: boolean): Record<OrderType, boolean> {
+  return { table: on, pickup: on, porter: on, appointment: on, homeVisit: on };
+}
+
+/** When the mock stores joined (the real API returns each account's creation date). */
+const MOCK_JOINED = '2026-01-15T10:00:00.000Z';
+const MAX_GALLERY_IMAGES = 20;
+
 /** Stores as kept in memory; `rating` is computed from `reviews` when they're read. */
 type StoreRecord = Omit<Store, 'rating'>;
 
@@ -84,7 +96,7 @@ const stores: StoreRecord[] = [
     maxPerSlot: 3,
     maxPerBooking: 3,
     limitUnit: 'hour',
-    autoApprove: false,
+    autoApprove: approveAll(false),
     openAt: '09:00',
     closeAt: '22:00',
     maxServiceQty: 2,
@@ -93,8 +105,10 @@ const stores: StoreRecord[] = [
     serviceType: null,
     storeCategory: null,
     openDays: [...ALL_DAYS],
-    // The admin turned picture uploads on for Raju Tailor only.
+    // The admin turned picture uploads, picture links and the gallery on for Raju Tailor only.
     uploadsEnabled: true,
+    linksEnabled: true,
+    galleryEnabled: true,
     profile: {
       address: '12 MG Road',
       pin: '452001',
@@ -105,6 +119,7 @@ const stores: StoreRecord[] = [
       lat: 22.7196,
       lng: 75.8577,
       photoUrl: '',
+      openSince: 1998,
     },
   },
   {
@@ -113,7 +128,7 @@ const stores: StoreRecord[] = [
     maxPerSlot: 2,
     maxPerBooking: 2,
     limitUnit: 'halfHour',
-    autoApprove: true,
+    autoApprove: approveAll(true),
     openAt: '10:00',
     closeAt: '19:00',
     maxServiceQty: 1,
@@ -132,6 +147,7 @@ const stores: StoreRecord[] = [
       lat: 22.7533,
       lng: 75.8937,
       photoUrl: '',
+      openSince: null,
     },
   },
   {
@@ -140,7 +156,7 @@ const stores: StoreRecord[] = [
     maxPerSlot: 1000,
     maxPerBooking: 10,
     limitUnit: 'day',
-    autoApprove: true,
+    autoApprove: approveAll(true),
     openAt: '07:00',
     closeAt: '21:00',
     maxServiceQty: 1,
@@ -161,6 +177,7 @@ const stores: StoreRecord[] = [
       lat: 22.7244,
       lng: 75.8839,
       photoUrl: '',
+      openSince: null,
     },
   },
 ];
@@ -378,6 +395,51 @@ function findStore(storeId: string): StoreRecord {
   return store;
 }
 
+/**
+ * Picture links need the admin's image-links switch; pictures uploaded on this device (local URIs),
+ * no picture and the link already saved are always fine.
+ */
+function checkImageLink(store: StoreRecord, url: string, oldUrl?: string) {
+  if (!url || url === oldUrl || !/^https?:/.test(url) || store.linksEnabled) return;
+  throw new ApiError('Image links are off for this store; upload the picture instead', 403);
+}
+
+/** A store as Explore stores and its profile page show it. */
+function toStorePage(store: StoreRecord): StorePage {
+  return {
+    id: store.id,
+    name: store.name,
+    photoUrl: store.profile.photoUrl,
+    bio: store.profile.bio,
+    openSince: store.profile.openSince,
+    joinedOn: MOCK_JOINED,
+    openAt: store.openAt,
+    closeAt: store.closeAt,
+    openDays: [...store.openDays],
+    catalogType: store.catalogType,
+    category: (store.catalogType === 'service' ? store.serviceType : store.storeCategory) ?? null,
+    isDarkStore: store.isDarkStore,
+    orderTypes: orderTypeChoices(store),
+    address: {
+      address: store.profile.address,
+      city: store.profile.city,
+      pin: store.profile.pin,
+      country: store.profile.country,
+      mapUrl: store.profile.mapUrl ?? '',
+    },
+    rating: withRating(store).rating,
+    galleryOn: Boolean(store.galleryEnabled),
+  };
+}
+
+/** Gallery pictures by store id. */
+const galleries: Record<string, GalleryImage[]> = {
+  s1: [
+    { id: 'g1', imageUrl: 'https://picsum.photos/seed/ghoomyo-tailor-1/800/600', caption: 'Our shop on MG Road' },
+    { id: 'g2', imageUrl: 'https://picsum.photos/seed/ghoomyo-tailor-2/800/600', caption: '' },
+  ],
+};
+
 function requireStoreOwner(storeId: string) {
   const account = currentAccount();
   if (account.role !== 'store' || account.id !== storeId) {
@@ -465,7 +527,7 @@ export const mockApi: Api = {
       maxPerSlot: 10,
       maxPerBooking: 4,
       limitUnit: 'hour',
-      autoApprove: false,
+      autoApprove: approveAll(false),
       openAt: '09:00',
       closeAt: '18:00',
       maxServiceQty: 1,
@@ -484,6 +546,7 @@ export const mockApi: Api = {
         lat: 22.7196,
         lng: 75.8577,
         photoUrl: '',
+        openSince: null,
       },
       uploadsEnabled: false,
     });
@@ -624,6 +687,62 @@ export const mockApi: Api = {
     return [...STANDARD_SERVICE_TYPES, ...[...addedServiceTypes].sort((a, b) => a.localeCompare(b))];
   },
 
+  async searchStores(query, cursor) {
+    await delay();
+    const q = query.trim().toLowerCase();
+    const matches = stores
+      .filter((s) => !s.inactive && s.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    const start = Number(cursor ?? 0);
+    const page = matches.slice(start, start + 20);
+    return { stores: clone(page.map(toStorePage)), nextCursor: start + 20 < matches.length ? String(start + 20) : null };
+  },
+
+  async getStorePage(storeId) {
+    await delay();
+    return clone(toStorePage(findStore(storeId)));
+  },
+
+  async getGallery(storeId) {
+    await delay();
+    return findStore(storeId).galleryEnabled ? clone(galleries[storeId] ?? []) : [];
+  },
+
+  async getMyGallery(storeId) {
+    await delay();
+    requireStoreOwner(storeId);
+    return clone(galleries[storeId] ?? []);
+  },
+
+  async saveGalleryImage(storeId, input, imageId) {
+    await delay();
+    requireStoreOwner(storeId);
+    const store = findStore(storeId);
+    if (!store.galleryEnabled) throw new ApiError("The gallery isn't turned on for this store", 403);
+    if (!input.imageUrl) throw new ApiError('imageUrl is required', 400);
+    const list = (galleries[storeId] ??= []);
+    const existing = imageId ? list.find((image) => image.id === imageId) : undefined;
+    if (imageId && !existing) throw new ApiError('Picture not found', 404);
+    checkImageLink(store, input.imageUrl, existing?.imageUrl);
+    if (existing) {
+      Object.assign(existing, { imageUrl: input.imageUrl, caption: input.caption.trim() });
+      return clone(existing);
+    }
+    if (list.length >= MAX_GALLERY_IMAGES) throw new ApiError(`The gallery holds at most ${MAX_GALLERY_IMAGES} pictures`, 400);
+    const image = { id: newId('g'), imageUrl: input.imageUrl, caption: input.caption.trim() };
+    list.push(image);
+    return clone(image);
+  },
+
+  async deleteGalleryImage(storeId, imageId) {
+    await delay();
+    requireStoreOwner(storeId);
+    const list = galleries[storeId] ?? [];
+    const index = list.findIndex((image) => image.id === imageId);
+    if (index < 0) throw new ApiError('Picture not found', 404);
+    list.splice(index, 1);
+  },
+
   async getStoreServices(storeId) {
     await delay();
     findStore(storeId);
@@ -634,6 +753,7 @@ export const mockApi: Api = {
     await delay();
     requireStoreOwner(storeId);
     const { maxQty, ...fields } = checkServiceInput(input);
+    checkImageLink(findStore(storeId), fields.imageUrl);
     const service: StoredService = { ...fields, id: newId('svc'), storeId, maxQtyOverride: maxQty };
     services.push(service);
     return clone(withMaxQty(service));
@@ -643,6 +763,7 @@ export const mockApi: Api = {
     await delay();
     const service = findOwnService(storeId, serviceId);
     const { maxQty, ...fields } = checkServiceInput(input);
+    checkImageLink(findStore(storeId), fields.imageUrl, service.imageUrl);
     Object.assign(service, fields, { maxQtyOverride: maxQty });
     return clone(withMaxQty(service));
   },
@@ -702,7 +823,7 @@ export const mockApi: Api = {
       id: newId('b'),
       storeName: store.name,
       userId: account.id,
-      status: store.autoApprove ? 'accepted' : 'pending',
+      status: store.autoApprove[input.orderType] ? 'accepted' : 'pending',
       createdAt: new Date().toISOString(),
       rating: null,
     };
@@ -710,8 +831,8 @@ export const mockApi: Api = {
     notify(
       store.id,
       booking.id,
-      store.autoApprove ? 'AUTO_ACCEPTED' : 'NEW_REQUEST',
-      `${booking.name || 'A customer'} requested a booking${store.autoApprove ? ' — auto-approved' : ''}`,
+      booking.status === 'accepted' ? 'AUTO_ACCEPTED' : 'NEW_REQUEST',
+      `${booking.name || 'A customer'} requested a booking${booking.status === 'accepted' ? ' — auto-approved' : ''}`,
     );
     return clone(booking);
   },
@@ -882,8 +1003,10 @@ export const mockApi: Api = {
       throw new ApiError('openDays must list 1 to 7 different whole numbers from 0 (Sunday) to 6 (Saturday)', 400);
     }
     Object.assign(store, settings, {
-      // Only the app admin changes this.
+      // Only the app admin changes these.
       uploadsEnabled: store.uploadsEnabled,
+      linksEnabled: store.linksEnabled,
+      galleryEnabled: store.galleryEnabled,
       openDays: [...settings.openDays].sort((a, b) => a - b),
       serviceType: settings.serviceType && addServiceType(settings.serviceType),
       storeCategory: settings.storeCategory && addStoreCategory(settings.storeCategory),
@@ -897,6 +1020,7 @@ export const mockApi: Api = {
     await delay();
     requireStoreOwner(storeId);
     const store = findStore(storeId);
+    checkImageLink(store, profile.photoUrl, store.profile.photoUrl);
     store.profile = { ...profile };
     return clone(withRating(store));
   },

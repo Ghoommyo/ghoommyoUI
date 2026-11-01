@@ -55,6 +55,7 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
   const items: Item[] = session
     ? [
         { label: 'menu.home', href: '/home', route: 'home' },
+        { label: 'menu.explore', href: '/stores', route: 'stores/index' },
         { label: 'menu.dashboard', href: '/dashboard', route: 'dashboard' },
         ...(session.role === 'user'
           ? [
@@ -63,13 +64,17 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
             ]
           : []),
         ...(session.role === 'store'
-          ? [{ label: 'menu.reviews' as const, href: '/reviews' as const, route: 'reviews' }]
+          ? [
+              { label: 'menu.reviews' as const, href: '/reviews' as const, route: 'reviews' },
+              { label: 'menu.myStorePage' as const, href: { pathname: '/stores/[id]', params: { id: session.accountId } } as const },
+            ]
           : []),
         { label: 'menu.profile', href: '/profile', route: 'profile' },
         { label: 'menu.settings', href: '/settings', route: 'settings' },
       ]
     : [
         { label: 'menu.home', href: '/home', route: 'home' },
+        { label: 'menu.explore', href: '/stores', route: 'stores/index' },
         { label: 'menu.dashboard', href: '/dashboard', route: 'dashboard' },
         { label: 'menu.login', href: '/login' },
         { label: 'menu.signup', href: '/signup' },

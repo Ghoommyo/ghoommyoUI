@@ -4,14 +4,14 @@ import { StyleSheet, View } from 'react-native';
 import { errorMessage } from '@/api';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { ImageField } from '@/components/ui/image-field';
+import { ImageField, storePictureRules } from '@/components/ui/image-field';
 import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useCreateService, useProductTypes, useUpdateService } from '@/hooks/queries';
 import { validateService } from '@/lib/services';
-import type { StoreService } from '@/types/domain';
+import type { StoreService, StoreSettings } from '@/types/domain';
 import { useT } from '@/i18n/language-provider';
 
 type ServiceFormModalProps = {
@@ -24,8 +24,8 @@ type ServiceFormModalProps = {
   item: string;
   /** Product stores can tag items with a product type. */
   isProductStore: boolean;
-  /** The app admin lets the store upload pictures; otherwise only a pasted link works. */
-  uploadsEnabled: boolean;
+  /** The store's picture switches (uploads, links), set by the app admin. */
+  store: Pick<StoreSettings, 'uploadsEnabled' | 'linksEnabled'>;
   onClose(): void;
   onSaved(service: StoreService): void;
 };
@@ -39,7 +39,7 @@ export function ServiceFormModal({
   defaultMaxQty,
   item,
   isProductStore,
-  uploadsEnabled,
+  store,
   onClose,
   onSaved,
 }: ServiceFormModalProps) {
@@ -125,18 +125,8 @@ export function ServiceFormModal({
         kind="item"
         value={draft.imageUrl.trim()}
         onChange={set('imageUrl')}
-        disabled={!uploadsEnabled}
-        hint={uploadsEnabled ? t('items.photoHint') : t('upload.off')}
-      />
-      <TextField
-        label={t('items.imageLink')}
-        value={draft.imageUrl}
-        onChangeText={set('imageUrl')}
-        error={errors.imageUrl}
-        keyboardType="url"
-        autoCapitalize="none"
-        autoCorrect={false}
-        placeholder="https://…"
+        {...storePictureRules(store, t, 'items.photoHint')}
+        linkError={errors.imageUrl}
       />
       <TextField
         label={t('items.limit')}

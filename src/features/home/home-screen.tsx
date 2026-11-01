@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -6,11 +5,9 @@ import { errorMessage } from '@/api';
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
 import { Banner } from '@/components/ui/banner';
-import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
-import { RatingBadge } from '@/components/ui/stars';
-import { StorePhoto } from '@/components/ui/store-photo';
 import { Spacing } from '@/constants/theme';
+import { StoreCard } from '@/features/stores/store-card';
 import { useStores } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { storeTypeLabel } from '@/lib/order-types';
@@ -89,7 +86,7 @@ export function HomeScreen() {
                 ) : null}
               </View>
               {(type ? group.stores : group.stores.slice(0, TOP)).map((store) => (
-                <StoreCard key={store.id} store={store} />
+                <HomeCard key={store.id} store={store} />
               ))}
             </View>
           ))}
@@ -99,42 +96,20 @@ export function HomeScreen() {
   );
 }
 
-function StoreCard({ store }: { store: Store }) {
+function HomeCard({ store }: { store: Store }) {
   const { t } = useT();
-  const theme = useTheme();
   const kind = storeTypeLabel(store);
   const place = [store.profile.city, store.profile.pin].filter(Boolean).join(' ');
+  const line = [t(store.catalogType === 'service' ? 'catalog.Services' : 'catalog.Products'), kind, place].filter(Boolean).join(' · ');
   return (
-    <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
-      <StorePhoto uri={store.profile.photoUrl} name={store.name} style={styles.cardPhoto} />
-      <View style={styles.cardTop}>
-        <ThemedText type="smallBold" style={styles.cardName}>
-          {store.name}
-        </ThemedText>
-        <RatingBadge rating={store.rating} />
-      </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        {t(store.catalogType === 'service' ? 'catalog.Services' : 'catalog.Products')}
-        {kind ? ` · ${kind}` : ''}
-        {place ? ` · ${place}` : ''}
-      </ThemedText>
-      <View style={styles.cardActions}>
-        <Button
-          label={t('home.book')}
-          variant="success"
-          size="sm"
-          accessibilityLabel={t('app.bookAt', { name: store.name })}
-          onPress={() => router.navigate({ pathname: '/dashboard', params: { storeId: store.id } })}
-        />
-        <Button
-          label={t('home.reviews')}
-          variant="secondary"
-          size="sm"
-          accessibilityLabel={t('app.reviewsFor', { name: store.name })}
-          onPress={() => router.push({ pathname: '/reviews', params: { storeId: store.id } })}
-        />
-      </View>
-    </View>
+    <StoreCard
+      id={store.id}
+      name={store.name}
+      photoUrl={store.profile.photoUrl}
+      bio={store.profile.bio}
+      rating={store.rating}
+      line={line}
+    />
   );
 }
 
@@ -166,30 +141,5 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontSize: 22,
     lineHeight: 30,
-  },
-  card: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
-  cardPhoto: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: Spacing.two,
-    marginBottom: Spacing.one,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.two,
-  },
-  cardName: {
-    flex: 1,
-    fontSize: 16,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    marginTop: Spacing.one,
   },
 });

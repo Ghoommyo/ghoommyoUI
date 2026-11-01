@@ -163,11 +163,11 @@ export function UserDashboard() {
             // Service stores show their type of service, e.g. "Raju Tailor · Plumber".
             label: storeTypeLabel(s) ? `${s.name} · ${storeTypeLabel(s)}` : s.name,
             value: s.id,
-            // The rating opens the store's reviews; the name still selects the store.
+            // The rating opens the store's profile on its Reviews tab; the name still selects the store.
             accessory: {
               content: <RatingBadge rating={s.rating} />,
-              accessibilityLabel: t('storePicker.seeReviews', { name: s.name }),
-              onPress: () => router.push({ pathname: '/reviews', params: { storeId: s.id } }),
+              accessibilityLabel: t('storePicker.seeProfile', { name: s.name }),
+              onPress: () => router.push({ pathname: '/stores/[id]', params: { id: s.id } }),
             },
           }))}
           fieldAccessory={store ? <RatingBadge rating={store.rating} color={theme.cardTextSecondary} /> : null}

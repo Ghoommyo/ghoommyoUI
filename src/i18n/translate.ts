@@ -4,7 +4,15 @@ import type { Language } from "./languages";
 export type MessageVars = Record<string, string | number>;
 export type Translate = (key: MessageKey, vars?: MessageVars) => string;
 
-const pluralRules = new Map<Language, Intl.PluralRules>();
+const pluralRules = new Map<Language, Pick<Intl.PluralRules, "select">>();
+
+/**
+ * Hermes on Android has no Intl.PluralRules, so the CLDR "one" rule for our languages is written
+ * out: English and Marathi use it for exactly 1, Hindi for 0 and 1.
+ */
+const fallbackRules = (language: Language): Pick<Intl.PluralRules, "select"> => ({
+  select: (n) => ((language === "hi" ? n === 0 || n === 1 : n === 1) ? "one" : "other"),
+});
 
 /**
  * The message in `language` with `{name}` filled in. A message written as "one|other"
@@ -15,7 +23,10 @@ export function translate(language: Language, key: MessageKey, vars?: MessageVar
   if (text.includes("|")) {
     const [one, other] = text.split("|");
     let rules = pluralRules.get(language);
-    if (!rules) pluralRules.set(language, (rules = new Intl.PluralRules(language)));
+    if (!rules) {
+      rules = typeof Intl.PluralRules === "function" ? new Intl.PluralRules(language) : fallbackRules(language);
+      pluralRules.set(language, rules);
+    }
     text = rules.select(Number(vars?.count ?? 0)) === "one" ? one : other;
   }
   return vars ? text.replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match)) : text;

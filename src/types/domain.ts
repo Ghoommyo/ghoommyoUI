@@ -78,7 +78,8 @@ export interface StoreSettings {
   maxPerSlot: number;
   maxPerBooking: number;
   limitUnit: LimitUnit;
-  autoApprove: boolean;
+  /** Whether bookings of each order type are accepted at once. */
+  autoApprove: Record<OrderType, boolean>;
   /** `HH:mm` */
   openAt: string;
   /** `HH:mm` */
@@ -97,6 +98,10 @@ export interface StoreSettings {
   inactive?: boolean;
   /** The app admin lets the store upload pictures; off by default (only known for the store's own record). */
   uploadsEnabled?: boolean;
+  /** The app admin lets the store save picture links instead of uploading (own record only). */
+  linksEnabled?: boolean;
+  /** The app admin turned the store's gallery on (own record only). */
+  galleryEnabled?: boolean;
   /** How many of each service a booking may include, for services without their own limit. */
   maxServiceQty: number;
 }
@@ -115,6 +120,8 @@ export interface StoreProfile {
   mapUrl?: string;
   /** The store's photo; `''` when none. */
   photoUrl: string;
+  /** The year the store opened; null = not given. */
+  openSince: number | null;
 }
 
 /** Average stars (1 decimal; null when unrated) and how many ratings. */
@@ -159,8 +166,46 @@ export interface ServiceInput {
   productType: string | null;
 }
 
-/** What a picture is for: a store's item or its photo (stores, when the admin allows it), or a user's photo. */
-export type ImageKind = 'item' | 'store' | 'user';
+/** What a picture is for: a store's item, photo or gallery (stores, when the admin allows it), or a user's photo. */
+export type ImageKind = 'item' | 'store' | 'user' | 'gallery';
+
+/** A store as its public profile page and Explore stores show it. */
+export interface StorePage {
+  id: string;
+  name: string;
+  /** `''` when none. */
+  photoUrl: string;
+  bio: string;
+  openSince: number | null;
+  /** When the store joined (ISO). */
+  joinedOn: string;
+  /** `HH:mm` */
+  openAt: string;
+  /** `HH:mm` */
+  closeAt: string;
+  openDays: number[];
+  catalogType: CatalogType;
+  /** Category (product stores) or type of service; null = not set. */
+  category: string | null;
+  isDarkStore: boolean;
+  orderTypes: OrderType[];
+  address: { address: string; city: string; pin: string; country: string; mapUrl: string };
+  rating: RatingSummary;
+  galleryOn: boolean;
+}
+
+export interface StoresPage {
+  stores: StorePage[];
+  /** Pass to the next `searchStores` call; null on the last page. */
+  nextCursor: string | null;
+}
+
+/** A picture in a store's gallery. */
+export interface GalleryImage {
+  id: string;
+  imageUrl: string;
+  caption: string;
+}
 
 /**
  * A picked picture, ready to upload: `{ uri, name, type }` is what React Native's FormData sends

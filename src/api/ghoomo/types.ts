@@ -36,6 +36,8 @@ export interface GhoomoLocation {
   loc_nav?: string | null;
   /** The location's photo; null when none. */
   loc_profile_url?: string | null;
+  /** The location's bio; null when none. */
+  loc_info?: string | null;
   /** Average stars (1 decimal) and number of ratings; strings, null when unrated. */
   rating_avg?: string | null;
   rating_count?: string | null;
@@ -61,6 +63,11 @@ export interface GhoomoSettings {
   store_inactive?: number;
   /** 1 when the app admin lets the location upload pictures (GET settings only). */
   uploads_on?: number;
+  /** 1 when the app admin lets it use picture links / turned its gallery on (GET settings only). */
+  links_on?: number;
+  gallery_on?: number;
+  /** Auto-approval per order type (Api.md §5.4); older servers only send `is_auto_approval`. */
+  auto_approve?: Partial<Record<'table' | 'pickup' | 'porter' | 'appointment' | 'homeVisit', boolean>>;
 }
 
 /** A location's service (Api.md §5.4a). Already camelCase on the wire. */
@@ -97,6 +104,36 @@ export interface GhoomoProfile {
   loc_pin_code: string | null;
   loc_profile_url: string | null;
   loc_address: string | null;
+  /** The year the store opened (null = not given). */
+  open_since?: number | null;
+}
+
+/** A store from GET /stores and /stores/{id} (Api.md §5.3a). Already camelCase on the wire. */
+export interface GhoomoPublicStore {
+  id: string;
+  code: string;
+  name: string;
+  photoUrl: string | null;
+  bio: string | null;
+  openSince: number | null;
+  joinedOn: string;
+  openAt: string;
+  closeAt: string;
+  openDays: number[];
+  catalogType: 'PRODUCT' | 'SERVICE';
+  category: string | null;
+  isDarkStore: boolean;
+  orderTypes: string[];
+  address: { address: string | null; city: string | null; pinCode: string | null; country: string | null; mapLink: string | null };
+  rating: { average: number | null; count: number };
+  galleryOn: boolean;
+}
+
+export interface GhoomoGalleryImage {
+  id: string;
+  imageUrl: string;
+  caption: string;
+  createdAt: string;
 }
 
 export interface GhoomoAppointment {

@@ -53,6 +53,9 @@ export const common = defineMessages({
   "rate.placeholder": { en: "What was good, what could be better?", hi: "क्या अच्छा था, क्या बेहतर हो सकता था?", mr: "काय चांगले होते, काय अधिक चांगले होऊ शकले असते?" },
 
   "upload.off": { en: "Picture uploads aren't turned on for your store yet. Contact support to enable them.", hi: "आपके स्टोर के लिए फ़ोटो अपलोड अभी चालू नहीं है। चालू करवाने के लिए सपोर्ट से संपर्क करें।", mr: "तुमच्या स्टोअरसाठी फोटो अपलोड अजून सुरू नाही. सुरू करण्यासाठी सपोर्टशी संपर्क साधा." },
+  "upload.linkOnly": { en: "Picture uploads aren't turned on for your store. Paste a picture link instead.", hi: "आपके स्टोर के लिए फ़ोटो अपलोड चालू नहीं है। इसकी जगह फ़ोटो का लिंक डालें।", mr: "तुमच्या स्टोअरसाठी फोटो अपलोड सुरू नाही. त्याऐवजी फोटोची लिंक टाका." },
+  "upload.link": { en: "Or paste a picture link", hi: "या फ़ोटो का लिंक डालें", mr: "किंवा फोटोची लिंक टाका" },
+  "upload.linkInvalid": { en: "Enter a link starting with http:// or https://.", hi: "http:// या https:// से शुरू होने वाला लिंक डालें।", mr: "http:// किंवा https:// ने सुरू होणारी लिंक टाका." },
   "upload.notPicture": { en: "That file isn't a picture this browser can open. Choose a JPEG, PNG or WebP.", hi: "यह फ़ाइल ऐसी फ़ोटो नहीं है जिसे यह ब्राउज़र खोल सके। JPEG, PNG या WebP चुनें।", mr: "ही फाइल या ब्राउझरला उघडता येणारा फोटो नाही. JPEG, PNG किंवा WebP निवडा." },
   "upload.prepareFailed": { en: "Couldn't prepare the picture. Please try again.", hi: "फ़ोटो तैयार नहीं हो सकी। कृपया फिर से कोशिश करें।", mr: "फोटो तयार करता आला नाही. कृपया पुन्हा प्रयत्न करा." },
   "upload.change": { en: "Change photo", hi: "फ़ोटो बदलें", mr: "फोटो बदला" },
