@@ -1,15 +1,19 @@
 import { fromMinutes, makeDateKey, toMinutes } from '@/lib/date';
+import type { MessageKey } from '@/i18n/messages';
+import type { Translate } from '@/i18n/translate';
 import type { Booking, DateKey, LimitUnit, SlotStart, StoreSettings } from '@/types/domain';
 
 export type SlotState = 'ok' | 'full' | 'over';
 
 const STEP_MINUTES: Record<Exclude<LimitUnit, 'day'>, number> = { hour: 60, halfHour: 30 };
 
-export const LIMIT_UNIT_LABEL: Record<LimitUnit, string> = {
-  day: 'day',
-  hour: 'hour',
-  halfHour: 'half hour',
+const LIMIT_UNIT_KEY: Record<LimitUnit, MessageKey> = {
+  day: 'slots.unitDay',
+  hour: 'slots.unitHour',
+  halfHour: 'slots.unitHalfHour',
 };
+/** "day", "hour", "half hour" in the chosen language. */
+export const limitUnitLabel = (t: Translate, unit: LimitUnit) => t(LIMIT_UNIT_KEY[unit]);
 
 /**
  * Slot start times for a day, from `openAt` up to (not including) `closeAt`.
@@ -54,17 +58,15 @@ export function daysInMonth(year: number, month: number): number {
 
 /** Every weekday, 0 = Sunday … 6 = Saturday (`Date.getDay()`). */
 export const ALL_DAYS: readonly number[] = [0, 1, 2, 3, 4, 5, 6];
+// Weekday names by `Date.getDay()` (0 = Sunday).
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+const shortDay = (t: Translate, day: number) => t(`day.${DAY_KEYS[day]}` as MessageKey);
+const longDay = (t: Translate, day: number) => t(`day.${DAY_KEYS[day]}Long` as MessageKey);
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
 /** Weekday buttons in the order shown (Monday first): `day` is the `Date.getDay()` value. */
-export const WEEK = [
-  { day: 1, short: 'Mon', long: 'Monday' },
-  { day: 2, short: 'Tue', long: 'Tuesday' },
-  { day: 3, short: 'Wed', long: 'Wednesday' },
-  { day: 4, short: 'Thu', long: 'Thursday' },
-  { day: 5, short: 'Fri', long: 'Friday' },
-  { day: 6, short: 'Sat', long: 'Saturday' },
-  { day: 0, short: 'Sun', long: 'Sunday' },
-] as const;
-const SHORT_DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const weekDays = (t: Translate) =>
+  WEEK_ORDER.map((day) => ({ day, short: shortDay(t, day), long: longDay(t, day) }));
 
 const weekday = (year: number, month: number, day: number) => new Date(year, month, day).getDay();
 
@@ -74,11 +76,16 @@ export function isOpenDay(openDays: number[] | undefined, year: number, month: n
 }
 
 /** The days of a month the store is open, as Day picker options ("Mon 3"). */
-export function openDayOptions(openDays: number[] | undefined, year: number, month: number) {
+export function openDayOptions(
+  openDays: number[] | undefined,
+  year: number,
+  month: number,
+  t: Translate,
+) {
   const options: { label: string; value: number }[] = [];
   for (let d = 1; d <= daysInMonth(year, month); d++) {
     if (isOpenDay(openDays, year, month, d)) {
-      options.push({ label: openDays ? `${SHORT_DAY[weekday(year, month, d)]} ${d}` : String(d), value: d });
+      options.push({ label: openDays ? `${shortDay(t, weekday(year, month, d))} ${d}` : String(d), value: d });
     }
   }
   return options;
@@ -86,18 +93,19 @@ export function openDayOptions(openDays: number[] | undefined, year: number, mon
 
 /** `day` when the store is open then, else its next open day in the month, else its first one. */
 export function nextOpenDay(openDays: number[] | undefined, year: number, month: number, day: number): number {
-  const open = openDayOptions(openDays, year, month).map((o) => o.value);
+  const open: number[] = [];
+  for (let d = 1; d <= daysInMonth(year, month); d++) if (isOpenDay(openDays, year, month, d)) open.push(d);
   return open.find((d) => d >= day) ?? open[0] ?? day;
 }
 
 /** "Every day", "Mon–Fri", "Mon, Wed, Sat" (Monday first). */
-export function openDaysLabel(openDays: number[]): string {
-  const on = WEEK.filter((w) => openDays.includes(w.day));
-  if (on.length === 7) return 'Every day';
-  const positions = on.map((w) => WEEK.indexOf(w));
+export function openDaysLabel(openDays: number[], t: Translate): string {
+  const on = WEEK_ORDER.filter((day) => openDays.includes(day));
+  if (on.length === 7) return t('slots.everyDay');
+  const positions = on.map((day) => WEEK_ORDER.indexOf(day));
   const consecutive = positions.every((p, i) => i === 0 || p === positions[i - 1] + 1);
-  if (on.length >= 3 && consecutive) return `${on[0].short}–${on[on.length - 1].short}`;
-  return on.map((w) => w.short).join(', ');
+  if (on.length >= 3 && consecutive) return `${shortDay(t, on[0])}–${shortDay(t, on[on.length - 1])}`;
+  return on.map((day) => shortDay(t, day)).join(', ');
 }
 
 /** Calendar cells for a month, padded with `null` so day 1 lands on its weekday. */

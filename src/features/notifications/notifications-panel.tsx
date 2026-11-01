@@ -20,6 +20,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { formatSlotStart, formatTimeAgo } from '@/lib/date';
 import type { AppNotification, Booking, NotificationKind } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 /**
  * The signed-in account's notifications, split into New (unseen, tinted) and Earlier. They're
@@ -27,6 +28,7 @@ import type { AppNotification, Booking, NotificationKind } from '@/types/domain'
  * Tapping one marks it seen; closing marks the rest. Mount only while open.
  */
 export function NotificationsPanel({ onClose }: { onClose(): void }) {
+  const { t } = useT();
   const theme = useTheme();
   const { session } = useSession();
   const isStore = session?.role === 'store';
@@ -95,14 +97,18 @@ export function NotificationsPanel({ onClose }: { onClose(): void }) {
     <Sheet
       visible
       variant="panel"
-      title={fresh.length ? `Notifications · ${fresh.length} new` : 'Notifications'}
+      title={
+        fresh.length
+          ? `${t('notifications.title')} · ${t('notifications.newCount', { count: fresh.length })}`
+          : t('notifications.title')
+      }
       onClose={close}
       headerAction={
         <Button
           label="↻"
           variant="secondary"
           size="sm"
-          accessibilityLabel="Refresh notifications"
+          accessibilityLabel={t('notifications.refresh')}
           loading={notifications.isFetching && !notifications.isLoading}
           onPress={() => notifications.refetch()}
         />
@@ -113,12 +119,12 @@ export function NotificationsPanel({ onClose }: { onClose(): void }) {
         <Banner message={{ type: 'error', text: errorMessage(notifications.error) }} />
       ) : !list.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-          No notifications yet.
+          {t('notifications.none')}
         </ThemedText>
       ) : (
         <View style={[styles.list, { borderColor: theme.border }]}>
-          {section('New', fresh)}
-          {section('Earlier', earlier)}
+          {section(t('notifications.new'), fresh)}
+          {section(t('notifications.earlier'), earlier)}
         </View>
       )}
       {open ? (
@@ -146,6 +152,7 @@ function NotificationRow({
   isStore: boolean;
   onOpen(notification: AppNotification): void;
 }) {
+  const { t, language } = useT();
   const theme = useTheme();
   const setStatus = useSetBookingStatus();
   const booking = n.booking;
@@ -165,7 +172,7 @@ function NotificationRow({
         disabled={!booking}
         onPress={() => onOpen(n)}
         accessibilityRole="button"
-        accessibilityLabel={`${unseen ? 'New. ' : ''}${n.text}${booking ? `. ${formatSlotStart(booking.slotStart)}` : ''}`}
+        accessibilityLabel={`${n.text}${unseen ? ` ${t('notifications.unseen')}` : ''}${booking ? `. ${formatSlotStart(booking.slotStart, language)}` : ''}`}
         style={({ pressed }) => [styles.main, pressed && styles.pressed]}>
         <View style={[styles.dot, { backgroundColor: dot[n.kind] ?? theme.primary }]} />
         <View style={styles.texts}>
@@ -173,11 +180,11 @@ function NotificationRow({
           {booking ? (
             <ThemedText type="small" themeColor="textSecondary">
               {isStore ? '' : `${booking.storeName} · `}
-              {formatSlotStart(booking.slotStart)}
+              {formatSlotStart(booking.slotStart, language)}
             </ThemedText>
           ) : null}
           <ThemedText type="small" themeColor="textSecondary" style={styles.time}>
-            {formatTimeAgo(n.createdAt)}
+            {formatTimeAgo(n.createdAt, t, language)}
           </ThemedText>
         </View>
       </Pressable>
@@ -185,7 +192,7 @@ function NotificationRow({
       {isStore && booking?.status === 'pending' ? (
         <View style={styles.decide}>
           <Button
-            label="✕ Reject"
+            label={t('booking.reject')}
             variant="danger"
             size="sm"
             loading={busy === 'rejected'}
@@ -193,7 +200,7 @@ function NotificationRow({
             onPress={() => setStatus.mutate({ bookingId: booking.id, status: 'rejected' })}
           />
           <Button
-            label="✓ Accept"
+            label={t('booking.accept')}
             variant="success"
             size="sm"
             loading={busy === 'accepted'}

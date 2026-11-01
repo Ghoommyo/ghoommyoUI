@@ -12,6 +12,7 @@ import { ensureReminderPermission, SNOOZE_MINUTES } from '@/features/reminders/r
 import { useReminderSettings, useSaveReminderSettings } from '@/features/reminders/use-reminder-settings';
 import { useTheme } from '@/hooks/use-theme';
 import type { ReminderSettings } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 const PRESETS = [1, 2, 3, 6, 12, 24];
 const CUSTOM = 0;
@@ -24,6 +25,7 @@ export function ReminderSettingsSection() {
 }
 
 function ReminderSettingsForm({ initial }: { initial: ReminderSettings }) {
+  const { t } = useT();
   const theme = useTheme();
   const save = useSaveReminderSettings();
   const [enabled, setEnabled] = useState(initial.enabled);
@@ -35,7 +37,7 @@ function ReminderSettingsForm({ initial }: { initial: ReminderSettings }) {
   const submit = async () => {
     const hoursBefore = preset === CUSTOM ? Number(custom) : preset;
     if (!Number.isInteger(hoursBefore) || hoursBefore < 1 || hoursBefore > 72) {
-      setError('Enter a whole number of hours from 1 to 72.');
+      setError(t('reminder.hoursInvalid'));
       return;
     }
     setError(undefined);
@@ -46,12 +48,12 @@ function ReminderSettingsForm({ initial }: { initial: ReminderSettings }) {
         onSuccess: ({ recordedOnServer }) =>
           setMessage(
             !allowed
-              ? { type: 'error', text: 'Saved, but notifications are turned off for Ghoomyo. Allow them in the phone settings.' }
+              ? { type: 'error', text: t('reminder.savedNoPermission') }
               : recordedOnServer
-                ? { type: 'success', text: 'Reminder settings saved.' }
-                : { type: 'success', text: 'Saved on this phone. It will be recorded on the server next time you save online.' },
+                ? { type: 'success', text: t('reminder.saved') }
+                : { type: 'success', text: t('reminder.savedLocal') },
           ),
-        onError: () => setMessage({ type: 'error', text: "Couldn't save the reminder settings. Try again." }),
+        onError: () => setMessage({ type: 'error', text: t('reminder.saveFailed') }),
       },
     );
   };
@@ -60,13 +62,13 @@ function ReminderSettingsForm({ initial }: { initial: ReminderSettings }) {
     <ThemedView type="backgroundElement" style={styles.card}>
       <View style={styles.row}>
         <View style={styles.flex}>
-          <ThemedText type="smallBold">Booking reminders</ThemedText>
+          <ThemedText type="smallBold">{t('reminder.channel')}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            An alarm before each accepted booking, with Snooze ({SNOOZE_MINUTES} min) and Close.
+            {t('reminder.hint', { minutes: SNOOZE_MINUTES })}
           </ThemedText>
         </View>
         <Switch
-          accessibilityLabel="Booking reminders"
+          accessibilityLabel={t('reminder.channel')}
           value={enabled}
           onValueChange={(value) => {
             setEnabled(value);
@@ -78,11 +80,11 @@ function ReminderSettingsForm({ initial }: { initial: ReminderSettings }) {
       {enabled ? (
         <>
           <Select
-            label="Remind me"
+            label={t('reminder.remindMe')}
             value={preset}
             options={[
-              ...PRESETS.map((h) => ({ label: `${h} ${h === 1 ? 'hour' : 'hours'} before`, value: h })),
-              { label: 'Custom…', value: CUSTOM },
+              ...PRESETS.map((h) => ({ label: t('reminder.hoursBefore', { count: h }), value: h })),
+              { label: t('reminder.custom'), value: CUSTOM },
             ]}
             onChange={(value) => {
               setPreset(value);
@@ -91,7 +93,7 @@ function ReminderSettingsForm({ initial }: { initial: ReminderSettings }) {
           />
           {preset === CUSTOM ? (
             <TextField
-              label="Hours before (1–72)"
+              label={t('reminder.customLabel')}
               value={custom}
               onChangeText={(value) => {
                 setCustom(value.replace(/\D/g, ''));
@@ -105,7 +107,7 @@ function ReminderSettingsForm({ initial }: { initial: ReminderSettings }) {
       ) : null}
       <Banner message={message} />
       <View style={styles.actions}>
-        <Button label="Save reminders" variant="success" loading={save.isPending} onPress={submit} />
+        <Button label={t('reminder.save')} variant="success" loading={save.isPending} onPress={submit} />
       </View>
     </ThemedView>
   );

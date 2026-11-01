@@ -1,4 +1,5 @@
 // Booking reminders are a phone feature (iOS/Android); on web everything here is a no-op.
+import type { Language } from '@/i18n/languages';
 import type { Booking, ReminderSettings, Role } from '@/types/domain';
 
 export const REMINDERS_SUPPORTED = false;
@@ -8,7 +9,7 @@ export async function setupReminders() {}
 export async function ensureReminderPermission() {
   return false;
 }
-export async function syncReminders(_bookings: Booking[], _settings: ReminderSettings, _role: Role) {
+export async function syncReminders(_bookings: Booking[], _settings: ReminderSettings, _role: Role, _language: Language) {
   return 0;
 }
 export async function clearReminders() {}

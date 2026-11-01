@@ -13,6 +13,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n/language-provider';
 
 // react-native-web can leave a fading modal stuck on screen if navigation happens mid-fade.
 const MODAL_ANIMATION = Platform.OS === 'web' ? 'none' : 'fade';
@@ -47,7 +48,7 @@ type SelectProps<T extends string | number> = {
 /** Cross-platform dropdown: a field that opens a modal list (native pickers have no web support). */
 export function Select<T extends string | number>({
   label,
-  placeholder = 'Select…',
+  placeholder,
   value,
   options,
   onChange,
@@ -57,6 +58,7 @@ export function Select<T extends string | number>({
   style,
   fieldAccessory,
 }: SelectProps<T>) {
+  const { t } = useT();
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -71,8 +73,8 @@ export function Select<T extends string | number>({
       ) : null}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label ?? placeholder}
-        accessibilityHint="Opens a list of options"
+        accessibilityLabel={label ?? placeholder ?? t('common.select')}
+        accessibilityHint={t('app.opensList')}
         disabled={disabled}
         onPress={() => setOpen(true)}
         style={[
@@ -86,7 +88,7 @@ export function Select<T extends string | number>({
         <ThemedText
           numberOfLines={1}
           style={[styles.fieldText, { color: selected ? fieldText : theme.textSecondary }]}>
-          {selected?.label ?? placeholder}
+          {selected?.label ?? placeholder ?? t('common.select')}
         </ThemedText>
         {selected ? fieldAccessory : null}
         <ThemedText aria-hidden style={{ color: fieldText }}>
@@ -103,7 +105,7 @@ export function Select<T extends string | number>({
         <Pressable
           style={[styles.backdrop, { backgroundColor: theme.overlay }]}
           onPress={() => setOpen(false)}
-          accessibilityLabel="Close list">
+          accessibilityLabel={t('app.closeList')}>
           <View style={[styles.sheet, { backgroundColor: theme.backgroundElement }]}>
             {label ? (
               <ThemedText type="smallBold" style={styles.sheetTitle}>

@@ -9,10 +9,12 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useUpdateMyProfile } from '@/hooks/queries';
 import type { UserProfile } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 const MOBILE_PATTERN = /^\+?\d{10,15}$/;
 
 export function UserProfileForm({ profile }: { profile: UserProfile }) {
+  const { t } = useT();
   const [name, setName] = useState(profile.name);
   const [mobile, setMobile] = useState(profile.mobile);
   const [photoUrl, setPhotoUrl] = useState(profile.photoUrl);
@@ -23,16 +25,16 @@ export function UserProfileForm({ profile }: { profile: UserProfile }) {
   const save = () => {
     const cleanMobile = mobile.replace(/[\s-]/g, '');
     const next = {
-      name: name.trim() ? undefined : 'Name is required.',
+      name: name.trim() ? undefined : t('book.nameRequired'),
       mobile:
-        !cleanMobile || MOBILE_PATTERN.test(cleanMobile) ? undefined : 'Enter a valid mobile number.',
+        !cleanMobile || MOBILE_PATTERN.test(cleanMobile) ? undefined : t('booking.invalidMobile'),
     };
     setErrors(next);
     if (next.name || next.mobile) return;
     update.mutate(
       { name: name.trim(), mobile: cleanMobile, photoUrl },
       {
-        onSuccess: () => setMessage({ type: 'success', text: 'Profile saved.' }),
+        onSuccess: () => setMessage({ type: 'success', text: t('profile.saved') }),
         onError: (error) => setMessage({ type: 'error', text: errorMessage(error) }),
       },
     );
@@ -42,7 +44,7 @@ export function UserProfileForm({ profile }: { profile: UserProfile }) {
     <View style={styles.form}>
       <Banner message={message} />
       <ImageField
-        label="Profile photo"
+        label={t('profile.photo')}
         kind="user"
         round
         name={name || profile.name}
@@ -51,17 +53,17 @@ export function UserProfileForm({ profile }: { profile: UserProfile }) {
           setPhotoUrl(url);
           setMessage(null);
         }}
-        hint="Save to keep it."
+        hint={t('app.saveToKeep')}
       />
       <TextField
-        label="Name"
+        label={t('profile.name')}
         value={name}
         onChangeText={setName}
         error={errors.name}
         autoComplete="name"
       />
       <TextField
-        label="Mobile"
+        label={t('profile.mobile')}
         value={mobile}
         onChangeText={setMobile}
         error={errors.mobile}
@@ -69,7 +71,7 @@ export function UserProfileForm({ profile }: { profile: UserProfile }) {
         autoComplete="tel"
       />
       <View style={styles.actions}>
-        <Button label="Save" variant="success" onPress={save} loading={update.isPending} />
+        <Button label={t('common.save')} variant="success" onPress={save} loading={update.isPending} />
       </View>
     </View>
   );

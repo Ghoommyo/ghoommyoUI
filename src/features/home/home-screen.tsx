@@ -14,17 +14,21 @@ import { Spacing } from '@/constants/theme';
 import { useStores } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { storeTypeLabel } from '@/lib/order-types';
-import { groupStoresByType } from '@/lib/store-groups';
+import { groupStoresByType, OTHER_STORES } from '@/lib/store-groups';
 import type { Store } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 const TOP = 6;
 
 /** Home: store types, each with its highest-rated stores. Open to everyone. */
 export function HomeScreen() {
+  const { t } = useT();
   const theme = useTheme();
   const stores = useStores();
   const [type, setType] = useState<string | null>(null);
   const groups = groupStoresByType(stores.data ?? []);
+  // Store types are what stores typed; only the catch-all group is ours to translate.
+  const typeName = (name: string) => (name === OTHER_STORES ? t('home.otherStores') : name);
   const shown = type ? groups.filter((g) => g.type === type) : groups;
   const chips = [
     { type: null as string | null, count: stores.data?.length ?? 0 },
@@ -32,16 +36,16 @@ export function HomeScreen() {
   ];
 
   return (
-    <Screen>
-      <AppHeader title="Home" />
-      <ThemedText themeColor="textSecondary">Find a store by what it offers. The best rated ones are at the top.</ThemedText>
+    <Screen ads>
+      <AppHeader title={t('home.title')} />
+      <ThemedText themeColor="textSecondary">{t('home.intro')}</ThemedText>
       {stores.isLoading ? (
         <ActivityIndicator style={styles.empty} color={theme.primary} />
       ) : stores.isError ? (
         <Banner message={{ type: 'error', text: errorMessage(stores.error) }} />
       ) : !groups.length ? (
         <ThemedText themeColor="textSecondary" style={styles.empty}>
-          No stores yet.
+          {t('home.noStores')}
         </ThemedText>
       ) : (
         <>
@@ -49,7 +53,7 @@ export function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chips}
-            accessibilityLabel="Store types">
+            accessibilityLabel={t('home.storeTypes')}>
             {chips.map((chip) => {
               const selected = type === chip.type;
               return (
@@ -64,7 +68,7 @@ export function HomeScreen() {
                     { backgroundColor: selected ? theme.primary : theme.backgroundElement },
                   ]}>
                   <ThemedText type="smallBold" style={selected ? { color: theme.onPrimary } : undefined}>
-                    {chip.type ?? 'All'} ({chip.count})
+                    {chip.type ? typeName(chip.type) : t('home.all')} ({chip.count})
                   </ThemedText>
                 </Pressable>
               );
@@ -74,12 +78,12 @@ export function HomeScreen() {
             <View key={group.type} style={styles.group}>
               <View style={styles.groupHeader}>
                 <ThemedText type="subtitle" style={styles.groupTitle} accessibilityRole="header">
-                  {group.type}
+                  {typeName(group.type)}
                 </ThemedText>
                 {!type && group.stores.length > TOP ? (
                   <Pressable accessibilityRole="button" onPress={() => setType(group.type)} hitSlop={8}>
                     <ThemedText type="smallBold" style={{ color: theme.primary }}>
-                      See all {group.stores.length}
+                      {t('home.seeAll', { count: group.stores.length })}
                     </ThemedText>
                   </Pressable>
                 ) : null}
@@ -96,6 +100,7 @@ export function HomeScreen() {
 }
 
 function StoreCard({ store }: { store: Store }) {
+  const { t } = useT();
   const theme = useTheme();
   const kind = storeTypeLabel(store);
   const place = [store.profile.city, store.profile.pin].filter(Boolean).join(' ');
@@ -109,23 +114,23 @@ function StoreCard({ store }: { store: Store }) {
         <RatingBadge rating={store.rating} />
       </View>
       <ThemedText type="small" themeColor="textSecondary">
-        {store.catalogType === 'service' ? 'Services' : 'Products'}
+        {t(store.catalogType === 'service' ? 'catalog.Services' : 'catalog.Products')}
         {kind ? ` · ${kind}` : ''}
         {place ? ` · ${place}` : ''}
       </ThemedText>
       <View style={styles.cardActions}>
         <Button
-          label="Book"
+          label={t('home.book')}
           variant="success"
           size="sm"
-          accessibilityLabel={`Book at ${store.name}`}
+          accessibilityLabel={t('app.bookAt', { name: store.name })}
           onPress={() => router.navigate({ pathname: '/dashboard', params: { storeId: store.id } })}
         />
         <Button
-          label="Reviews"
+          label={t('home.reviews')}
           variant="secondary"
           size="sm"
-          accessibilityLabel={`Reviews for ${store.name}`}
+          accessibilityLabel={t('app.reviewsFor', { name: store.name })}
           onPress={() => router.push({ pathname: '/reviews', params: { storeId: store.id } })}
         />
       </View>

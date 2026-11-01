@@ -7,12 +7,14 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
-import { AuthFormLayout, MIN_PASSWORD_LENGTH, ROLE_OPTIONS } from '@/features/auth/auth-form';
+import { AuthFormLayout, MIN_PASSWORD_LENGTH, roleOptions } from '@/features/auth/auth-form';
 import { EmailVerifyField } from '@/features/auth/email-verify-field';
 import type { PasswordReset, Role } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 /** Forgot password: email → emailed code → new password, then back to login. */
 export default function ForgotPasswordScreen() {
+  const { t } = useT();
   const params = useLocalSearchParams<{ role?: Role }>();
   const [role, setRole] = useState<Role>(params.role === 'store' ? 'store' : 'user');
   const [email, setEmail] = useState('');
@@ -30,9 +32,9 @@ export default function ForgotPasswordScreen() {
     const next = {
       password:
         password.length < MIN_PASSWORD_LENGTH
-          ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+          ? t('auth.passwordLength', { count: MIN_PASSWORD_LENGTH })
           : undefined,
-      confirm: confirm !== password ? 'Passwords do not match.' : undefined,
+      confirm: confirm !== password ? t('auth.passwordsDiffer') : undefined,
     };
     setErrors(next);
     if (!verificationToken || next.password || next.confirm) return;
@@ -41,15 +43,15 @@ export default function ForgotPasswordScreen() {
 
   return (
     <AuthFormLayout
-      title="Forgot password"
-      footerText="Remembered it?"
-      footerLinkText="Back to login"
+      title={t('auth.forgotTitle')}
+      footerText={t('auth.remembered')}
+      footerLinkText={t('auth.backToLogin')}
       footerHref="/login">
       <Banner message={reset.isError ? { type: 'error', text: errorMessage(reset.error) } : null} />
       <Select
-        label="Type"
+        label={t('auth.type')}
         value={role}
-        options={ROLE_OPTIONS}
+        options={roleOptions(t)}
         onChange={(value) => {
           if (value !== role) setVerificationToken(null);
           setRole(value);
@@ -63,12 +65,12 @@ export default function ForgotPasswordScreen() {
         onChangeEmail={setEmail}
         token={verificationToken}
         onVerified={setVerificationToken}
-        sendLabel="Send code"
+        sendLabel={t('auth.sendCode')}
       />
       {verificationToken ? (
         <>
           <TextField
-            label="New password"
+            label={t('auth.newPassword')}
             value={password}
             onChangeText={setPassword}
             error={errors.password}
@@ -77,7 +79,7 @@ export default function ForgotPasswordScreen() {
             textContentType="newPassword"
           />
           <TextField
-            label="Confirm new password"
+            label={t('auth.confirmNewPassword')}
             value={confirm}
             onChangeText={setConfirm}
             error={errors.confirm}
@@ -86,7 +88,7 @@ export default function ForgotPasswordScreen() {
             textContentType="newPassword"
             onSubmitEditing={submit}
           />
-          <Button label="Change password" onPress={submit} loading={reset.isPending} fullWidth />
+          <Button label={t('auth.changePassword')} onPress={submit} loading={reset.isPending} fullWidth />
         </>
       ) : null}
     </AuthFormLayout>

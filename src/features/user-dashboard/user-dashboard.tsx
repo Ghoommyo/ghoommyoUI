@@ -17,19 +17,20 @@ import { UserEventsTabs } from '@/features/events/user-events-tabs';
 import { ServicesModal } from '@/features/services/services-modal';
 import { SlotGrid } from '@/features/user-dashboard/slot-grid';
 import { useMyProfile, useStores, useStoreSlots } from '@/hooks/queries';
-import { INACTIVE_USER_HINT } from '@/lib/account-status';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDayLong, formatSlotStart, makeDateKey, MONTHS, toDateKey } from '@/lib/date';
-import { catalogWords, storeTypeLabel } from '@/lib/order-types';
+import { formatDayLong, formatMonthYear, formatSlotStart, makeDateKey, toDateKey } from '@/lib/date';
+import { catalogLabels, storeTypeLabel } from '@/lib/order-types';
 import { countServices, encodeServices } from '@/lib/services';
-import { daysInMonth, isOpenDay, LIMIT_UNIT_LABEL, nextOpenDay, openDayOptions, openDaysLabel } from '@/lib/slots';
+import { daysInMonth, isOpenDay, limitUnitLabel, nextOpenDay, openDayOptions, openDaysLabel } from '@/lib/slots';
 import type { ServicePicks, SlotStart } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
+import type { Language } from '@/i18n/languages';
 
 /** The next 12 months, starting with the current one; values are `year-month` (0-based month). */
-function monthOptions(today: Date): SelectOption<string>[] {
+function monthOptions(today: Date, language: Language): SelectOption<string>[] {
   return Array.from({ length: 12 }, (_, i) => {
     const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-    return { label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, value: `${d.getFullYear()}-${d.getMonth()}` };
+    return { label: formatMonthYear(d.getFullYear(), d.getMonth(), language), value: `${d.getFullYear()}-${d.getMonth()}` };
   });
 }
 
@@ -39,6 +40,7 @@ function nowSlotStart(now: Date): SlotStart {
 }
 
 export function UserDashboard() {
+  const { t, language } = useT();
   const theme = useTheme();
   const { session } = useSession();
   // The admin can make a customer inactive: they can look around but not submit requests.
@@ -94,14 +96,16 @@ export function UserDashboard() {
     setSelectedSlot(null);
   }
   // Products or Services, by the store type; "Products" until a store is picked.
-  const words = catalogWords(store?.catalogType);
+  const words = catalogLabels(t, store?.catalogType);
   const slots = useStoreSlots(storeId, dateKey);
 
   // Confirmation passed back from the booking modal.
   const bookedMessage: BannerMessage | null = booked
     ? {
         type: 'success',
-        text: `Booking ${bookedStatus === 'accepted' ? 'confirmed' : 'requested'} for ${formatSlotStart(booked)}.${bookedStatus === 'pending' ? ' The store will review it.' : ''}`,
+        text: t(bookedStatus === 'accepted' ? 'user.bookedConfirmed' : 'user.bookedRequested', {
+          when: formatSlotStart(booked, language),
+        }),
       }
     : null;
 
@@ -128,11 +132,11 @@ export function UserDashboard() {
       return;
     }
     if (!storeId) {
-      setMessage({ type: 'error', text: 'Store is not selected.' });
+      setMessage({ type: 'error', text: t('user.storeNotSelected') });
       return;
     }
     if (!selectedSlot) {
-      setMessage({ type: 'error', text: 'Time is not selected.' });
+      setMessage({ type: 'error', text: t('user.timeNotSelected') });
       return;
     }
     setMessage(null);
@@ -148,12 +152,12 @@ export function UserDashboard() {
   };
 
   return (
-    <Screen>
+    <Screen ads>
       <AppHeader />
 
       <View style={styles.storeRow}>
         <Select
-          placeholder={stores.isLoading ? 'Loading stores…' : 'Select a store'}
+          placeholder={stores.isLoading ? t('storePicker.loading') : t('storePicker.select')}
           value={storeId}
           options={(stores.data ?? []).map((s) => ({
             // Service stores show their type of service, e.g. "Raju Tailor · Plumber".
@@ -162,7 +166,7 @@ export function UserDashboard() {
             // The rating opens the store's reviews; the name still selects the store.
             accessory: {
               content: <RatingBadge rating={s.rating} />,
-              accessibilityLabel: `See reviews for ${s.name}`,
+              accessibilityLabel: t('storePicker.seeReviews', { name: s.name }),
               onPress: () => router.push({ pathname: '/reviews', params: { storeId: s.id } }),
             },
           }))}
@@ -181,7 +185,7 @@ export function UserDashboard() {
           label={serviceCount ? `${words.Items} (${serviceCount})` : words.Items}
           variant="secondary"
           disabled={!store}
-          accessibilityHint={store ? undefined : 'Select a store first'}
+          accessibilityHint={store ? undefined : t('app.selectStoreFirst')}
           onPress={() => setServicesOpen(true)}
         />
       </View>
@@ -189,8 +193,12 @@ export function UserDashboard() {
         <View style={styles.storeInfo}>
           <StorePhoto uri={store.profile.photoUrl} name={store.name} style={styles.storePhoto} />
           <ThemedText type="default" themeColor="textSecondary" style={styles.flex}>
-            Max Count : {store.maxPerSlot} {store.isDarkStore ? 'orders ' : ''}per {LIMIT_UNIT_LABEL[store.limitUnit]}
-            {' · '}Open: {openDaysLabel(store.openDays)}
+            {t(store.isDarkStore ? 'user.maxOrders' : 'user.maxCount', {
+              count: store.maxPerSlot,
+              unit: limitUnitLabel(t, store.limitUnit),
+            })}
+            {' · '}
+            {t('user.open', { days: openDaysLabel(store.openDays, t) })}
           </ThemedText>
         </View>
       ) : null}
@@ -202,33 +210,33 @@ export function UserDashboard() {
         <View style={styles.cardHeader}>
           <View style={styles.flex}>
             <ThemedText style={[styles.cardTitle, { color: theme.cardText }]}>
-              {store?.isDarkStore ? 'Order Schedule' : 'Visitor Schedule'}
+              {t(store?.isDarkStore ? 'schedule.orderTitle' : 'schedule.visitorTitle')}
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.cardTextSecondary }}>
-              Monitor {store?.isDarkStore ? 'orders' : 'visitors'} by day and hour
+              {t(store?.isDarkStore ? 'schedule.monitorOrders' : 'schedule.monitorVisitors')}
             </ThemedText>
           </View>
           <View style={[styles.datePill, { backgroundColor: theme.purple }]}>
             <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-              {formatDayLong(dateKey)}
+              {formatDayLong(dateKey, language)}
             </ThemedText>
           </View>
         </View>
 
         <View style={styles.dateRow}>
           <Select
-            label="Month"
+            label={t('schedule.month')}
             value={monthKey}
-            options={monthOptions(today)}
+            options={monthOptions(today, language)}
             onChange={changeMonth}
             onCard
             style={styles.flex}
           />
           <Select
-            label="Day"
+            label={t('schedule.day')}
             value={day}
             // Only the days the store is open ("Mon 3"); every day before a store is chosen.
-            options={openDayOptions(store?.openDays, year, month)}
+            options={openDayOptions(store?.openDays, year, month, t)}
             onChange={(d) => {
               setDay(d);
               setSelectedSlot(null);
@@ -240,7 +248,7 @@ export function UserDashboard() {
 
         {!store ? (
           <ThemedText type="small" style={[styles.empty, { color: theme.cardTextSecondary }]}>
-            Select a store to see how many people are visiting and when.
+            {t('schedule.selectStore')}
           </ThemedText>
         ) : slots.isLoading ? (
           <ActivityIndicator style={styles.empty} color={theme.primary} />
@@ -264,12 +272,12 @@ export function UserDashboard() {
         )}
       </View>
 
-      <Banner message={inactive ? { type: 'error', text: INACTIVE_USER_HINT } : (message ?? bookedMessage)} />
+      <Banner message={inactive ? { type: 'error', text: t('hint.inactiveUser') } : (message ?? bookedMessage)} />
 
       <View style={styles.actions}>
-        <Button label="Reset" variant="danger" onPress={reset} />
+        <Button label={t('user.reset')} variant="danger" onPress={reset} />
         <Button
-          label={session ? 'Submit request' : 'Login to book'}
+          label={session ? t('user.submit') : t('user.loginToBook')}
           variant="success"
           onPress={book}
           disabled={inactive}

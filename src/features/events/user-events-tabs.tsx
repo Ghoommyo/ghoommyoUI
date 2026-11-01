@@ -17,29 +17,33 @@ import { todayKey } from '@/lib/date';
 import { showsPeople } from '@/lib/order-types';
 import { bucketEvents } from '@/lib/slots';
 import type { Booking } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
+import type { MessageKey } from '@/i18n/messages';
+import type { Translate } from '@/i18n/translate';
 
 type TabKey = 'coming' | 'inProgress' | 'completed';
 
-const TABS: Tab<TabKey>[] = [
-  { key: 'coming', label: 'Coming Events' },
-  { key: 'inProgress', label: 'In-Progress Events' },
-  { key: 'completed', label: 'Completed Events' },
+const tabs = (t: Translate): Tab<TabKey>[] => [
+  { key: 'coming', label: t('events.coming') },
+  { key: 'inProgress', label: t('events.inProgress') },
+  { key: 'completed', label: t('events.completed') },
 ];
 
-const EMPTY: Record<TabKey, string> = {
-  coming: 'No upcoming events. Book a visit from the dashboard.',
-  inProgress: 'Nothing scheduled for today.',
-  completed: 'No past events yet.',
+const EMPTY: Record<TabKey, MessageKey> = {
+  coming: 'events.comingEmpty',
+  inProgress: 'events.inProgressEmpty',
+  completed: 'events.completedEmpty',
 };
 
 /** The signed-in user's bookings: from tomorrow, today, and before today. */
 export function UserEventsTabs() {
+  const { t } = useT();
   const [tab, setTab] = useState<TabKey>('coming');
   const [today] = useState(todayKey);
   const [open, setOpen] = useState<Booking | null>(null);
   const [editing, setEditing] = useState<Booking | null>(null);
   const [rating, setRating] = useState<Booking | null>(null);
-  const [saved, setSaved] = useState<string | null>(null);
+  const [saved, setSaved] = useState<MessageKey | null>(null);
   const bookings = useMyBookings();
   const stores = useStores();
   const buckets = bucketEvents(bookings.data ?? [], today);
@@ -61,26 +65,26 @@ export function UserEventsTabs() {
     <View style={styles.container}>
       <View style={styles.header}>
         <ThemedText type="default" style={styles.heading}>
-          Your bookings
+          {t('events.yourBookings')}
         </ThemedText>
         <Button
-          label="↻ Refresh"
+          label={`↻ ${t('common.refresh')}`}
           variant="secondary"
           size="sm"
-          accessibilityLabel="Refresh bookings"
+          accessibilityLabel={t('events.refresh')}
           loading={bookings.isFetching && !bookings.isLoading}
           onPress={() => bookings.refetch()}
         />
       </View>
-      <Banner message={saved ? { type: 'success', text: saved } : null} />
-      <SegmentedTabs tabs={TABS} value={tab} onChange={setTab} />
+      <Banner message={saved ? { type: 'success', text: t(saved) } : null} />
+      <SegmentedTabs tabs={tabs(t)} value={tab} onChange={setTab} />
       {bookings.isLoading ? (
         <ActivityIndicator style={styles.empty} />
       ) : bookings.isError ? (
         <Banner message={{ type: 'error', text: errorMessage(bookings.error) }} />
       ) : buckets[tab].length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-          {EMPTY[tab]}
+          {t(EMPTY[tab])}
         </ThemedText>
       ) : (
         buckets[tab].map((b) => (
@@ -94,7 +98,7 @@ export function UserEventsTabs() {
               <>
                 <StatusChip status={b.status} />
                 {canEditBooking(b, today) ? (
-                  <Button label="✎ Edit" variant="secondary" size="sm" onPress={() => startEdit(b)} />
+                  <Button label={t('events.edit')} variant="secondary" size="sm" onPress={() => startEdit(b)} />
                 ) : null}
               </>
             }
@@ -120,7 +124,7 @@ export function UserEventsTabs() {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
-            setSaved('Changes saved. The store has been notified.');
+            setSaved('events.changesSaved');
           }}
         />
       ) : null}
@@ -130,7 +134,7 @@ export function UserEventsTabs() {
           onClose={() => setRating(null)}
           onSaved={() => {
             setRating(null);
-            setSaved('Thanks! Your rating was saved.');
+            setSaved('events.ratingSaved');
           }}
         />
       ) : null}

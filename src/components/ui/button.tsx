@@ -49,7 +49,9 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={color} />
       ) : (
-        <ThemedText type={size === 'sm' ? 'smallBold' : 'default'} style={{ color }}>
+        // One line: Android sometimes lays out a Hindi/Marathi label narrower than it measured it, and
+        // the wrapped last word was hidden.
+        <ThemedText type={size === 'sm' ? 'smallBold' : 'default'} style={{ color }} numberOfLines={1}>
           {label}
         </ThemedText>
       )}

@@ -5,23 +5,26 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatSlotStart } from '@/lib/date';
-import { ORDER_TYPE_LABEL } from '@/lib/order-types';
+import type { MessageKey } from '@/i18n/messages';
+import { orderTypeLabel } from '@/lib/order-types';
 import type { Booking, BookingStatus } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
-const STATUS_LABEL: Record<BookingStatus, string> = {
-  accepted: '✓ Accepted',
-  pending: '◦ Pending',
-  rejected: '✕ Rejected',
+const STATUS_LABEL: Record<BookingStatus, MessageKey> = {
+  accepted: 'status.accepted',
+  pending: 'status.pending',
+  rejected: 'status.rejected',
 };
 
 export function StatusChip({ status }: { status: BookingStatus }) {
+  const { t } = useT();
   const theme = useTheme();
   const color = { accepted: theme.success, pending: theme.warning, rejected: theme.danger }[status];
 
   return (
     <View style={[styles.chip, { backgroundColor: color }]}>
       <ThemedText type="smallBold" style={{ color: theme.onPrimary, fontSize: 13 }}>
-        {STATUS_LABEL[status]}
+        {t(STATUS_LABEL[status])}
       </ThemedText>
     </View>
   );
@@ -43,11 +46,12 @@ type EventCardProps = {
 
 /** Blue booking row from the dashboard references. */
 export function EventCard({ booking, title, actions, subtitle, showPeople = true, onPress }: EventCardProps) {
+  const { t, language } = useT();
   const theme = useTheme();
   // `Book table · 2 people`; older bookings have no order type.
   const meta = [
-    booking.orderType ? ORDER_TYPE_LABEL[booking.orderType] : '',
-    showPeople ? `${booking.people} ${booking.people === 1 ? 'person' : 'people'}` : '',
+    booking.orderType ? orderTypeLabel(t, booking.orderType) : '',
+    showPeople ? t('common.people', { count: booking.people }) : '',
   ]
     .filter(Boolean)
     .join(' · ');
@@ -59,11 +63,11 @@ export function EventCard({ booking, title, actions, subtitle, showPeople = true
         disabled={!onPress}
         onPress={onPress}
         accessibilityRole={onPress ? 'button' : undefined}
-        accessibilityLabel={onPress ? `${title}, ${formatSlotStart(booking.slotStart)}. Open details` : undefined}
+        accessibilityLabel={onPress ? t('common.openDetails', { title, when: formatSlotStart(booking.slotStart, language) }) : undefined}
         style={({ pressed }) => [styles.main, pressed && styles.pressed]}>
         <View style={styles.who}>
           <ThemedText type="small" style={styles.light}>
-            {formatSlotStart(booking.slotStart)}
+            {formatSlotStart(booking.slotStart, language)}
           </ThemedText>
           <ThemedText type="smallBold" style={[styles.light, styles.title]}>
             {title}
@@ -76,7 +80,7 @@ export function EventCard({ booking, title, actions, subtitle, showPeople = true
         </View>
         <View style={[styles.details, { borderLeftColor: 'rgba(255,255,255,0.5)' }]}>
           <ThemedText style={styles.light} numberOfLines={6}>
-            {booking.description || 'No description'}
+            {booking.description || t('common.noDescription')}
           </ThemedText>
           {meta ? (
             <ThemedText type="small" style={styles.light}>

@@ -137,3 +137,9 @@ Stores upload photos of their products/services and a store photo once the app a
 Signup verifies the email with a 6-digit code (a **Verify** button beside Email); **Forgot password?** on login resets the password with an emailed code. Users and stores alike.
 
 - [x] [Email verification and forgot password](email-verification.md)
+
+## Languages (branch `languages`)
+
+The app in English, हिन्दी and मराठी: chosen in Settings (saved on the account) or, for guests, in the side menu; it starts in the phone's language. Plan and notes: the website repo's `plans/phase-30-languages.md`.
+
+- [x] Every screen, the drawer, the menu and booking reminders translated

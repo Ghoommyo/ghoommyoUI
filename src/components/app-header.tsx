@@ -11,9 +11,11 @@ import { Spacing } from '@/constants/theme';
 import { NotificationsPanel } from '@/features/notifications/notifications-panel';
 import { useNotifications } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n/language-provider';
 
 /** Wordmark, the notifications bell (signed in) and the "≡ Menu" button. Used by every drawer screen. */
 export function AppHeader({ title }: { title?: string }) {
+  const { t } = useT();
   const theme = useTheme();
   const navigation = useNavigation();
   const { session } = useSession();
@@ -33,7 +35,7 @@ export function AppHeader({ title }: { title?: string }) {
           {session ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={unseen ? `Notifications, ${unseen} new` : 'Notifications'}
+              accessibilityLabel={unseen ? t('notifications.titleNew', { count: unseen }) : t('notifications.title')}
               onPress={() => setNotificationsOpen(true)}
               style={({ pressed }) => [
                 styles.bell,
@@ -55,15 +57,15 @@ export function AppHeader({ title }: { title?: string }) {
           ) : null}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open menu"
+            accessibilityLabel={t('common.openMenu')}
             onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
             style={({ pressed }) => [
               styles.menu,
               { backgroundColor: theme.primary },
               pressed && styles.pressed,
             ]}>
-            <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>
-              ≡ Menu
+            <ThemedText type="smallBold" style={{ color: theme.onPrimary }} numberOfLines={1}>
+              ≡ {t('common.menu')}
             </ThemedText>
           </Pressable>
         </View>

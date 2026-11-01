@@ -66,7 +66,7 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
   - **Flow:** the dashboard's **Services** modal → **Submit request** passes picks as the `services` route param (`id:qty,…`, `src/lib/services.ts`) → the booking form prefills the description with the numbered services and total, and sends them as structured data too.
 - **Picture uploads** (branch `image_uploads`, plan `plans/image-uploads.md`):
   - **Endpoint:** `POST /uploads` (multipart `kind` = `item` | `store` | `user`, `file`) returns a URL; the forms save it as the item's `imageUrl`, the store profile's `photoUrl` (`locProfileUrl`) or the user profile's `photoUrl` (`PUT /traveller/profile`, which now saves name and mobile too).
-  - **Admin switch:** stores can upload only when the app admin turned it on (`uploads_on` on the owner's settings GET → `Store.uploadsEnabled`); otherwise the photo controls are disabled with `UPLOADS_OFF_HINT`. Pasting an item image link always works. User photos aren't gated.
+  - **Admin switch:** stores can upload only when the app admin turned it on (`uploads_on` on the owner's settings GET → `Store.uploadsEnabled`); otherwise the photo controls are disabled with the `upload.off` hint. Pasting an item image link always works. User photos aren't gated.
   - **Client:** `src/lib/pick-image.ts` (expo-image-picker, then expo-image-manipulator to a ≤1280 px JPEG), `ImageField` (`src/components/ui/image-field.tsx`), `Avatar` with `uri`, `StorePhoto` (Home cards, dashboard header). The picker and manipulator are native modules: rebuild dev builds after pulling.
   - **Backends:** the server stores pictures on Cloudinary (a local server without keys uses its `.uploads/` folder); the stub keeps them in memory (Raju Tailor has uploads on, City Salon off); the dummy backend returns the device's local URI (Raju Tailor on).
 - **Email verification and forgot password** (branch `email_verification`, plan `plans/email-verification.md`):
@@ -109,6 +109,16 @@ npm run stub:api          # local stand-in for the Ghoomo API on :3000 (see Back
 - **Where the setting lives:** SecureStore per account (what scheduling uses), seeded from the server on a new device. Every save also goes to `PUT /reminder-settings` for auditing (best-effort).
 - **Builds:** the custom sound and exact alarms need a **development build** (`npx expo run:android`), not Expo Go. The emulator reaches the Vercel API directly; a local server is `http://10.0.2.2:3000/apis` from it.
 - **iOS:** not verified here (no Xcode). Use Xcode or an EAS development build.
+
+### Languages (English, Hindi, Marathi)
+
+- **Never hard-code screen text.** Add a key to the right file in `src/i18n/messages/` (`{ en, hi, mr }` side by side; app-only keys in `messages/app.ts`) and use `const { t, language } = useT()` (`src/i18n/language-provider.tsx`). A missing language is a `tsc` error. The other message files are copies of the website's `app/i18n/messages/`, so keep shared keys the same there.
+- `t(key, { count })` fills `{count}` and picks "one|other" plurals. Helpers that make text take `t`/`language` as parameters (`orderTypeLabel`, `catalogLabels`, `countLabel`, `openDaysLabel`, `timeOptions`, `formatSlotStart`, …). Outside React (API client errors, `pick-image`, reminders) use `say()` / `currentLanguage()` from `src/i18n/translate.ts`.
+- **Language order:** the device's stored choice (`ghoomyo.language`) → the phone's language (expo-localization) → English. Sign-in switches to the account's saved language, or saves the current one to it (`api.setLanguage`, `PUT /account/language`). Settings has the Language section; guests use the picker in the side menu and on the auth screens.
+- **Dates** use `Intl` with `{lang}-IN-u-nu-latn` (digits stay 0–9); English keeps its own formats.
+- **Stays English (data):** server messages, store categories and service types, the calendar ids from `MONTHS`, and the `Products`/`Services` block written into booking descriptions (`catalogWords`, matched by `replaceServicesBlock`).
+- **Reminders** are written in the app's language and rescheduled when it changes (`reminder-sync.tsx`).
+- Plan: the website repo's `plans/phase-30-languages.md`.
 
 ### Cross-platform rules
 

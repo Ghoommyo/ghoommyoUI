@@ -13,9 +13,10 @@ import { DescriptionHistory } from '@/features/bookings/description-history';
 import { useSetBookingStatus, useStores } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { formatSlotStart } from '@/lib/date';
-import { catalogWords, hasStoreAddress, ORDER_TYPE_LABEL, showsPeople, visitsStore } from '@/lib/order-types';
+import { catalogLabels, hasStoreAddress, orderTypeLabel, showsPeople, visitsStore } from '@/lib/order-types';
 import { formatPrice } from '@/lib/services';
 import type { Booking, BookingStatus, CatalogType } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 type BookingDetailsModalProps = {
   booking: Booking;
@@ -42,8 +43,9 @@ export function BookingDetailsModal({
   onEdit,
   onRate,
 }: BookingDetailsModalProps) {
+  const { t, language } = useT();
   const theme = useTheme();
-  const words = catalogWords(catalogType);
+  const words = catalogLabels(t, catalogType);
   // Customers visiting the store are reminded where it is.
   const stores = useStores();
   // Keep the latest version after accepting/rejecting from here.
@@ -53,15 +55,15 @@ export function BookingDetailsModal({
   const change = (status: BookingStatus) => setStatus.mutate({ bookingId: booking.id, status }, { onSuccess: setBooking });
 
   const rows: [string, ReactNode][] = [
-    viewer === 'store' ? ['Customer', booking.name] : ['Store', booking.storeName],
+    viewer === 'store' ? [t('booking.customer'), booking.name] : [t('booking.store'), booking.storeName],
   ];
   if (booking.mobile) {
     rows.push([
-      viewer === 'store' ? 'Mobile' : 'Your mobile',
+      viewer === 'store' ? t('booking.mobile') : t('booking.yourMobile'),
       viewer === 'store' ? (
         <Pressable
           accessibilityRole="link"
-          accessibilityLabel={`Call ${booking.mobile}`}
+          accessibilityLabel={t('app.call', { number: booking.mobile })}
           onPress={() => Linking.openURL(`tel:${booking.mobile.replace(/[\s-]/g, '')}`)}>
           <ThemedText type="smallBold" style={{ color: theme.primary }}>
             {booking.mobile}
@@ -72,11 +74,11 @@ export function BookingDetailsModal({
       ),
     ]);
   }
-  rows.push(['When', formatSlotStart(booking.slotStart)]);
-  if (booking.orderType) rows.push(['Order type', ORDER_TYPE_LABEL[booking.orderType]]);
-  if (showsPeople(booking, isDarkStore)) rows.push(['People', String(booking.people)]);
+  rows.push([t('booking.when'), formatSlotStart(booking.slotStart, language)]);
+  if (booking.orderType) rows.push([t('booking.orderType'), orderTypeLabel(t, booking.orderType)]);
+  if (showsPeople(booking, isDarkStore)) rows.push([t('booking.people'), String(booking.people)]);
   if (booking.deliveryAddress) {
-    rows.push([booking.orderType === 'homeVisit' ? 'Visit at' : 'Deliver to', booking.deliveryAddress]);
+    rows.push([booking.orderType === 'homeVisit' ? t('booking.visitAt') : t('booking.deliverTo'), booking.deliveryAddress]);
   }
   const store =
     viewer === 'user' && visitsStore(booking.orderType)
@@ -84,30 +86,30 @@ export function BookingDetailsModal({
       : undefined;
   if (store && hasStoreAddress(store)) {
     const place = [store.profile.city, store.profile.pin].filter(Boolean).join(' ');
-    rows.push(['Store address', [store.profile.address, place].filter(Boolean).join('\n')]);
+    rows.push([t('booking.storeAddress'), [store.profile.address, place].filter(Boolean).join('\n')]);
   }
 
   const footer =
     viewer === 'store' ? (
       <View style={styles.actions}>
         {booking.status !== 'rejected' ? (
-          <Button label="✕ Reject" variant="danger" loading={busy === 'rejected'} disabled={setStatus.isPending} onPress={() => change('rejected')} />
+          <Button label={t('booking.reject')} variant="danger" loading={busy === 'rejected'} disabled={setStatus.isPending} onPress={() => change('rejected')} />
         ) : null}
         {booking.status !== 'accepted' ? (
-          <Button label="✓ Accept" variant="success" loading={busy === 'accepted'} disabled={setStatus.isPending} onPress={() => change('accepted')} />
+          <Button label={t('booking.accept')} variant="success" loading={busy === 'accepted'} disabled={setStatus.isPending} onPress={() => change('accepted')} />
         ) : null}
       </View>
     ) : onEdit || onRate ? (
       <View style={styles.actions}>
         {onRate ? (
-          <Button label={booking.rating ? '★ Edit rating' : '★ Rate'} variant={onEdit ? 'secondary' : 'primary'} onPress={() => onRate(booking)} />
+          <Button label={`★ ${booking.rating ? t('booking.editRating') : t('booking.rate')}`} variant={onEdit ? 'secondary' : 'primary'} onPress={() => onRate(booking)} />
         ) : null}
-        {onEdit ? <Button label="Edit booking" onPress={() => onEdit(booking)} /> : null}
+        {onEdit ? <Button label={t('booking.edit')} onPress={() => onEdit(booking)} /> : null}
       </View>
     ) : undefined;
 
   return (
-    <Sheet visible title="Booking details" onClose={onClose} footer={footer}>
+    <Sheet visible title={t('booking.details')} onClose={onClose} footer={footer}>
       <View style={styles.statusRow}>
         <StatusChip status={booking.status} />
         <ThemedText type="small" themeColor="textSecondary">
@@ -144,7 +146,7 @@ export function BookingDetailsModal({
             ))}
             <View style={[styles.itemLine, styles.itemTotal, { borderTopColor: theme.border }]}>
               <ThemedText type="smallBold" style={styles.itemName}>
-                Total
+                {t('booking.total')}
               </ThemedText>
               <ThemedText type="smallBold">
                 {formatPrice(booking.services.reduce((sum, s) => sum + s.price * s.qty, 0))}
@@ -156,7 +158,7 @@ export function BookingDetailsModal({
 
       {viewer === 'user' && booking.rating ? (
         <View style={styles.section}>
-          <ThemedText type="smallBold">Your rating</ThemedText>
+          <ThemedText type="smallBold">{t('booking.yourRating')}</ThemedText>
           <View style={[styles.box, { backgroundColor: theme.backgroundSelected }]}>
             <Stars value={booking.rating.stars} />
             {booking.rating.review ? <ThemedText>{booking.rating.review}</ThemedText> : null}
@@ -165,7 +167,7 @@ export function BookingDetailsModal({
       ) : null}
 
       <View style={styles.section}>
-        <ThemedText type="smallBold">Description</ThemedText>
+        <ThemedText type="smallBold">{t('booking.description')}</ThemedText>
         <DescriptionHistory description={booking.description} />
       </View>
     </Sheet>

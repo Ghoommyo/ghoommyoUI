@@ -9,6 +9,7 @@ import { SessionProvider, useSession } from '@/auth/session';
 import { Colors } from '@/constants/theme';
 import { ReminderSync } from '@/features/reminders/reminder-sync';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { LanguageProvider, useT } from '@/i18n/language-provider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,12 +32,14 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={navigationTheme}>
-        <SessionProvider>
-          <QueryProvider>
-            <RootNavigator />
-            <ReminderSync />
-          </QueryProvider>
-        </SessionProvider>
+        <LanguageProvider>
+          <SessionProvider>
+            <QueryProvider>
+              <RootNavigator />
+              <ReminderSync />
+            </QueryProvider>
+          </SessionProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );
@@ -71,6 +74,7 @@ function QueryProvider({ children }: PropsWithChildren) {
 
 function RootNavigator() {
   const { session, isLoading } = useSession();
+  const { t } = useT();
 
   useEffect(() => {
     if (!isLoading) SplashScreen.hideAsync();
@@ -89,7 +93,7 @@ function RootNavigator() {
       <Stack.Protected guard={session?.role === 'user'}>
         <Stack.Screen
           name="booking"
-          options={{ presentation: 'modal', headerShown: true, title: 'Book a visit' }}
+          options={{ presentation: 'modal', headerShown: true, title: t('book.title') }}
         />
       </Stack.Protected>
     </Stack>

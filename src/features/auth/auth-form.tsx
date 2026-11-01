@@ -8,24 +8,26 @@ import { Screen } from '@/components/ui/screen';
 import type { SelectOption } from '@/components/ui/select';
 import { Spacing } from '@/constants/theme';
 import type { Role } from '@/types/domain';
+import { LanguagePicker } from '@/components/language-picker';
+import type { Translate } from '@/i18n/translate';
 
-export const ROLE_OPTIONS: SelectOption<Role>[] = [
-  { label: 'User', value: 'user' },
-  { label: 'Store', value: 'store' },
+export const roleOptions = (t: Translate): SelectOption<Role>[] => [
+  { label: t('auth.roleUser'), value: 'user' },
+  { label: t('auth.roleStore'), value: 'store' },
 ];
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const MIN_PASSWORD_LENGTH = 8;
 
-export function validateEmail(email: string) {
-  if (!email.trim()) return 'Email is required.';
-  if (!EMAIL_PATTERN.test(email.trim())) return 'Enter a valid email address.';
+export function validateEmail(email: string, t: Translate) {
+  if (!email.trim()) return t('validation.emailRequired');
+  if (!EMAIL_PATTERN.test(email.trim())) return t('validation.emailInvalid');
 }
 
-export function validateUsername(username: string) {
+export function validateUsername(username: string, t: Translate) {
   const length = username.trim().length;
-  if (!length) return 'Username is required.';
-  if (length < 2 || length > 40) return 'Username must be 2–40 characters.';
+  if (!length) return t('validation.usernameRequired');
+  if (length < 2 || length > 40) return t('validation.usernameLength');
 }
 
 type AuthFormLayoutProps = PropsWithChildren<{
@@ -58,6 +60,7 @@ export function AuthFormLayout({
           <ThemedText type="linkPrimary">{footerLinkText}</ThemedText>
         </Link>
       </View>
+      <LanguagePicker />
     </Screen>
   );
 }

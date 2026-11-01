@@ -11,12 +11,13 @@ import { EmailVerifyField } from '@/features/auth/email-verify-field';
 import {
   AuthFormLayout,
   MIN_PASSWORD_LENGTH,
-  ROLE_OPTIONS,
+  roleOptions,
   validateEmail,
   validateUsername,
 } from '@/features/auth/auth-form';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
 import type { Role, SignupInput } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 type FieldErrors = {
   role?: string;
@@ -28,6 +29,7 @@ type FieldErrors = {
 };
 
 export default function SignupScreen() {
+  const { t } = useT();
   const [role, setRole] = useState<Role>();
   const [username, setUsername] = useState('');
   const [locationName, setLocationName] = useState('');
@@ -53,15 +55,15 @@ export default function SignupScreen() {
 
   const submit = () => {
     const next: FieldErrors = {
-      role: role ? undefined : 'Choose an account type.',
-      username: role === 'user' ? validateUsername(username) : undefined,
-      locationName: isStore ? validateStoreName(locationName) : undefined,
-      email: validateEmail(email) ?? (verificationToken ? undefined : 'Verify your email to continue.'),
+      role: role ? undefined : t('auth.chooseType'),
+      username: role === 'user' ? validateUsername(username, t) : undefined,
+      locationName: isStore ? validateStoreName(locationName, t) : undefined,
+      email: validateEmail(email, t) ?? (verificationToken ? undefined : t('auth.verifyFirst')),
       password:
         password.length < MIN_PASSWORD_LENGTH
-          ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+          ? t('auth.passwordLength', { count: MIN_PASSWORD_LENGTH })
           : undefined,
-      confirm: confirm !== password ? 'Passwords do not match.' : undefined,
+      confirm: confirm !== password ? t('auth.passwordsDiffer') : undefined,
     };
     setErrors(next);
     if (!role || !verificationToken || Object.values(next).some(Boolean)) return;
@@ -74,18 +76,18 @@ export default function SignupScreen() {
 
   return (
     <AuthFormLayout
-      title="Sign up"
-      footerText="Already a member?"
-      footerLinkText="Click to login"
+      title={t('auth.signup')}
+      footerText={t('auth.alreadyMember')}
+      footerLinkText={t('auth.toLogin')}
       footerHref="/login">
       <Banner
         message={signup.isError ? { type: 'error', text: errorMessage(signup.error) } : null}
       />
       <Select
-        label="Type"
-        placeholder="User or store"
+        label={t('auth.type')}
+        placeholder={t('auth.typePlaceholder')}
         value={role}
-        options={ROLE_OPTIONS}
+        options={roleOptions(t)}
         onChange={(value) => {
           // A verified email is tied to the account type.
           if (value !== role) setVerificationToken(null);
@@ -96,30 +98,30 @@ export default function SignupScreen() {
       />
       {isStore ? (
         <TextField
-          label="Store name"
+          label={t('auth.storeName')}
           value={locationName}
           onChangeText={(value) => {
             setLocationName(value);
             setErrors((e) => ({ ...e, locationName: undefined }));
           }}
           onBlur={() =>
-            locationName && setErrors((e) => ({ ...e, locationName: validateStoreName(locationName) }))
+            locationName && setErrors((e) => ({ ...e, locationName: validateStoreName(locationName, t) }))
           }
           error={errors.locationName}
           hint={
             locationName.trim()
-              ? `Must be unique. Saved as "${storeKey(locationName)}".`
-              : 'Letters, numbers and spaces only. Must be unique.'
+              ? t('auth.storeNameSaved', { key: storeKey(locationName) })
+              : t('auth.storeNameHint')
           }
           autoComplete="organization"
         />
       ) : role === 'user' ? (
         <TextField
-          label="Username"
+          label={t('auth.username')}
           value={username}
           onChangeText={setUsername}
           error={errors.username}
-          hint="Shown on your bookings. Doesn't need to be unique."
+          hint={t('auth.usernameHint')}
           autoComplete="username"
           textContentType="username"
         />
@@ -141,7 +143,7 @@ export default function SignupScreen() {
         error={errors.email}
       />
       <TextField
-        label="Password"
+        label={t('auth.password')}
         value={password}
         onChangeText={setPassword}
         error={errors.password}
@@ -150,7 +152,7 @@ export default function SignupScreen() {
         textContentType="newPassword"
       />
       <TextField
-        label="Confirm password"
+        label={t('auth.confirmPassword')}
         value={confirm}
         onChangeText={setConfirm}
         error={errors.confirm}
@@ -159,7 +161,7 @@ export default function SignupScreen() {
         textContentType="newPassword"
         onSubmitEditing={submit}
       />
-      <Button label="Sign up" onPress={submit} loading={signup.isPending} fullWidth />
+      <Button label={t('auth.signup')} onPress={submit} loading={signup.isPending} fullWidth />
     </AuthFormLayout>
   );
 }

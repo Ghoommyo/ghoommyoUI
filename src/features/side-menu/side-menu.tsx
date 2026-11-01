@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,57 +12,67 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Spacing } from '@/constants/theme';
 import { useMyProfile, useStore } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
+import { privacyChoicesRequired, showPrivacyChoices } from '@/lib/ads';
 import { openSitePage } from '@/lib/site';
+import { LanguagePicker } from '@/components/language-picker';
+import type { MessageKey } from '@/i18n/messages';
+import { useT } from '@/i18n/language-provider';
 
-type Item = { label: string; href: Href; route?: string };
+type Item = { label: MessageKey; href: Href; route?: string };
 
 /** Information pages: native screens, or website pages opened in the in-app browser. */
-const MORE: ({ label: string; href: Href; route: string } | { label: string; site: string })[] = [
-  { label: 'About', href: '/about', route: 'about' },
-  { label: 'Help & FAQ', site: '/help' },
-  { label: 'Support', site: '/support' },
-  { label: 'Contact us', href: '/contact', route: 'contact' },
-  { label: 'Privacy policy', site: '/privacy' },
-  { label: 'Terms of service', site: '/terms' },
-  { label: 'Delete account', href: '/delete-account', route: 'delete-account' },
+const MORE: ({ label: MessageKey; href: Href; route: string } | { label: MessageKey; site: string })[] = [
+  { label: 'info.about', href: '/about', route: 'about' },
+  { label: 'info.help', site: '/help' },
+  { label: 'info.support', site: '/support' },
+  { label: 'info.contact', href: '/contact', route: 'contact' },
+  { label: 'info.privacy', site: '/privacy' },
+  { label: 'info.terms', site: '/terms' },
+  { label: 'info.deleteAccount', href: '/delete-account', route: 'delete-account' },
 ];
 
 export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
+  const { t } = useT();
   const theme = useTheme();
   const { session, signOut } = useSession();
   const [confirmLogout, setConfirmLogout] = useState(false);
   const profile = useMyProfile();
   const store = useStore(session?.role === 'store' ? session.accountId : undefined);
   const activeRoute = state.routes[state.index]?.name;
+  // Google's ad privacy choices, offered only where the law needs it (EU/UK users).
+  const [privacyChoices, setPrivacyChoices] = useState(false);
+  useEffect(() => {
+    privacyChoicesRequired().then(setPrivacyChoices);
+  }, []);
 
   const displayName =
     session?.role === 'store'
       ? (store.data?.name ?? session.name ?? session.email)
-      : (profile.data?.name || session?.name || session?.email || 'Guest');
+      : (profile.data?.name || session?.name || session?.email || t('menu.guest'));
 
   const photoUrl = session?.role === 'store' ? store.data?.profile.photoUrl : profile.data?.photoUrl;
 
   const items: Item[] = session
     ? [
-        { label: 'Home', href: '/home', route: 'home' },
-        { label: 'Dashboard', href: '/dashboard', route: 'dashboard' },
+        { label: 'menu.home', href: '/home', route: 'home' },
+        { label: 'menu.dashboard', href: '/dashboard', route: 'dashboard' },
         ...(session.role === 'user'
           ? [
-              { label: 'Events', href: '/events' as const, route: 'events' },
-              { label: 'Addresses', href: '/addresses' as const, route: 'addresses' },
+              { label: 'menu.events' as const, href: '/events' as const, route: 'events' },
+              { label: 'menu.addresses' as const, href: '/addresses' as const, route: 'addresses' },
             ]
           : []),
         ...(session.role === 'store'
-          ? [{ label: 'Reviews', href: '/reviews' as const, route: 'reviews' }]
+          ? [{ label: 'menu.reviews' as const, href: '/reviews' as const, route: 'reviews' }]
           : []),
-        { label: 'Profile', href: '/profile', route: 'profile' },
-        { label: 'Settings', href: '/settings', route: 'settings' },
+        { label: 'menu.profile', href: '/profile', route: 'profile' },
+        { label: 'menu.settings', href: '/settings', route: 'settings' },
       ]
     : [
-        { label: 'Home', href: '/home', route: 'home' },
-        { label: 'Dashboard', href: '/dashboard', route: 'dashboard' },
-        { label: 'Login', href: '/login' },
-        { label: 'Sign up', href: '/signup' },
+        { label: 'menu.home', href: '/home', route: 'home' },
+        { label: 'menu.dashboard', href: '/dashboard', route: 'dashboard' },
+        { label: 'menu.login', href: '/login' },
+        { label: 'menu.signup', href: '/signup' },
       ];
 
   const go = (href: Href) => {
@@ -82,9 +92,9 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
             <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
               {session
                 ? session.role === 'store'
-                  ? `Store · ${session.locCode ?? session.email}`
+                  ? t('menu.storeLine', { code: session.locCode ?? session.email })
                   : session.email
-                : 'Not signed in'}
+                : t('menu.notSignedIn')}
             </ThemedText>
           </View>
         </View>
@@ -95,26 +105,26 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
             return (
               <MenuItem
                 key={item.label}
-                label={item.label}
+                label={t(item.label)}
                 active={active}
                 onPress={() => go(item.href)}
               />
             );
           })}
           {session ? (
-            <MenuItem label="Logout" danger onPress={() => setConfirmLogout(true)} />
+            <MenuItem label={t('menu.logout')} danger onPress={() => setConfirmLogout(true)} />
           ) : null}
           <ThemedText
             type="smallBold"
             themeColor="textSecondary"
             style={[styles.moreTitle, { borderTopColor: theme.border }]}
             accessibilityRole="header">
-            MORE
+            {t('app.moreTitle')}
           </ThemedText>
           {MORE.map((item) => (
             <MenuItem
               key={item.label}
-              label={item.label}
+              label={t(item.label)}
               small
               active={'route' in item && item.route === activeRoute}
               onPress={() => {
@@ -125,14 +135,30 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
               }}
             />
           ))}
+          {privacyChoices && (
+            <MenuItem
+              label={t('app.privacyChoices')}
+              small
+              onPress={() => {
+                navigation.closeDrawer();
+                showPrivacyChoices();
+              }}
+            />
+          )}
+          {/* Signed-in people choose in Settings (saved on the account); guests choose here. */}
+          {!session && (
+            <View style={[styles.language, { borderTopColor: theme.border }]}>
+              <LanguagePicker />
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
 
       <ConfirmModal
         visible={confirmLogout}
-        title="Log out?"
-        message="You'll need to log in again to book or manage appointments."
-        confirmLabel="Logout"
+        title={t('menu.logoutTitle')}
+        message={t('menu.logoutMessage')}
+        confirmLabel={t('menu.logout')}
         destructive
         onCancel={() => setConfirmLogout(false)}
         onConfirm={async () => {
@@ -205,6 +231,12 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: 16,
+  },
+  language: {
+    marginTop: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingHorizontal: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   moreTitle: {
     marginTop: Spacing.two,

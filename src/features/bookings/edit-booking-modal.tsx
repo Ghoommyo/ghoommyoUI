@@ -16,6 +16,7 @@ import { MESSAGE_SEPARATOR } from '@/lib/bookings';
 import { formatSlotStart } from '@/lib/date';
 import { asksPeople } from '@/lib/order-types';
 import type { Booking, BookingChanges } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 const MOBILE_PATTERN = /^\+?\d{10,15}$/;
 
@@ -34,6 +35,7 @@ type EditBookingModalProps = {
  * description below a ===== line. The store is notified. Mount it only while open.
  */
 export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose, onSaved }: EditBookingModalProps) {
+  const { t, language } = useT();
   const theme = useTheme();
   const update = useUpdateBooking();
   // Dark-store orders and home visits have no head count to change.
@@ -49,8 +51,8 @@ export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose,
     if (hasPeople && people !== booking.people) changes.people = people;
     if (mobile.trim() !== booking.mobile) changes.mobile = mobile.trim();
     const next = {
-      mobile: MOBILE_PATTERN.test(mobile.replace(/[\s-]/g, '')) ? undefined : 'Enter a valid mobile number.',
-      form: Object.keys(changes).length ? undefined : 'Nothing to save. Change something or write a message.',
+      mobile: MOBILE_PATTERN.test(mobile.replace(/[\s-]/g, '')) ? undefined : t('booking.invalidMobile'),
+      form: Object.keys(changes).length ? undefined : t('booking.nothingToSave'),
     };
     setErrors(next);
     if (next.mobile || next.form) return;
@@ -65,12 +67,12 @@ export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose,
   return (
     <Sheet
       visible
-      title="Edit booking"
+      title={t('booking.edit')}
       onClose={onClose}
       footer={
         <View style={styles.actions}>
-          <Button label="Cancel" variant="secondary" onPress={onClose} />
-          <Button label="Save and notify store" variant="success" loading={update.isPending} onPress={save} />
+          <Button label={t('common.cancel')} variant="secondary" onPress={onClose} />
+          <Button label={t('booking.saveAndNotify')} variant="success" loading={update.isPending} onPress={save} />
         </View>
       }>
       <Banner
@@ -85,13 +87,13 @@ export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose,
       <View style={[styles.summary, { backgroundColor: theme.backgroundSelected }]}>
         <ThemedText type="smallBold">{booking.storeName}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          {formatSlotStart(booking.slotStart)}
+          {formatSlotStart(booking.slotStart, language)}
         </ThemedText>
       </View>
 
       {hasPeople ? (
         <Select
-          label="How many people are coming"
+          label={t('booking.howManyPeople')}
           value={people}
           options={peopleOptions}
           onChange={(value) => {
@@ -101,7 +103,7 @@ export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose,
         />
       ) : null}
       <TextField
-        label="Contact (mobile)"
+        label={t('booking.contactMobile')}
         value={mobile}
         onChangeText={(value) => {
           setMobile(value);
@@ -113,7 +115,7 @@ export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose,
       />
 
       <View style={styles.description}>
-        <ThemedText type="smallBold">Description</ThemedText>
+        <ThemedText type="smallBold">{t('booking.description')}</ThemedText>
         <DescriptionHistory description={booking.description} />
         <View style={styles.separator} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <View style={[styles.line, { backgroundColor: theme.border }]} />
@@ -123,14 +125,14 @@ export function EditBookingModal({ booking, maxPerBooking, isDarkStore, onClose,
           <View style={[styles.line, { backgroundColor: theme.border }]} />
         </View>
         <TextField
-          label="Add a message"
+          label={t('booking.addMessage')}
           value={message}
           onChangeText={(value) => {
             setMessage(value);
             setErrors({});
           }}
-          placeholder="Anything you'd like to add for the store"
-          hint="It's added below the line; the earlier text stays as it is."
+          placeholder={t('booking.addMessagePlaceholder')}
+          hint={t('booking.addMessageHint')}
           multiline
         />
       </View>

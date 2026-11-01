@@ -3,10 +3,11 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
+import { AdBanner } from '@/components/ui/ad-banner';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 
-/** Scrollable, safe-area-aware page with centered content capped at MaxContentWidth. */
-export function Screen({ children }: PropsWithChildren) {
+/** Scrollable, safe-area-aware page with centered content capped at MaxContentWidth. `ads` pins a banner under it. */
+export function Screen({ children, ads }: PropsWithChildren<{ ads?: boolean }>) {
   return (
     <ThemedView style={styles.fill}>
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
@@ -19,6 +20,7 @@ export function Screen({ children }: PropsWithChildren) {
             {children}
           </ScrollView>
         </KeyboardAvoidingView>
+        {ads && <AdBanner />}
       </SafeAreaView>
     </ThemedView>
   );

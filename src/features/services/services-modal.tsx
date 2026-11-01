@@ -10,9 +10,10 @@ import { Sheet } from '@/components/ui/sheet';
 import { Spacing } from '@/constants/theme';
 import { useStoreServices } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { catalogWords } from '@/lib/order-types';
+import { catalogLabels } from '@/lib/order-types';
 import { countServices, formatPrice } from '@/lib/services';
 import type { CatalogType, ServicePicks, StoreService } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 type ServicesModalProps = {
   storeId: string;
@@ -38,7 +39,8 @@ export function ServicesModal({
   onSave,
   onClose,
 }: ServicesModalProps) {
-  const words = catalogWords(catalogType);
+  const { t } = useT();
+  const words = catalogLabels(t, catalogType);
   const services = useStoreServices(storeId);
   const [draft, setDraft] = useState<ServicePicks>(initial);
   const count = countServices(draft);
@@ -67,7 +69,7 @@ export function ServicesModal({
       onClose={onClose}
       footer={
         <Button
-          label={count ? `Save (${count} selected)` : 'Save'}
+          label={count ? t('items.saveCount', { count }) : t('items.save')}
           variant="success"
           fullWidth
           disabled={!services.data}
@@ -80,7 +82,7 @@ export function ServicesModal({
         <Banner message={{ type: 'error', text: errorMessage(services.error) }} />
       ) : !services.data?.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-          This store hasn&apos;t added any {words.items} yet.
+          {t('items.none', { items: words.items })}
         </ThemedText>
       ) : (
         <View>
@@ -109,6 +111,7 @@ type ServiceRowProps = {
 };
 
 function ServiceRow({ number, service, qty, first, onChange }: ServiceRowProps) {
+  const { t } = useT();
   const theme = useTheme();
 
   return (
@@ -137,20 +140,20 @@ function ServiceRow({ number, service, qty, first, onChange }: ServiceRowProps) 
         <View style={styles.stepper}>
           <StepButton
             glyph="−"
-            label={`Remove one ${service.name}`}
+            label={t('items.removeOne', { name: service.name })}
             disabled={qty === 0}
             onPress={() => onChange(service, -1)}
           />
           <ThemedText
             type="smallBold"
             style={styles.qty}
-            accessibilityLabel={`${qty} ${service.name} selected`}
+            accessibilityLabel={t('items.selected', { count: qty, name: service.name })}
             accessibilityLiveRegion="polite">
             {qty}
           </ThemedText>
           <StepButton
             glyph="+"
-            label={`Add one ${service.name}`}
+            label={t('items.addOne', { name: service.name })}
             primary
             disabled={qty >= service.maxQty}
             onPress={() => onChange(service, 1)}
@@ -158,7 +161,7 @@ function ServiceRow({ number, service, qty, first, onChange }: ServiceRowProps) 
         </View>
         {service.maxQty > 1 ? (
           <ThemedText type="small" themeColor="textSecondary" style={styles.max}>
-            max {service.maxQty}
+            {t('items.max', { count: service.maxQty })}
           </ThemedText>
         ) : null}
       </View>

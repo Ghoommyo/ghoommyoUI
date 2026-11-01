@@ -49,6 +49,13 @@
         }
       ],
       "expo-secure-store",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
       "expo-maps",
       [
         "expo-notifications",
@@ -65,6 +72,34 @@
           "photosPermission": "Ghoomyo uses your photos so you can add pictures of your store, its products and yourself.",
           "cameraPermission": "Ghoomyo uses the camera so you can take pictures of your store, its products and yourself.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": [
+              "en",
+              "hi",
+              "mr"
+            ],
+            "android": [
+              "en",
+              "hi",
+              "mr"
+            ]
+          }
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/noto-sans-devanagari/400Regular/NotoSansDevanagari_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/noto-sans-devanagari/500Medium/NotoSansDevanagari_500Medium.ttf",
+            "./node_modules/@expo-google-fonts/noto-sans-devanagari/600SemiBold/NotoSansDevanagari_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/noto-sans-devanagari/700Bold/NotoSansDevanagari_700Bold.ttf"
+          ]
         }
       ]
     ],

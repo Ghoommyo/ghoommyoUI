@@ -11,9 +11,7 @@ import { Spacing } from '@/constants/theme';
 import { useUploadImage } from '@/hooks/queries';
 import { pickImage } from '@/lib/pick-image';
 import type { ImageKind } from '@/types/domain';
-
-/** Shown under store photo controls until the app admin turns uploads on. */
-export const UPLOADS_OFF_HINT = "Picture uploads aren't turned on for your store yet. Contact support to enable them.";
+import { useT } from '@/i18n/language-provider';
 
 type ImageFieldProps = {
   label: string;
@@ -33,6 +31,7 @@ type ImageFieldProps = {
 
 /** Pick, shrink and upload a picture, with a preview. */
 export function ImageField({ label, kind, value, onChange, round = false, name = '', disabled = false, hint }: ImageFieldProps) {
+  const { t } = useT();
   const upload = useUploadImage(kind);
   const [pickError, setPickError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
@@ -61,31 +60,31 @@ export function ImageField({ label, kind, value, onChange, round = false, name =
         {round ? <Avatar name={name} uri={value || undefined} size={72} /> : <ServiceImage uri={value} size={72} />}
         <View style={styles.actions}>
           <Button
-            label={value ? 'Change photo' : 'Choose photo'}
+            label={t(value ? 'upload.change' : 'upload.choose')}
             variant="secondary"
             size="sm"
             loading={busy}
             disabled={disabled}
-            accessibilityLabel={`${value ? 'Change' : 'Choose'} ${label.toLowerCase()}`}
+            accessibilityLabel={t(value ? 'upload.changeNamed' : 'upload.chooseNamed', { label: label.toLowerCase() })}
             onPress={() => choose('library')}
           />
           {Platform.OS !== 'web' ? (
             <Button
-              label="Take photo"
+              label={t('app.takePhoto')}
               variant="secondary"
               size="sm"
               disabled={disabled || busy}
-              accessibilityLabel={`Take ${label.toLowerCase()}`}
+              accessibilityLabel={t('app.takeNamed', { label: label.toLowerCase() })}
               onPress={() => choose('camera')}
             />
           ) : null}
           {value ? (
             <Button
-              label="Remove"
+              label={t('upload.remove')}
               variant="danger"
               size="sm"
               disabled={busy}
-              accessibilityLabel={`Remove ${label.toLowerCase()}`}
+              accessibilityLabel={t('upload.removeNamed', { label: label.toLowerCase() })}
               onPress={() => {
                 upload.reset();
                 setPickError(null);

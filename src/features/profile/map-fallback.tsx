@@ -5,9 +5,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import type { StoreProfile } from '@/types/domain';
+import { useT } from '@/i18n/language-provider';
 
 /** Address card with a link out to maps, for web and Expo Go (no expo-maps there). */
 export function MapFallback({ profile }: { profile: StoreProfile }) {
+  const { t } = useT();
   const address = [profile.address, profile.city, profile.state, profile.pin, profile.country]
     .filter(Boolean)
     .join(', ');
@@ -19,13 +21,13 @@ export function MapFallback({ profile }: { profile: StoreProfile }) {
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
-      <ThemedText type="smallBold">Location</ThemedText>
+      <ThemedText type="smallBold">{t('profile.location')}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        {address || 'No address yet'}
+        {address || t('profile.noAddress')}
       </ThemedText>
       {profile.mapUrl || query ? (
         <ExternalLink href={url}>
-          <ThemedText type="linkPrimary">Open in Maps ↗</ThemedText>
+          <ThemedText type="linkPrimary">{t('profile.openInMaps')}</ThemedText>
         </ExternalLink>
       ) : null}
     </ThemedView>

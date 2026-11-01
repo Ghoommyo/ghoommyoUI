@@ -1,12 +1,16 @@
+import type { MessageKey } from '@/i18n/messages';
+import type { Translate } from '@/i18n/translate';
 import type { Booking, CatalogType, OrderType, StoreProfile, StoreSettings } from '@/types/domain';
 
-export const ORDER_TYPE_LABEL: Record<OrderType, string> = {
-  table: 'Book table',
-  pickup: 'Pickup',
-  porter: 'Porter',
-  appointment: 'Book appointment',
-  homeVisit: 'Book home visit',
+const ORDER_TYPE_KEY: Record<OrderType, MessageKey> = {
+  table: 'orderType.table',
+  pickup: 'orderType.pickup',
+  porter: 'orderType.porter',
+  appointment: 'orderType.appointment',
+  homeVisit: 'orderType.homeVisit',
 };
+/** "Book table", "Pickup", … in the chosen language. */
+export const orderTypeLabel = (t: Translate, type: OrderType) => t(ORDER_TYPE_KEY[type]);
 
 const TO_API: Record<OrderType, string> = {
   table: 'TABLE',
@@ -56,8 +60,8 @@ export function orderTypeChoices(store: OrderTypeStore): OrderType[] {
   return store.profile && !hasStoreAddress(store) ? all.filter((type) => !visitsStore(type)) : all;
 }
 
-export function orderTypeOptions(store: OrderTypeStore): { label: string; value: OrderType }[] {
-  return orderTypeChoices(store).map((value) => ({ label: ORDER_TYPE_LABEL[value], value }));
+export function orderTypeOptions(store: OrderTypeStore, t: Translate): { label: string; value: OrderType }[] {
+  return orderTypeChoices(store).map((value) => ({ label: orderTypeLabel(t, value), value }));
 }
 
 export const defaultOrderType = (store: OrderTypeStore): OrderType => orderTypeChoices(store)[0];
@@ -80,9 +84,12 @@ export const showsPeople = (
     booking.orderType === 'table' ||
     booking.orderType === 'appointment');
 
-/** What a slot or day counts: orders at dark stores, visitors elsewhere. */
-export const countNoun = (isDarkStore: boolean | undefined, n: number) =>
-  isDarkStore ? (n === 1 ? 'order' : 'orders') : n === 1 ? 'visitor' : 'visitors';
+/** What a slot or day counts, with the number: "3 orders" at dark stores, "3 visitors" elsewhere. */
+export const countLabel = (t: Translate, isDarkStore: boolean | undefined, count: number) =>
+  t(isDarkStore ? 'count.orders' : 'count.visitors', { count });
+/** The word under a slot's number: "orders" or "visitors". */
+export const countWord = (t: Translate, isDarkStore: boolean | undefined) =>
+  t(isDarkStore ? 'count.ordersWord' : 'count.visitorsWord');
 
 /**
  * What kind of store it is, for customers: the type of service ("Plumber") for service stores,
@@ -92,7 +99,10 @@ export const storeTypeLabel = (
   store: Pick<StoreSettings, 'catalogType' | 'serviceType' | 'storeCategory'> | undefined,
 ) => (store?.catalogType === 'service' ? store.serviceType : store?.storeCategory) || null;
 
-/** How a store's items are called: Products (default) or Services. */
+/**
+ * How a store's items are called, in English: Products (default) or Services. Also data: the booking
+ * description's block is headed with `Items` (src/lib/services.ts), so screens use `catalogLabels`.
+ */
 export function catalogWords(catalogType: CatalogType | undefined) {
   const service = catalogType === 'service';
   return {
@@ -103,4 +113,15 @@ export function catalogWords(catalogType: CatalogType | undefined) {
   };
 }
 
-export type CatalogWords = ReturnType<typeof catalogWords>;
+/** How a store's items are called on screen, in the chosen language. */
+export function catalogLabels(t: Translate, catalogType: CatalogType | undefined) {
+  const service = catalogType === 'service';
+  return {
+    Items: t(service ? 'catalog.Services' : 'catalog.Products'),
+    items: t(service ? 'catalog.services' : 'catalog.products'),
+    Item: t(service ? 'catalog.Service' : 'catalog.Product'),
+    item: t(service ? 'catalog.service' : 'catalog.product'),
+  };
+}
+
+export type CatalogWords = ReturnType<typeof catalogLabels>;
