@@ -44,6 +44,8 @@ export function AdBanner() {
   return (
     <View
       accessibilityLabel={t('common.advertisement')}
+      // The hidden banner covers the bottom of the screen: let taps through until an ad shows.
+      pointerEvents={loaded ? 'auto' : 'none'}
       style={loaded ? [styles.shown, { paddingBottom: insets.bottom, backgroundColor: theme.background }] : styles.loading}>
       <BannerAd
         unitId={BANNER_ID}
