@@ -10,6 +10,7 @@ import type {
   DaySummary,
   EmailCodeRequest,
   EmailCodeSent,
+  GalleryImage,
   NewBooking,
   PasswordReset,
   ReminderSettings,
@@ -22,9 +23,11 @@ import type {
   SignupResult,
   Slot,
   Store,
+  StorePage,
   StoreProfile,
   StoreService,
   StoreSettings,
+  StoresPage,
   UserProfile,
   SavedAddress,
 } from '@/types/domain';
@@ -55,6 +58,17 @@ export interface Api {
 
   listStores(): Promise<Store[]>;
   getStore(storeId: string): Promise<Store>;
+  /** Explore stores: names containing `query` (any case), by name, 20 per page. Public. */
+  searchStores(query: string, cursor?: string | null): Promise<StoresPage>;
+  /** A store's public profile page. Public. */
+  getStorePage(storeId: string): Promise<StorePage>;
+  /** A store's gallery as customers see it (empty while the admin has it off). Public. */
+  getGallery(storeId: string): Promise<GalleryImage[]>;
+  /** The signed-in store's own gallery (also while it's off). */
+  getMyGallery(storeId: string): Promise<GalleryImage[]>;
+  /** Adds a gallery picture, or edits `imageId`. Needs the gallery turned on; at most 20. */
+  saveGalleryImage(storeId: string, input: Omit<GalleryImage, 'id'>, imageId?: string): Promise<GalleryImage>;
+  deleteGalleryImage(storeId: string, imageId: string): Promise<void>;
   getStoreSlots(storeId: string, date: DateKey): Promise<Slot[]>;
   /** `month` is 0-based. */
   getStoreMonthSummary(storeId: string, year: number, month: number): Promise<DaySummary[]>;

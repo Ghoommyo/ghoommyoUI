@@ -299,12 +299,21 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         keyboardType="number-pad"
         hint={t('storeSettings.maxEachHint', { item: words.item, items: words.items })}
       />
-      <SwitchRow
-        label={t('storeSettings.autoApprove')}
-        description={t('storeSettings.autoApproveHint')}
-        value={draft.autoApprove}
-        onChange={(v) => set('autoApprove', v)}
-      />
+      <View style={styles.group}>
+        <ThemedText type="smallBold">{t('storeSettings.autoApprove')}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('storeSettings.autoApproveHint')}
+        </ThemedText>
+        {offered.map((type) => (
+          <SwitchRow
+            key={type}
+            label={orderTypeLabel(t, type)}
+            description={t(draft.autoApprove[type] ? 'storeSettings.autoApproveOn' : 'storeSettings.autoApproveOff')}
+            value={draft.autoApprove[type]}
+            onChange={(on) => set('autoApprove', { ...draft.autoApprove, [type]: on })}
+          />
+        ))}
+      </View>
       <SwitchRow
         label={t('storeSettings.darkStore')}
         description={t(
@@ -426,6 +435,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: Spacing.two,
     padding: Spacing.three,
+  },
+  group: {
+    gap: Spacing.two,
   },
   actions: {
     flexDirection: 'row',

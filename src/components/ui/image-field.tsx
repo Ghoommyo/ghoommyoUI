@@ -7,11 +7,24 @@ import { Avatar } from '@/components/ui/avatar';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { ServiceImage } from '@/components/ui/service-image';
+import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useUploadImage } from '@/hooks/queries';
 import { pickImage } from '@/lib/pick-image';
-import type { ImageKind } from '@/types/domain';
+import type { ImageKind, StoreSettings } from '@/types/domain';
 import { useT } from '@/i18n/language-provider';
+import type { MessageKey } from '@/i18n/messages';
+import type { Translate } from '@/i18n/translate';
+
+/**
+ * What a store may do with a picture field: upload when the admin turned uploads on, paste a link
+ * when it turned image links on. `hintKey` is the hint shown while uploads are on.
+ */
+export function storePictureRules(store: Pick<StoreSettings, 'uploadsEnabled' | 'linksEnabled'>, t: Translate, hintKey: MessageKey) {
+  const uploads = !!store.uploadsEnabled;
+  const links = !!store.linksEnabled;
+  return { disabled: !uploads, linkAllowed: links, hint: t(uploads ? hintKey : links ? 'upload.linkOnly' : 'upload.off') };
+}
 
 type ImageFieldProps = {
   label: string;
@@ -27,10 +40,25 @@ type ImageFieldProps = {
   /** Uploading isn't allowed (yet); `hint` says why. Remove still works. */
   disabled?: boolean;
   hint?: string;
+  /** Also offer a box to paste a picture link (stores the admin allowed to use links). */
+  linkAllowed?: boolean;
+  /** An error for the pasted link, from the form's own check. */
+  linkError?: string;
 };
 
 /** Pick, shrink and upload a picture, with a preview. */
-export function ImageField({ label, kind, value, onChange, round = false, name = '', disabled = false, hint }: ImageFieldProps) {
+export function ImageField({
+  label,
+  kind,
+  value,
+  onChange,
+  round = false,
+  name = '',
+  disabled = false,
+  hint,
+  linkAllowed = false,
+  linkError,
+}: ImageFieldProps) {
   const { t } = useT();
   const upload = useUploadImage(kind);
   const [pickError, setPickError] = useState<string | null>(null);
@@ -94,6 +122,22 @@ export function ImageField({ label, kind, value, onChange, round = false, name =
           ) : null}
         </View>
       </View>
+      {linkAllowed ? (
+        <TextField
+          label={t('upload.link')}
+          value={value}
+          onChangeText={(url) => {
+            upload.reset();
+            setPickError(null);
+            onChange(url);
+          }}
+          error={linkError}
+          keyboardType="url"
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="https://…"
+        />
+      ) : null}
       {hint ? (
         <ThemedText type="small" themeColor="textSecondary">
           {hint}

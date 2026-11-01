@@ -2,6 +2,8 @@ import type {
   GhoomoAddress,
   GhoomoAppointment,
   GhoomoDayDetails,
+  GhoomoGalleryImage,
+  GhoomoPublicStore,
   GhoomoLocation,
   GhoomoProfile,
   GhoomoService,
@@ -17,12 +19,15 @@ import type {
   BookingStatus,
   DateKey,
   DaySummary,
+  GalleryImage,
   LimitUnit,
+  OrderType,
   SavedAddress,
   ServiceInput,
   Slot,
   SlotStart,
   Store,
+  StorePage,
   StoreProfile,
   StoreService,
   StoreSettings,
@@ -141,7 +146,7 @@ export function daySummaryFromCalendar(
   }));
 }
 
-type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'open_days' | 'store_inactive' | 'uploads_on'>;
+type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'open_days' | 'store_inactive' | 'uploads_on' | 'links_on' | 'gallery_on' | 'auto_approve'>;
 /** Settings columns, which are null on browse rows for locations that never opened settings. */
 type SettingsInput = { [K in keyof SettingsFields]?: SettingsFields[K] | null };
 
@@ -151,13 +156,21 @@ function toOpenDays(value: unknown): number[] {
   return days.length ? days : [...ALL_DAYS];
 }
 
+const ORDER_TYPES: OrderType[] = ['table', 'pickup', 'porter', 'appointment', 'homeVisit'];
+
+/** Auto-approval per order type; list rows and older servers only have the one switch. */
+function toAutoApprove(row: SettingsInput): Record<OrderType, boolean> {
+  const all = row.is_auto_approval == null ? API_DEFAULTS.settings.autoApprove : row.is_auto_approval === 1;
+  return Object.fromEntries(ORDER_TYPES.map((type) => [type, row.auto_approve?.[type] ?? all])) as Record<OrderType, boolean>;
+}
+
 export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'> {
   const d = API_DEFAULTS.settings;
   return {
     maxPerSlot: Number(row.max_limit ?? d.maxLimit) || d.maxLimit,
     maxPerBooking: API_DEFAULTS.maxPerBooking,
     limitUnit: toLimitUnit(row.unit ?? d.unit),
-    autoApprove: row.is_auto_approval == null ? d.autoApprove : row.is_auto_approval === 1,
+    autoApprove: toAutoApprove(row),
     openAt: row.open_at || d.openAt,
     closeAt: row.close_at || d.closeAt,
     isDarkStore: row.is_dark_store === 1,
@@ -168,6 +181,8 @@ export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'>
     openDays: toOpenDays(row.open_days),
     inactive: Number(row.store_inactive ?? 0) === 1,
     uploadsEnabled: Number(row.uploads_on ?? 0) === 1,
+    linksEnabled: Number(row.links_on ?? 0) === 1,
+    galleryEnabled: Number(row.gallery_on ?? 0) === 1,
   };
 }
 
@@ -175,7 +190,7 @@ export function settingsToRequest(settings: StoreSettings) {
   return {
     maxLimit: settings.maxPerSlot,
     limitUnit: fromLimitUnit(settings.limitUnit),
-    isAutoApprove: settings.autoApprove ? 1 : 0,
+    autoApprove: settings.autoApprove,
     openAt: settings.openAt,
     closeAt: settings.closeAt,
     maxServiceQty: settings.maxServiceQty,
@@ -195,6 +210,7 @@ export const EMPTY_PROFILE: StoreProfile = {
   country: '',
   bio: '',
   photoUrl: '',
+  openSince: null,
 };
 
 export function profileToStore(row: GhoomoProfile | null | undefined): StoreProfile {
@@ -208,12 +224,13 @@ export function profileToStore(row: GhoomoProfile | null | undefined): StoreProf
     bio: row.loc_info ?? '',
     mapUrl: row.loc_nav ?? undefined,
     photoUrl: row.loc_profile_url ?? '',
+    openSince: row.open_since ?? null,
   };
 }
 
 /**
  * PUT body for a profile. The API ignores empty strings, so cleared fields can't be blanked yet;
- * the photo can (`locProfileUrl: ""` removes it).
+ * the photo and the bio can (`""` removes them).
  */
 export function profileToRequest(profile: StoreProfile) {
   return {
@@ -223,6 +240,7 @@ export function profileToRequest(profile: StoreProfile) {
     locCity: profile.city,
     locCountry: profile.country,
     locInfo: profile.bio,
+    openSince: profile.openSince,
     ...(profile.mapUrl ? { locNavigation: profile.mapUrl } : {}),
   };
 }
@@ -277,8 +295,39 @@ function addressFromRow(row: GhoomoLocation): StoreProfile {
     country: row.loc_country ?? '',
     mapUrl: row.loc_nav || undefined,
     photoUrl: row.loc_profile_url ?? '',
+    bio: row.loc_info ?? '',
   };
 }
+
+/** A store from GET /stores (Explore stores, the store profile page). */
+export function publicStoreToPage(row: GhoomoPublicStore): StorePage {
+  return {
+    id: row.id,
+    name: row.name ?? '',
+    photoUrl: row.photoUrl ?? '',
+    bio: row.bio ?? '',
+    openSince: row.openSince ?? null,
+    joinedOn: row.joinedOn ?? '',
+    openAt: row.openAt || API_DEFAULTS.settings.openAt,
+    closeAt: row.closeAt || API_DEFAULTS.settings.closeAt,
+    openDays: toOpenDays(row.openDays),
+    catalogType: row.catalogType === 'SERVICE' ? 'service' : 'product',
+    category: row.category ?? null,
+    isDarkStore: row.isDarkStore === true,
+    orderTypes: (row.orderTypes ?? []).map(orderTypeFromApi).filter((type): type is OrderType => type !== null),
+    address: {
+      address: row.address?.address ?? '',
+      city: row.address?.city ?? '',
+      pin: row.address?.pinCode ?? '',
+      country: row.address?.country ?? '',
+      mapUrl: row.address?.mapLink ?? '',
+    },
+    rating: { average: row.rating?.average ?? null, count: Number(row.rating?.count ?? 0) },
+    galleryOn: row.galleryOn === true,
+  };
+}
+
+export const galleryToImage = (row: GhoomoGalleryImage): GalleryImage => ({ id: row.id, imageUrl: row.imageUrl ?? '', caption: row.caption ?? '' });
 
 export function addressToSaved(row: GhoomoAddress): SavedAddress {
   return { id: row.id, label: row.label ?? '', address: row.address ?? '' };

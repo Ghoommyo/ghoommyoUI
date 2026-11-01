@@ -15,6 +15,8 @@ export default function AppLayout() {
       <Drawer.Screen name="home" options={{ title: t('menu.home') }} />
       <Drawer.Screen name="dashboard" options={{ title: t('menu.dashboard') }} />
       <Drawer.Screen name="reviews" options={{ title: t('menu.reviews') }} />
+      <Drawer.Screen name="stores/index" options={{ title: t('menu.explore') }} />
+      <Drawer.Screen name="stores/[id]" options={{ title: t('storePage.title') }} />
       <Drawer.Protected guard={session?.role === 'user'}>
         <Drawer.Screen name="events" options={{ title: t('menu.events') }} />
         <Drawer.Screen name="addresses" options={{ title: t('menu.addresses') }} />

@@ -9,7 +9,6 @@ export const screens = defineMessages({
   "home.all": { en: "All", hi: "सभी", mr: "सर्व" },
   "home.seeAll": { en: "See all {count}", hi: "सभी {count} देखें", mr: "सर्व {count} पाहा" },
   "home.book": { en: "Book", hi: "बुक करें", mr: "बुक करा" },
-  "home.reviews": { en: "Reviews", hi: "रिव्यू", mr: "रिव्ह्यू" },
 
   "eventsPage.title": { en: "Events", hi: "मेरी बुकिंग", mr: "माझी बुकिंग" },
   "reviewsPage.title": { en: "Reviews", hi: "रिव्यू", mr: "रिव्ह्यू" },

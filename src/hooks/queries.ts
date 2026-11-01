@@ -9,6 +9,7 @@ import type {
   BookingRating,
   BookingStatus,
   DateKey,
+  GalleryImage,
   ImageKind,
   NewBooking,
   PickedImage,
@@ -31,6 +32,10 @@ export const queryKeys = {
   myProfile: (accountId: string) => ['me', accountId, 'profile'] as const,
   storeReviews: (storeId: string) => ['stores', storeId, 'reviews'] as const,
   storeServices: (storeId: string) => ['stores', storeId, 'services'] as const,
+  storeSearch: (query: string) => ['stores', 'search', query] as const,
+  storePage: (storeId: string) => ['stores', storeId, 'page'] as const,
+  gallery: (storeId: string) => ['stores', storeId, 'gallery'] as const,
+  myGallery: (storeId: string) => ['stores', storeId, 'gallery', 'owner'] as const,
   serviceTypes: ['service-types'] as const,
   appConfig: ['app-config'] as const,
   storeCategories: ['store-categories'] as const,
@@ -151,6 +156,57 @@ export function useUpdateService(storeId: string) {
   return useMutation({
     mutationFn: ({ serviceId, input }: { serviceId: string; input: ServiceInput }) =>
       api.updateService(storeId, serviceId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.stores }),
+  });
+}
+
+/** Explore stores: names containing `query`, 20 per page; call `fetchNextPage()` for more. */
+export function useSearchStores(query: string) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.storeSearch(query.trim().toLowerCase()),
+    queryFn: ({ pageParam }) => api.searchStores(query, pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
+  });
+}
+
+/** A store's public profile page. */
+export function useStorePage(storeId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.storePage(storeId ?? ''),
+    queryFn: () => api.getStorePage(storeId!),
+    enabled: !!storeId,
+  });
+}
+
+/** A store's gallery as customers see it. */
+export function useGallery(storeId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.gallery(storeId ?? ''),
+    queryFn: () => api.getGallery(storeId!),
+    enabled: !!storeId,
+  });
+}
+
+/** The signed-in store's own gallery. */
+export function useMyGallery(storeId: string) {
+  return useQuery({ queryKey: queryKeys.myGallery(storeId), queryFn: () => api.getMyGallery(storeId) });
+}
+
+/** Add or edit (with `imageId`) a picture in the store's gallery. */
+export function useSaveGalleryImage(storeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ imageId, input }: { imageId?: string; input: Omit<GalleryImage, 'id'> }) =>
+      api.saveGalleryImage(storeId, input, imageId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.stores }),
+  });
+}
+
+export function useDeleteGalleryImage(storeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (imageId: string) => api.deleteGalleryImage(storeId, imageId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.stores }),
   });
 }
