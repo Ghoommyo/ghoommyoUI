@@ -261,6 +261,18 @@ export function useSetBookingStatus() {
   });
 }
 
+export function useStartDelivery() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, trackingUrl }: { bookingId: string; trackingUrl: string }) =>
+      api.startDelivery(bookingId, trackingUrl),
+    onSuccess: (booking) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
 export function useUpdateStoreSettings(storeId: string) {
   const queryClient = useQueryClient();
   return useMutation({

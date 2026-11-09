@@ -37,6 +37,9 @@ export const visitsStore = (type: OrderType | null) =>
   type === 'table' || type === 'pickup' || type === 'appointment';
 /** The store goes to the customer for these, so the booking needs a delivery address. */
 export const needsDeliveryAddress = (type: OrderType | null) => type === 'porter' || type === 'homeVisit';
+/** Pickup, Porter and home visits are orders of the store's items, so they need at least one. */
+export const needsItems = (type: OrderType | null) =>
+  type === 'pickup' || type === 'porter' || type === 'homeVisit';
 /** Whether the store entered an address customers can visit. */
 export const hasStoreAddress = (store: { profile?: Pick<StoreProfile, 'address'> }) =>
   !!store.profile?.address.trim();

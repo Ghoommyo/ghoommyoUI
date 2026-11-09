@@ -164,6 +164,7 @@ function NotificationRow({
     REJECTED: theme.danger,
     UPDATED: theme.primary,
     RATED: theme.purple,
+    DELIVERY_STARTED: theme.success,
   };
 
   return (

@@ -282,6 +282,9 @@ export function appointmentToBooking(row: GhoomoAppointment): Booking {
     })),
     orderType: orderTypeFromApi(row.order_type),
     deliveryAddress: row.dlvry_addr || null,
+    delivery: row.dlvry_start_on
+      ? { startedAt: row.dlvry_start_on, trackingUrl: row.dlvry_track_url || null }
+      : null,
   };
 }
 

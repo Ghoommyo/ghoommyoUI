@@ -95,6 +95,11 @@ export interface Api {
 
   createBooking(booking: NewBooking): Promise<Booking>;
   setBookingStatus(bookingId: string, status: BookingStatus): Promise<Booking>;
+  /**
+   * The store starts its accepted Porter order's delivery, with an optional tracking link.
+   * Calling it again changes the link; the customer is notified.
+   */
+  startDelivery(bookingId: string, trackingUrl: string): Promise<Booking>;
   getMyBookings(): Promise<Booking[]>;
   /** The customer edits their own pending/accepted booking; the store is notified. */
   updateBooking(bookingId: string, changes: BookingChanges): Promise<Booking>;

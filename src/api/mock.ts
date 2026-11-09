@@ -1,6 +1,6 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
-import { needsDeliveryAddress, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
+import { needsDeliveryAddress, needsItems, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
 import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
 import { STANDARD_STORE_CATEGORIES } from '@/lib/store-categories';
 import { ALL_DAYS, buildSlotStarts, daysInMonth, visitorCount, weekDays } from '@/lib/slots';
@@ -210,6 +210,7 @@ function seedBookings(): Booking[] {
     // The oldest one predates order types.
     orderType: i === 0 ? null : 'appointment',
     deliveryAddress: null,
+    delivery: null,
   }));
 }
 
@@ -810,6 +811,9 @@ export const mockApi: Api = {
       }
       return { serviceId, name: stored.name, price: stored.price, qty };
     });
+    if (needsItems(input.orderType) && booked.length === 0) {
+      throw new ApiError('Choose at least one product or service for PICKUP, PORTER and HOME_VISIT bookings', 400);
+    }
     // Porter and home visits go to the customer, so they need an address; store visits don't keep one.
     const deliveryAddress = needsDeliveryAddress(input.orderType) ? (input.deliveryAddress ?? '').trim() : null;
     if (deliveryAddress !== null && (!deliveryAddress || deliveryAddress.length > 500)) {
@@ -818,6 +822,7 @@ export const mockApi: Api = {
     const booking: Booking = {
       ...input,
       deliveryAddress,
+      delivery: null,
       people,
       services: booked,
       id: newId('b'),
@@ -846,6 +851,30 @@ export const mockApi: Api = {
     if (status !== 'pending') {
       notify(booking.userId, booking.id, status === 'accepted' ? 'ACCEPTED' : 'REJECTED', `${booking.storeName} ${status} your booking`);
     }
+    return clone(booking);
+  },
+
+  async startDelivery(bookingId, trackingUrl) {
+    await delay();
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (!booking) throw new ApiError('Appointment not found', 404);
+    requireStoreOwner(booking.storeId);
+    if (booking.orderType !== 'porter') throw new ApiError('Only Porter orders have a delivery', 409);
+    if (booking.status !== 'accepted') throw new ApiError('Accept the order before starting its delivery', 409);
+    const link = trackingUrl.trim();
+    if (link && !/^https?:\/\/\S+$/i.test(link)) {
+      throw new ApiError('trackingUrl must be an http(s) link of at most 1000 characters', 400);
+    }
+    const again = booking.delivery !== null;
+    booking.delivery = { startedAt: booking.delivery?.startedAt ?? new Date().toISOString(), trackingUrl: link || null };
+    notify(
+      booking.userId,
+      booking.id,
+      'DELIVERY_STARTED',
+      again
+        ? `${booking.storeName} updated the tracking link for your delivery`
+        : `${booking.storeName} started your delivery${link ? ' — open the booking to track it' : ''}`,
+    );
     return clone(booking);
   },
 

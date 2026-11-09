@@ -496,6 +496,7 @@ export function createGhoomoApi(baseUrl: string): Api {
 
       return {
         ...input,
+        delivery: null,
         id: appointmentId,
         storeName: store.name,
         userId,
@@ -514,6 +515,14 @@ export function createGhoomoApi(baseUrl: string): Api {
         method: 'PUT',
         body: { apntmnt_id: bookingId, status: fromStatus(status) },
       });
+      return appointmentToBooking(res!.appointment);
+    },
+
+    async startDelivery(bookingId, trackingUrl) {
+      const res = await request<{ appointment: GhoomoAppointment }>(
+        `/appointment/${encodeURIComponent(bookingId)}/delivery`,
+        { method: 'POST', body: { trackingUrl: trackingUrl.trim() || null } },
+      );
       return appointmentToBooking(res!.appointment);
     },
 

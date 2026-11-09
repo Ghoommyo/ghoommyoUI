@@ -160,6 +160,10 @@ export interface GhoomoAppointment {
   order_type?: string | null;
   /** Delivery address of PORTER / HOME_VISIT bookings; null otherwise. */
   dlvry_addr?: string | null;
+  /** When the store started a PORTER order's delivery (ISO); null before. */
+  dlvry_start_on?: string | null;
+  /** The delivery's tracking link, or null. */
+  dlvry_track_url?: string | null;
 }
 
 /** A saved address (GET/POST /traveller/addresses). Already camelCase on the wire. */

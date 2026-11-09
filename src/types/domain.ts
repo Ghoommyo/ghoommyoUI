@@ -257,6 +257,15 @@ export interface Booking {
   orderType: OrderType | null;
   /** Where the store goes for Porter / home-visit bookings; null otherwise. */
   deliveryAddress: string | null;
+  /** Set once the store started a Porter order's delivery; null before (and for other types). */
+  delivery: BookingDelivery | null;
+}
+
+export interface BookingDelivery {
+  /** ISO timestamp of when the store started the delivery. */
+  startedAt: string;
+  /** The delivery service's tracking link, when the store added one. */
+  trackingUrl: string | null;
 }
 
 export interface BookingRating {
@@ -290,7 +299,7 @@ export interface ReviewsPage {
   summary?: RatingSummary;
 }
 
-export type NotificationKind = 'NEW_REQUEST' | 'AUTO_ACCEPTED' | 'ACCEPTED' | 'REJECTED' | 'UPDATED' | 'RATED';
+export type NotificationKind = 'NEW_REQUEST' | 'AUTO_ACCEPTED' | 'ACCEPTED' | 'REJECTED' | 'UPDATED' | 'RATED' | 'DELIVERY_STARTED';
 
 export interface AppNotification {
   id: string;
