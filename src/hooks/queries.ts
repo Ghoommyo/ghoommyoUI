@@ -19,6 +19,9 @@ import type {
   UserProfile,
 } from '@/types/domain';
 
+/** How often a store's dashboard and bell check for new bookings while the app is open. */
+const STORE_REFRESH_MS = 60_000;
+
 // Account-scoped keys include the account id so switching accounts never shows stale data.
 export const queryKeys = {
   stores: ['stores'] as const,
@@ -70,6 +73,8 @@ export function useStoreMonthSummary(storeId: string | undefined, year: number, 
     queryKey: queryKeys.storeMonth(storeId ?? '', year, month),
     queryFn: () => api.getStoreMonthSummary(storeId!, year, month),
     enabled: !!storeId,
+    // New requests show up without pulling down (only while the app is in the foreground).
+    refetchInterval: STORE_REFRESH_MS,
   });
 }
 
@@ -79,6 +84,7 @@ export function useStoreBookings(storeId: string | undefined, dates: DateKey[] |
     queryKey: queryKeys.storeBookings(storeId ?? '', dates ?? []),
     queryFn: () => api.getStoreBookings(storeId!, dates!),
     enabled: !!storeId && !!dates && dates.length > 0,
+    refetchInterval: STORE_REFRESH_MS,
   });
 }
 
@@ -370,6 +376,8 @@ export function useNotifications() {
     queryKey: queryKeys.notifications(session?.accountId ?? ''),
     queryFn: () => api.getNotifications(),
     enabled: !!session,
+    // Stores check every minute in the foreground, so new requests show on the bell.
+    refetchInterval: session?.role === 'store' ? STORE_REFRESH_MS : false,
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

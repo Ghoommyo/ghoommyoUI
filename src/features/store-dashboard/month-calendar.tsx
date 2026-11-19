@@ -5,7 +5,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDayLong, formatMonthYear, parseDateKey, weekdayNames } from '@/lib/date';
 import { countLabel } from '@/lib/order-types';
-import { monthGrid, slotState } from '@/lib/slots';
+import { isOpenDay, monthGrid, slotState } from '@/lib/slots';
 import type { DateKey } from '@/types/domain';
 import { useT } from '@/i18n/language-provider';
 
@@ -16,6 +16,8 @@ type MonthCalendarProps = {
   /** Visitors per day for the shown month. */
   counts: Map<DateKey, number>;
   capacity: number;
+  /** The store's open weekdays: other days show "Closed". */
+  openDays?: number[];
   /** Dark stores count orders instead of visitors. */
   isDarkStore?: boolean;
   selected: Set<DateKey>;
@@ -30,6 +32,7 @@ export function MonthCalendar({
   today,
   counts,
   capacity,
+  openDays,
   isDarkStore,
   selected,
   onToggle,
@@ -37,6 +40,13 @@ export function MonthCalendar({
   onNext,
 }: MonthCalendarProps) {
   const { t, language } = useT();
+  const theme = useTheme();
+  const legend = [
+    { color: theme.success, label: t('calendar.legendRoom') },
+    { color: theme.warning, label: t('calendar.legendFull') },
+    { color: theme.danger, label: t('calendar.legendOver') },
+    { color: theme.backgroundSelected, label: t('schedule.closed') },
+  ];
   const cells = monthGrid(year, month);
   const weeks = Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
 
@@ -69,6 +79,7 @@ export function MonthCalendar({
                 date={date}
                 count={counts.get(date)}
                 capacity={capacity}
+                closed={!isOpenDay(openDays, year, month, parseDateKey(date).day)}
                 isDarkStore={isDarkStore}
                 isToday={date === today}
                 isSelected={selected.has(date)}
@@ -80,6 +91,17 @@ export function MonthCalendar({
           )}
         </View>
       ))}
+
+      <View style={styles.legend}>
+        {legend.map((item) => (
+          <View key={item.label} style={styles.legendItem}>
+            <View style={[styles.swatch, { backgroundColor: item.color }]} />
+            <ThemedText type="small" themeColor="textSecondary">
+              {item.label}
+            </ThemedText>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -105,6 +127,8 @@ type DayCellProps = {
   date: DateKey;
   count: number | undefined;
   capacity: number;
+  /** The store is closed that weekday (shown when the day has no bookings). */
+  closed: boolean;
   isDarkStore?: boolean;
   isToday: boolean;
   isSelected: boolean;
@@ -115,6 +139,7 @@ function DayCell({
   date,
   count,
   capacity,
+  closed,
   isDarkStore,
   isToday,
   isSelected,
@@ -124,7 +149,8 @@ function DayCell({
   const theme = useTheme();
   const { day } = parseDateKey(date);
   const state = count ? slotState(count, capacity) : 'ok';
-  const pillColor = { ok: theme.success, full: theme.warning, over: theme.danger }[state];
+  // No bookings: a grey pill with 0, or Closed on the store's closed days.
+  const pillColor = count ? { ok: theme.success, full: theme.warning, over: theme.danger }[state] : theme.backgroundSelected;
   const stateLabel = state === 'ok' ? '' : `, ${t(state === 'full' ? 'schedule.full' : 'app.overCapacity')}`;
 
   return (
@@ -148,8 +174,10 @@ function DayCell({
       ]}>
       <ThemedText style={styles.dayNumber}>{day}</ThemedText>
       <View style={[styles.pill, { backgroundColor: pillColor }]}>
-        <ThemedText style={[styles.pillText, { color: theme.onPrimary }]}>
-          {count ? count : 'NA'}
+        <ThemedText
+          style={[styles.pillText, { color: count ? theme.onPrimary : theme.textSecondary }]}
+          numberOfLines={1}>
+          {count ? count : closed ? t('schedule.closed') : 0}
         </ThemedText>
       </View>
     </Pressable>
@@ -188,6 +216,23 @@ const styles = StyleSheet.create({
   },
   week: {
     flexDirection: 'row',
+  },
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: Spacing.three,
+    rowGap: Spacing.one,
+    marginTop: Spacing.one,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  swatch: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
   },
   weekday: {
     flex: 1,

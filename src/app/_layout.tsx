@@ -1,7 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState, type PropsWithChildren } from 'react';
+import { AppState, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ApiError } from '@/api';
@@ -12,6 +13,12 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { LanguageProvider, useT } from '@/i18n/language-provider';
 
 SplashScreen.preventAutoHideAsync();
+
+// Coming back to the app counts as focus, so stale lists (store bookings, the bell) refetch, and
+// the one-minute refresh pauses while the app is in the background.
+if (Platform.OS !== 'web') {
+  AppState.addEventListener('change', (state) => focusManager.setFocused(state === 'active'));
+}
 
 export default function RootLayout() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
