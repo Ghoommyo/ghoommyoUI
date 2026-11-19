@@ -23,6 +23,9 @@ import type {
   Store,
   StoreService,
   UserProfile,
+  DateKey,
+  Slot,
+  SlotStart,
 } from '@/types/domain';
 
 // The mock answers like the server, which speaks English.
@@ -215,6 +218,20 @@ function seedBookings(): Booking[] {
 }
 
 const bookings: Booking[] = seedBookings();
+
+/** Slots of a day with their counts; `blocked` when full and the store stops bookings in full slots. */
+function mockSlots(store: StoreRecord, date: DateKey, dayBookings: Booking[]): Slot[] {
+  const starts = buildSlotStarts(date, store.openAt, store.closeAt, store.limitUnit);
+  const counted = (start: SlotStart, inSlot: Booking[]): Slot => {
+    const count = visitorCount(inSlot);
+    return { start, count, left: Math.max(0, store.maxPerSlot - count), blocked: Boolean(store.blockWhenFull) && count >= store.maxPerSlot };
+  };
+  if (store.limitUnit === 'day') return [counted(starts[0], dayBookings)];
+  return starts.map((start, i) => {
+    const end = starts[i + 1] ?? `${date}T${store.closeAt}`;
+    return counted(start, dayBookings.filter((b) => b.slotStart >= start && b.slotStart < end));
+  });
+}
 
 /** Customers' saved delivery addresses, newest first. */
 const addresses: (SavedAddress & { accountId: string })[] = [
@@ -596,13 +613,7 @@ export const mockApi: Api = {
     const dayBookings = bookings.filter(
       (b) => b.storeId === storeId && b.slotStart.startsWith(date),
     );
-    const starts = buildSlotStarts(date, store.openAt, store.closeAt, store.limitUnit);
-    if (store.limitUnit === 'day') return [{ start: starts[0], count: visitorCount(dayBookings) }];
-    return starts.map((start, i) => {
-      const end = starts[i + 1] ?? `${date}T${store.closeAt}`;
-      const inSlot = dayBookings.filter((b) => b.slotStart >= start && b.slotStart < end);
-      return { start, count: visitorCount(inSlot) };
-    });
+    return mockSlots(store, date, dayBookings);
   },
 
   async getStoreMonthSummary(storeId, year, month) {
@@ -811,6 +822,14 @@ export const mockApi: Api = {
       }
       return { serviceId, name: stored.name, price: stored.price, qty };
     });
+    // Stores that stop bookings in full slots (phase 34).
+    if (store.blockWhenFull) {
+      const sameDay = bookings.filter((b) => b.storeId === store.id && b.slotStart.startsWith(input.slotStart.slice(0, 10)));
+      const slot = mockSlots(store, input.slotStart.slice(0, 10), sameDay).findLast((s) => s.start <= input.slotStart);
+      if (slot && slot.count + people > store.maxPerSlot) {
+        throw new ApiError('This time slot is full. Please choose another time.', 409, 'SLOT_FULL');
+      }
+    }
     if (needsItems(input.orderType) && booked.length === 0) {
       throw new ApiError('Choose at least one product or service for PICKUP, PORTER and HOME_VISIT bookings', 400);
     }

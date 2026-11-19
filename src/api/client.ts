@@ -38,6 +38,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** The server's error `code`, when it sends one (e.g. `SLOT_FULL`). */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';

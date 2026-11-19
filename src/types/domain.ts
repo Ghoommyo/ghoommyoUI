@@ -94,6 +94,8 @@ export interface StoreSettings {
   storeCategory: string | null;
   /** Weekdays the store is open, 0 = Sunday … 6 = Saturday (`Date.getDay()`); customers only book these. */
   openDays: number[];
+  /** Full slots stop bookings and show greyed out (server phase 34; false on older servers). */
+  blockWhenFull?: boolean;
   /** The admin made the store inactive (only known for the signed-in store's own record). */
   inactive?: boolean;
   /** The app admin lets the store upload pictures; off by default (only known for the store's own record). */
@@ -349,6 +351,10 @@ export interface Slot {
   start: SlotStart;
   /** Visitors booked into this slot (rejected bookings excluded). */
   count: number;
+  /** Places left before the store's limit (older servers: worked out from `count`). */
+  left?: number;
+  /** Full, and the store stops bookings in full slots: it can't be chosen. */
+  blocked?: boolean;
 }
 
 export interface DaySummary {

@@ -74,4 +74,5 @@ export const booking = defineMessages({
   "delivery.startedAt": { en: "Started {time}", hi: "{time} को शुरू हुई", mr: "{time} ला सुरू झाली" },
   "delivery.onTheWay": { en: "Delivery started", hi: "डिलीवरी शुरू", mr: "डिलिव्हरी सुरू" },
   "delivery.track": { en: "Track delivery ↗", hi: "डिलीवरी ट्रैक करें ↗", mr: "डिलिव्हरी ट्रॅक करा ↗" },
+  "book.chooseAnotherTime": { en: "Choose another time", hi: "दूसरा समय चुनें", mr: "दुसरी वेळ निवडा" },
 });

@@ -260,6 +260,7 @@ export function UserDashboard() {
           <SlotGrid
             slots={slots.data ?? []}
             maxPerSlot={store.maxPerSlot}
+            blockWhenFull={store.blockWhenFull}
             limitUnit={store.limitUnit}
             isDarkStore={store.isDarkStore}
             selected={selectedSlot}

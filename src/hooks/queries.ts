@@ -246,6 +246,8 @@ export function useCreateBooking() {
       queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.myBookings(session?.accountId ?? '') });
     },
+    // The slot filled up meanwhile: refresh the grid so it shows as full.
+    onError: (_error, booking) => queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) }),
   });
 }
 

@@ -80,6 +80,7 @@ const toDraft = (store: Store): Draft => ({
   closeAt: store.closeAt,
   openDays: store.openDays,
   isDarkStore: store.isDarkStore,
+  blockWhenFull: Boolean(store.blockWhenFull),
   catalogType: store.catalogType,
   serviceType: store.serviceType,
   otherType: '',
@@ -198,6 +199,12 @@ export function StoreSettingsForm({ store }: { store: Store }) {
           style={styles.flex}
         />
       </View>
+      <SwitchRow
+        label={t('storeSettings.blockWhenFull')}
+        description={t(draft.blockWhenFull ? 'storeSettings.blockWhenFullOn' : 'storeSettings.blockWhenFullOff')}
+        value={Boolean(draft.blockWhenFull)}
+        onChange={(v) => set('blockWhenFull', v)}
+      />
       <TextField
         label={t('storeSettings.maxPerBooking')}
         value={draft.maxPerBooking}

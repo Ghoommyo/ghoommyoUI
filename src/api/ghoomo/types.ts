@@ -28,6 +28,8 @@ export interface GhoomoLocation {
   store_cat?: string | null;
   /** Weekdays open, 0 = Sunday … 6 = Saturday; all seven when not set. */
   open_days?: number[] | null;
+  /** 1 = full slots stop bookings (phase 34). */
+  block_when_full?: number | null;
   /** From the location's profile, so customers know where to go; null when not filled in. */
   loc_address?: string | null;
   loc_city?: string | null;
@@ -41,6 +43,15 @@ export interface GhoomoLocation {
   /** Average stars (1 decimal) and number of ratings; strings, null when unrated. */
   rating_avg?: string | null;
   rating_count?: string | null;
+}
+
+/** GET /stores/{id}/slots?date= (phase 34): pending + accepted people per slot, India time. */
+export interface GhoomoSlotCounts {
+  date: string;
+  maxPerSlot: number;
+  limitUnit: string;
+  blockWhenFull: boolean;
+  slots: { start: string; count: number; left: number; full: boolean }[];
 }
 
 export interface GhoomoSettings {
@@ -59,6 +70,8 @@ export interface GhoomoSettings {
   svc_type?: string | null;
   store_cat?: string | null;
   open_days?: number[];
+  /** 1 = full slots stop bookings (phase 34). */
+  block_when_full?: number;
   /** 1 when the admin made the location inactive (GET settings only). */
   store_inactive?: number;
   /** 1 when the app admin lets the location upload pictures (GET settings only). */
