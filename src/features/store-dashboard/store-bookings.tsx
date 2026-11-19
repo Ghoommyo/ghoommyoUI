@@ -8,6 +8,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { SegmentedTabs, type Tab } from '@/components/ui/segmented-tabs';
 import { BookingDetailsModal } from '@/features/bookings/booking-details-modal';
+import { RejectBookingModal } from '@/features/bookings/reject-booking-modal';
 import { Spacing } from '@/constants/theme';
 import { useSetBookingStatus, useStoreBookings } from '@/hooks/queries';
 import { showsPeople } from '@/lib/order-types';
@@ -47,34 +48,35 @@ export function StoreBookings({ storeId, dates, searchedDays, isDarkStore, catal
   const [open, setOpen] = useState<Booking | null>(null);
   const bookings = useStoreBookings(storeId, dates);
   const setStatus = useSetBookingStatus();
+  // Rejecting asks first (with an optional reason for the customer).
+  const [rejecting, setRejecting] = useState<Booking | null>(null);
 
+  // Bookings the customer cancelled sit with the rejected ones.
   const visible = (bookings.data ?? []).filter(
-    (b) => tab === 'all' || b.status === TAB_STATUS[tab],
+    (b) => tab === 'all' || b.status === TAB_STATUS[tab] || (tab === 'rejected' && b.status === 'cancelled'),
   );
 
   const renderActions = (booking: Booking) => {
     const busy = setStatus.isPending && setStatus.variables?.bookingId === booking.id;
     return (
       <>
-        {tab === 'all' ? <StatusChip status={booking.status} /> : null}
-        {booking.status !== 'accepted' ? (
+        {tab === 'all' || booking.status === 'cancelled' ? <StatusChip status={booking.status} /> : null}
+        {booking.status !== 'accepted' && booking.status !== 'cancelled' ? (
           <Button
             label={t('booking.accept')}
             variant="success"
-            size="sm"
             loading={busy && setStatus.variables?.status === 'accepted'}
             disabled={busy}
             onPress={() => setStatus.mutate({ bookingId: booking.id, status: 'accepted' })}
           />
         ) : null}
-        {booking.status !== 'rejected' ? (
+        {booking.status !== 'rejected' && booking.status !== 'cancelled' ? (
           <Button
             label={t('booking.reject')}
             variant="danger"
-            size="sm"
             loading={busy && setStatus.variables?.status === 'rejected'}
             disabled={busy}
-            onPress={() => setStatus.mutate({ bookingId: booking.id, status: 'rejected' })}
+            onPress={() => setRejecting(booking)}
           />
         ) : null}
       </>
@@ -122,6 +124,14 @@ export function StoreBookings({ storeId, dates, searchedDays, isDarkStore, catal
       {open ? (
         <BookingDetailsModal booking={open} viewer="store" isDarkStore={isDarkStore} catalogType={catalogType} onClose={() => setOpen(null)} />
       ) : null}
+      <RejectBookingModal
+        customer={rejecting ? rejecting.name : null}
+        onCancel={() => setRejecting(null)}
+        onConfirm={(reason) => {
+          if (rejecting) setStatus.mutate({ bookingId: rejecting.id, status: 'rejected', reason });
+          setRejecting(null);
+        }}
+      />
     </View>
   );
 }

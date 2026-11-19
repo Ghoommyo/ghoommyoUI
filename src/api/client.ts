@@ -96,7 +96,10 @@ export interface Api {
   deleteService(storeId: string, serviceId: string): Promise<void>;
 
   createBooking(booking: NewBooking): Promise<Booking>;
-  setBookingStatus(bookingId: string, status: BookingStatus): Promise<Booking>;
+  /** `reason` goes with a rejection; the customer sees it. */
+  setBookingStatus(bookingId: string, status: BookingStatus, reason?: string): Promise<Booking>;
+  /** The customer cancels their own pending or accepted booking before it starts. */
+  cancelBooking(bookingId: string): Promise<Booking>;
   /**
    * The store starts its accepted Porter order's delivery, with an optional tracking link.
    * Calling it again changes the link; the customer is notified.

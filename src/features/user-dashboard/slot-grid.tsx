@@ -71,7 +71,7 @@ function Legend({ blocked }: { blocked: boolean }) {
     { label: t('schedule.legendOpen'), fill: theme.slot, border: theme.slotBorder },
     { label: t('schedule.legendFull'), fill: theme.slotFull, border: theme.slotFullBorder },
     ...(blocked
-      ? [{ label: t('schedule.legendBlocked'), fill: BLOCKED_FILL, border: theme.cardTextSecondary, dashed: true }]
+      ? [{ label: t('schedule.legendBlocked'), fill: blockedFill(theme.cardText), border: theme.cardTextSecondary, dashed: true }]
       : []),
   ];
   return (
@@ -93,8 +93,8 @@ function Legend({ blocked }: { blocked: boolean }) {
   );
 }
 
-/** Full slots the store doesn't take bookings for: greyed out on the (always light) card. */
-const BLOCKED_FILL = 'rgba(31, 35, 41, 0.08)';
+/** Full slots the store doesn't take bookings for: a faint tint of the card's text colour. */
+const blockedFill = (cardText: string) => `${cardText}14`;
 
 type SlotBlockProps = {
   slot: Slot;
@@ -143,7 +143,7 @@ function SlotBlock({
         styles.block,
         {
           width,
-          backgroundColor: blocked ? BLOCKED_FILL : palette[0],
+          backgroundColor: blocked ? blockedFill(theme.cardText) : palette[0],
           borderColor: selected ? theme.primary : blocked ? theme.cardTextSecondary : palette[1],
           borderStyle: blocked ? 'dashed' : 'solid',
           borderWidth: selected ? 3 : 1.5,

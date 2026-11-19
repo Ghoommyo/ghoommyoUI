@@ -254,8 +254,8 @@ export function useCreateBooking() {
 export function useSetBookingStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ bookingId, status }: { bookingId: string; status: BookingStatus }) =>
-      api.setBookingStatus(bookingId, status),
+    mutationFn: ({ bookingId, status, reason }: { bookingId: string; status: BookingStatus; reason?: string }) =>
+      api.setBookingStatus(bookingId, status, reason),
     onSuccess: (booking) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) });
       queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -309,6 +309,18 @@ export function useUpdateMyProfile() {
 /** Uploads a picture and resolves to its URL; the form that shows it saves the URL. */
 export function useUploadImage(kind: ImageKind) {
   return useMutation({ mutationFn: (image: PickedImage) => api.uploadImage(kind, image) });
+}
+
+/** The customer cancels their own booking; refreshes the store's lists and the customer's own. */
+export function useCancelBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingId: string) => api.cancelBooking(bookingId),
+    onSuccess: (booking) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
 }
 
 /** The customer edits their own booking; refreshes the store's lists and the customer's own. */

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Spacing } from '@/constants/theme';
 import { BookingDetailsModal } from '@/features/bookings/booking-details-modal';
+import { RejectBookingModal } from '@/features/bookings/reject-booking-modal';
 import {
   useMarkNotificationsRead,
   useNotifications,
@@ -155,6 +156,7 @@ function NotificationRow({
   const { t, language } = useT();
   const theme = useTheme();
   const setStatus = useSetBookingStatus();
+  const [rejecting, setRejecting] = useState(false);
   const booking = n.booking;
   const busy = setStatus.isPending ? setStatus.variables?.status : undefined;
   const dot: Record<NotificationKind, string> = {
@@ -195,15 +197,13 @@ function NotificationRow({
           <Button
             label={t('booking.reject')}
             variant="danger"
-            size="sm"
             loading={busy === 'rejected'}
             disabled={setStatus.isPending}
-            onPress={() => setStatus.mutate({ bookingId: booking.id, status: 'rejected' })}
+            onPress={() => setRejecting(true)}
           />
           <Button
             label={t('booking.accept')}
             variant="success"
-            size="sm"
             loading={busy === 'accepted'}
             disabled={setStatus.isPending}
             onPress={() => setStatus.mutate({ bookingId: booking.id, status: 'accepted' })}
@@ -211,6 +211,16 @@ function NotificationRow({
         </View>
       ) : null}
       {setStatus.isError ? <Banner message={{ type: 'error', text: errorMessage(setStatus.error) }} /> : null}
+      {booking ? (
+        <RejectBookingModal
+          customer={rejecting ? booking.name : null}
+          onCancel={() => setRejecting(false)}
+          onConfirm={(reason) => {
+            setStatus.mutate({ bookingId: booking.id, status: 'rejected', reason });
+            setRejecting(false);
+          }}
+        />
+      ) : null}
     </View>
   );
 }

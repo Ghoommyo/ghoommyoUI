@@ -3,6 +3,7 @@ import type { PropsWithChildren } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { BackButton } from '@/components/ui/back-button';
 import { Brand } from '@/components/ui/brand';
 import { Screen } from '@/components/ui/screen';
 import type { SelectOption } from '@/components/ui/select';
@@ -47,6 +48,7 @@ export function AuthFormLayout({
 }: AuthFormLayoutProps) {
   return (
     <Screen>
+      <BackButton />
       <View style={styles.header}>
         <Brand />
         <ThemedText type="subtitle">{title}</ThemedText>

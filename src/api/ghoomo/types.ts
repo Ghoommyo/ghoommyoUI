@@ -177,6 +177,10 @@ export interface GhoomoAppointment {
   dlvry_start_on?: string | null;
   /** The delivery's tracking link, or null. */
   dlvry_track_url?: string | null;
+  /** The store's reason for a rejection. */
+  updt_reason?: string | null;
+  /** Set when the customer cancelled (status stays REJECTED; migration 019). */
+  cncl_on?: string | null;
 }
 
 /** A saved address (GET/POST /traveller/addresses). Already camelCase on the wire. */

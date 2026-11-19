@@ -349,7 +349,7 @@ function SwitchRow({ label, description, value, onChange }: SwitchRowProps) {
           {description}
         </ThemedText>
       </View>
-      <Switch accessibilityLabel={label} value={value} onValueChange={onChange} trackColor={{ true: theme.success }} />
+      <Switch accessibilityLabel={label} value={value} onValueChange={onChange} trackColor={{ true: theme.success, false: theme.switchOff }} />
     </View>
   );
 }

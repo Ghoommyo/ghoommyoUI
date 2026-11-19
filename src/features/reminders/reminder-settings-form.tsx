@@ -74,7 +74,7 @@ function ReminderSettingsForm({ initial }: { initial: ReminderSettings }) {
             setEnabled(value);
             setMessage(null);
           }}
-          trackColor={{ true: theme.success }}
+          trackColor={{ true: theme.success, false: theme.switchOff }}
         />
       </View>
       {enabled ? (

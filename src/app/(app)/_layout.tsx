@@ -10,6 +10,8 @@ export default function AppLayout() {
 
   return (
     <Drawer
+      // Android back (and router.back) return to the screen you came from, not to Home.
+      backBehavior="history"
       drawerContent={(props) => <SideMenu {...props} />}
       screenOptions={{ headerShown: false, drawerPosition: 'left', drawerType: 'front' }}>
       <Drawer.Screen name="home" options={{ title: t('menu.home') }} />

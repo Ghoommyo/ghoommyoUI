@@ -51,6 +51,7 @@ export const shared = defineMessages({
 
   "status.accepted": { en: "✓ Accepted", hi: "✓ स्वीकार", mr: "✓ स्वीकारले" },
   "status.pending": { en: "◦ Pending", hi: "◦ बाकी", mr: "◦ प्रलंबित" },
+  "status.cancelled": { en: "Cancelled", hi: "रद्द", mr: "रद्द" },
   "status.rejected": { en: "✕ Rejected", hi: "✕ अस्वीकार", mr: "✕ नाकारले" },
 
   "hint.readOnly": { en: "Can't be changed yet — the server doesn't support it.", hi: "अभी बदला नहीं जा सकता — सर्वर इसे सपोर्ट नहीं करता।", mr: "अजून बदलता येत नाही — सर्व्हर याला सपोर्ट करत नाही." },

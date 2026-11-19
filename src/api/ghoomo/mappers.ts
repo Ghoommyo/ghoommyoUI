@@ -290,7 +290,9 @@ export function appointmentToBooking(row: GhoomoAppointment): Booking {
     mobile: row.mobile_number ?? '',
     people: Number(row.bokng_cnt) || 1,
     description: row.bokng_desc ?? '',
-    status: toStatus(row.status),
+    // Cancelled bookings stay REJECTED on the server (so older apps still show them), with `cncl_on`.
+    status: row.cncl_on ? 'cancelled' : toStatus(row.status),
+    statusReason: row.status === 'REJECTED' && !row.cncl_on && row.updt_reason ? row.updt_reason : null,
     createdAt: row.cret_on ?? '',
     rating: row.rtng_stars ? { stars: Number(row.rtng_stars), review: row.rtng_review ?? '' } : null,
     services: (row.services ?? []).map((s) => ({

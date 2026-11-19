@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSession } from '@/auth/session';
 
 import { ThemedText } from '@/components/themed-text';
+import { BackButton } from '@/components/ui/back-button';
 import { Brand } from '@/components/ui/brand';
 import { Spacing } from '@/constants/theme';
 import { NotificationsPanel } from '@/features/notifications/notifications-panel';
@@ -14,7 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n/language-provider';
 
 /** Wordmark, the notifications bell (signed in) and the "≡ Menu" button. Used by every drawer screen. */
-export function AppHeader({ title }: { title?: string }) {
+export function AppHeader({ title, back }: { title?: string; back?: boolean }) {
   const { t } = useT();
   const theme = useTheme();
   const navigation = useNavigation();
@@ -48,7 +49,7 @@ export function AppHeader({ title }: { title?: string }) {
                   style={[styles.badge, { backgroundColor: theme.danger, borderColor: theme.background }]}
                   accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants">
-                  <ThemedText type="smallBold" style={styles.badgeText}>
+                  <ThemedText type="smallBold" style={[styles.badgeText, { color: theme.onPrimary }]}>
                     {unseen > 9 ? '9+' : unseen}
                   </ThemedText>
                 </View>
@@ -73,6 +74,7 @@ export function AppHeader({ title }: { title?: string }) {
       {notificationsOpen ? (
         <NotificationsPanel onClose={() => setNotificationsOpen(false)} />
       ) : null}
+      {back ? <BackButton /> : null}
       {title ? <ThemedText type="subtitle">{title}</ThemedText> : null}
     </View>
   );
@@ -113,7 +115,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: {
-    color: '#FFFFFF',
     fontSize: 11,
     lineHeight: 14,
   },

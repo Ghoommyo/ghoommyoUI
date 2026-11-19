@@ -11,7 +11,10 @@ import { Stars } from '@/components/ui/stars';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { DescriptionHistory } from '@/features/bookings/description-history';
-import { useSetBookingStatus, useStartDelivery, useStores } from '@/hooks/queries';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { RejectBookingModal } from '@/features/bookings/reject-booking-modal';
+import { useCancelBooking, useSetBookingStatus, useStartDelivery, useStores } from '@/hooks/queries';
+import { canCancelBooking } from '@/lib/bookings';
 import { useTheme } from '@/hooks/use-theme';
 import { formatSlotStart, toDateKey } from '@/lib/date';
 import { catalogLabels, hasStoreAddress, orderTypeLabel, showsPeople, visitsStore } from '@/lib/order-types';
@@ -53,7 +56,16 @@ export function BookingDetailsModal({
   const [booking, setBooking] = useState(initial);
   const setStatus = useSetBookingStatus();
   const busy = setStatus.isPending ? setStatus.variables?.status : undefined;
-  const change = (status: BookingStatus) => setStatus.mutate({ bookingId: booking.id, status }, { onSuccess: setBooking });
+  const change = (status: BookingStatus, reason?: string) =>
+    setStatus.mutate({ bookingId: booking.id, status, reason }, { onSuccess: setBooking });
+  const [rejecting, setRejecting] = useState(false);
+  // Customers cancel their own booking until it starts.
+  const cancel = useCancelBooking();
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const canCancel = viewer === 'user' && canCancelBooking(booking, new Date());
+  // The buttons follow this booking's latest status (it can be cancelled from here).
+  const rate = booking.status === 'accepted' ? onRate : undefined;
+  const edit = booking.status === 'pending' || booking.status === 'accepted' ? onEdit : undefined;
 
   // Porter: once accepted, the store starts the delivery with an optional tracking link.
   const startDelivery = useStartDelivery();
@@ -103,6 +115,7 @@ export function BookingDetailsModal({
     ]);
   }
   rows.push([t('booking.when'), formatSlotStart(booking.slotStart, language)]);
+  if (booking.status === 'rejected' && booking.statusReason) rows.push([t('booking.reason'), booking.statusReason]);
   if (booking.orderType) rows.push([t('booking.orderType'), orderTypeLabel(t, booking.orderType)]);
   if (showsPeople(booking, isDarkStore)) rows.push([t('booking.people'), String(booking.people)]);
   if (booking.deliveryAddress) {
@@ -139,7 +152,7 @@ export function BookingDetailsModal({
         <Button label={t('common.cancel')} variant="secondary" disabled={startDelivery.isPending} onPress={() => setDeliveryForm(false)} />
         <Button label={t('delivery.submit')} variant="success" loading={startDelivery.isPending} onPress={submitDelivery} />
       </View>
-    ) : viewer === 'store' ? (
+    ) : viewer === 'store' && booking.status !== 'cancelled' ? (
       <View style={styles.actions}>
         {canDeliver ? (
           <Button
@@ -150,18 +163,21 @@ export function BookingDetailsModal({
           />
         ) : null}
         {booking.status !== 'rejected' ? (
-          <Button label={t('booking.reject')} variant="danger" loading={busy === 'rejected'} disabled={setStatus.isPending} onPress={() => change('rejected')} />
+          <Button label={t('booking.reject')} variant="danger" loading={busy === 'rejected'} disabled={setStatus.isPending} onPress={() => setRejecting(true)} />
         ) : null}
         {booking.status !== 'accepted' ? (
           <Button label={t('booking.accept')} variant="success" loading={busy === 'accepted'} disabled={setStatus.isPending} onPress={() => change('accepted')} />
         ) : null}
       </View>
-    ) : onEdit || onRate ? (
+    ) : viewer === 'user' && (edit || rate || canCancel) ? (
       <View style={styles.actions}>
-        {onRate ? (
-          <Button label={`★ ${booking.rating ? t('booking.editRating') : t('booking.rate')}`} variant={onEdit ? 'secondary' : 'primary'} onPress={() => onRate(booking)} />
+        {canCancel ? (
+          <Button label={t('cancel.button')} variant="secondary" loading={cancel.isPending} onPress={() => setConfirmCancel(true)} />
         ) : null}
-        {onEdit ? <Button label={t('booking.edit')} onPress={() => onEdit(booking)} /> : null}
+        {rate ? (
+          <Button label={`★ ${booking.rating ? t('booking.editRating') : t('booking.rate')}`} variant={edit ? 'secondary' : 'primary'} onPress={() => rate(booking)} />
+        ) : null}
+        {edit ? <Button label={t('booking.edit')} onPress={() => edit(booking)} /> : null}
       </View>
     ) : undefined;
 
@@ -177,6 +193,10 @@ export function BookingDetailsModal({
         message={
           setStatus.isError
             ? { type: 'error', text: errorMessage(setStatus.error) }
+            : cancel.isError
+              ? { type: 'error', text: errorMessage(cancel.error) }
+              : cancel.isSuccess
+                ? { type: 'success', text: t('cancel.done') }
             : startDelivery.isError
               ? { type: 'error', text: errorMessage(startDelivery.error) }
               : null
@@ -256,6 +276,27 @@ export function BookingDetailsModal({
         <ThemedText type="smallBold">{t('booking.description')}</ThemedText>
         <DescriptionHistory description={booking.description} />
       </View>
+      <ConfirmModal
+        visible={confirmCancel}
+        title={t('cancel.title')}
+        message={t('cancel.message', { store: booking.storeName })}
+        confirmLabel={t('cancel.confirm')}
+        cancelLabel={t('cancel.keep')}
+        destructive
+        onCancel={() => setConfirmCancel(false)}
+        onConfirm={() => {
+          setConfirmCancel(false);
+          cancel.mutate(booking.id, { onSuccess: setBooking });
+        }}
+      />
+      <RejectBookingModal
+        customer={rejecting ? booking.name : null}
+        onCancel={() => setRejecting(false)}
+        onConfirm={(reason) => {
+          change('rejected', reason);
+          setRejecting(false);
+        }}
+      />
     </Sheet>
   );
 }

@@ -14,12 +14,13 @@ const STATUS_LABEL: Record<BookingStatus, MessageKey> = {
   accepted: 'status.accepted',
   pending: 'status.pending',
   rejected: 'status.rejected',
+  cancelled: 'status.cancelled',
 };
 
 export function StatusChip({ status }: { status: BookingStatus }) {
   const { t } = useT();
   const theme = useTheme();
-  const color = { accepted: theme.success, pending: theme.warning, rejected: theme.danger }[status];
+  const color = { accepted: theme.success, pending: theme.warning, rejected: theme.danger, cancelled: theme.textSecondary }[status];
 
   return (
     <View style={[styles.chip, { backgroundColor: color }]}>
@@ -57,6 +58,8 @@ export function EventCard({ booking, title, actions, subtitle, showPeople = true
     .filter(Boolean)
     .join(' · ');
 
+  // Text on the card: white on the light theme's blue, dark on the dark theme's lighter blue.
+  const light = { color: theme.onPrimary };
   // The tappable part and the action buttons are siblings, so buttons never nest (invalid on web).
   return (
     <View style={[styles.card, { backgroundColor: theme.eventCard }]}>
@@ -67,24 +70,24 @@ export function EventCard({ booking, title, actions, subtitle, showPeople = true
         accessibilityLabel={onPress ? t('common.openDetails', { title, when: formatSlotStart(booking.slotStart, language) }) : undefined}
         style={({ pressed }) => [styles.main, pressed && styles.pressed]}>
         <View style={styles.who}>
-          <ThemedText type="small" style={styles.light}>
+          <ThemedText type="small" style={light}>
             {formatSlotStart(booking.slotStart, language)}
           </ThemedText>
-          <ThemedText type="smallBold" style={[styles.light, styles.title]}>
+          <ThemedText type="smallBold" style={[light, styles.title]}>
             {title}
           </ThemedText>
           {subtitle ? (
-            <ThemedText type="small" style={styles.light}>
+            <ThemedText type="small" style={light}>
               {subtitle}
             </ThemedText>
           ) : null}
         </View>
-        <View style={[styles.details, { borderLeftColor: 'rgba(255,255,255,0.5)' }]}>
-          <ThemedText style={styles.light} numberOfLines={6}>
+        <View style={[styles.details, { borderLeftColor: `${theme.onPrimary}80` }]}>
+          <ThemedText style={light} numberOfLines={6}>
             {booking.description || t('common.noDescription')}
           </ThemedText>
           {meta ? (
-            <ThemedText type="small" style={styles.light}>
+            <ThemedText type="small" style={light}>
               {meta}
             </ThemedText>
           ) : null}
@@ -130,9 +133,6 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     minWidth: 104,
     marginLeft: 'auto',
-  },
-  light: {
-    color: '#FFFFFF',
   },
   pressed: {
     opacity: 0.85,
