@@ -81,7 +81,7 @@ export function UserEventsTabs() {
       {bookings.isLoading ? (
         <ActivityIndicator style={styles.empty} />
       ) : bookings.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(bookings.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(bookings.error) }} onRetry={() => bookings.refetch()} />
       ) : buckets[tab].length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
           {t(EMPTY[tab])}

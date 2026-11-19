@@ -117,7 +117,7 @@ export function NotificationsPanel({ onClose }: { onClose(): void }) {
       {notifications.isLoading || (notifications.isFetching && !list.length) ? (
         <ActivityIndicator style={styles.empty} />
       ) : notifications.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(notifications.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(notifications.error) }} onRetry={() => notifications.refetch()} />
       ) : !list.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
           {t('notifications.none')}

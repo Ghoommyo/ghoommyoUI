@@ -10,6 +10,7 @@ export const stores = defineMessages({
 
   "explore.title": { en: "Explore stores", hi: "स्टोर खोजें", mr: "स्टोअर शोधा" },
   "explore.search": { en: "Search stores by name", hi: "नाम से स्टोर खोजें", mr: "नावाने स्टोअर शोधा" },
+  "explore.clear": { en: "Clear search", hi: "खोज हटाएँ", mr: "शोध साफ करा" },
   "explore.searchPlaceholder": { en: "e.g. bakery", hi: "जैसे बेकरी", mr: "उदा. बेकरी" },
   "explore.results": { en: "Stores", hi: "स्टोर", mr: "स्टोअर" },
   "explore.none": { en: "No stores match \"{query}\".", hi: "\"{query}\" से मिलता कोई स्टोर नहीं।", mr: "\"{query}\" शी जुळणारे स्टोअर नाही." },

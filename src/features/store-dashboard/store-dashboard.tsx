@@ -83,7 +83,7 @@ export function StoreDashboard() {
           </ThemedText>
         </View>
       ) : (
-        <Banner message={{ type: 'error', text: errorMessage(store.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(store.error) }} onRetry={() => store.refetch()} />
       )}
 
       <MonthCalendar

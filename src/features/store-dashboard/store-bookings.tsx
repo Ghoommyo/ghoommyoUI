@@ -157,7 +157,7 @@ export function StoreBookings({ storeId, dates, searchedDays, isDarkStore, catal
       {bookings.isLoading ? (
         <ActivityIndicator style={styles.empty} />
       ) : bookings.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(bookings.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(bookings.error) }} onRetry={() => bookings.refetch()} />
       ) : visible.length === 0 ? (
         <Empty text={searchedDays ? t('store.noneSelected') : t('store.noneToday')} />
       ) : (

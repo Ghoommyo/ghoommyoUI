@@ -22,6 +22,8 @@ export default function LoginScreen() {
   const params = useLocalSearchParams<{
     registered?: string;
     passwordReset?: string;
+    /** The app signed out after the server refused the session. */
+    ended?: string;
     role?: Role;
     store?: string;
     next?: string;
@@ -75,6 +77,8 @@ export default function LoginScreen() {
         message={
           login.isError
             ? { type: 'error', text: errorMessage(login.error) }
+            : params.ended
+              ? { type: 'error', text: t('auth.sessionEnded') }
             : params.registered
               ? { type: 'success', text: registeredText }
               : params.passwordReset

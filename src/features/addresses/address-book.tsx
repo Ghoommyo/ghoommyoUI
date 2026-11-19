@@ -60,7 +60,7 @@ export function AddressBook() {
       {addresses.isLoading ? (
         <ActivityIndicator style={styles.empty} />
       ) : addresses.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(addresses.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(addresses.error) }} onRetry={() => addresses.refetch()} />
       ) : !addresses.data?.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
           {t('addresses.empty')}

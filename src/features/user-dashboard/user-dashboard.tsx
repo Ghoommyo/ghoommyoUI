@@ -269,7 +269,7 @@ export function UserDashboard() {
         </View>
       ) : null}
       {stores.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(stores.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(stores.error) }} onRetry={() => stores.refetch()} />
       ) : null}
 
       <View style={[styles.card, { backgroundColor: theme.card }]}>

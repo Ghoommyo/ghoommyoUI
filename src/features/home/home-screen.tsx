@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -19,6 +20,8 @@ const TOP = 6;
 
 /** Home: store types, each with its highest-rated stores. Open to everyone. */
 export function HomeScreen() {
+  // Deleting an account ends here, with a confirmation.
+  const { deleted } = useLocalSearchParams<{ deleted?: string }>();
   const { t } = useT();
   const theme = useTheme();
   const stores = useStores();
@@ -35,11 +38,12 @@ export function HomeScreen() {
   return (
     <Screen ads>
       <AppHeader title={t('home.title')} />
+      <Banner message={deleted === '1' ? { type: 'success', text: t('account.deleted') } : null} />
       <ThemedText themeColor="textSecondary">{t('home.intro')}</ThemedText>
       {stores.isLoading ? (
         <ActivityIndicator style={styles.empty} color={theme.primary} />
       ) : stores.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(stores.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(stores.error) }} onRetry={() => stores.refetch()} />
       ) : !groups.length ? (
         <ThemedText themeColor="textSecondary" style={styles.empty}>
           {t('home.noStores')}

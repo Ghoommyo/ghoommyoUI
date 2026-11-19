@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { errorMessage } from '@/api';
@@ -42,6 +42,8 @@ export default function ExploreScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           onEndReachedThreshold={0.5}
+          style={stores.isPlaceholderData ? styles.loadingOld : undefined}
+          refreshControl={<RefreshControl refreshing={stores.isRefetching && !stores.isFetchingNextPage} onRefresh={() => stores.refetch()} />}
           onEndReached={() => {
             if (stores.hasNextPage && !stores.isFetchingNextPage && !stores.isFetchNextPageError) stores.fetchNextPage();
           }}
@@ -56,9 +58,20 @@ export default function ExploreScreen() {
                 autoCorrect={false}
                 returnKeyType="search"
                 onSubmitEditing={() => setQuery(text.trim())}
+                accessory={
+                  text ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('explore.clear')}
+                      onPress={() => setText('')}
+                      style={[styles.clear, { backgroundColor: theme.backgroundSelected }]}>
+                      <ThemedText style={styles.clearText}>×</ThemedText>
+                    </Pressable>
+                  ) : null
+                }
               />
               {stores.isError && !stores.data ? (
-                <Banner message={{ type: 'error', text: errorMessage(stores.error) }} />
+                <Banner message={{ type: 'error', text: errorMessage(stores.error) }} onRetry={() => stores.refetch()} />
               ) : null}
             </View>
           }
@@ -105,6 +118,20 @@ function ExploreCard({ store }: { store: StorePage }) {
 }
 
 const styles = StyleSheet.create({
+  clear: {
+    width: 44,
+    height: 44,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearText: {
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  loadingOld: {
+    opacity: 0.6,
+  },
   fill: {
     flex: 1,
   },

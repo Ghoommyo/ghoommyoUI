@@ -209,7 +209,7 @@ function ItemsTab({ storeId, items }: { storeId: string; items: string }) {
   const theme = useTheme();
   const services = useStoreServices(storeId);
   if (services.isLoading) return <ActivityIndicator style={styles.empty} color={theme.primary} />;
-  if (services.isError) return <Banner message={{ type: 'error', text: errorMessage(services.error) }} />;
+  if (services.isError) return <Banner message={{ type: 'error', text: errorMessage(services.error) }} onRetry={() => services.refetch()} />;
   if (!services.data?.length) {
     return (
       <ThemedText themeColor="textSecondary" style={styles.empty}>
@@ -252,7 +252,7 @@ function GalleryTab({ storeId }: { storeId: string }) {
   const gallery = useGallery(storeId);
   const [open, setOpen] = useState<number | null>(null);
   if (gallery.isLoading) return <ActivityIndicator style={styles.empty} color={theme.primary} />;
-  if (gallery.isError) return <Banner message={{ type: 'error', text: errorMessage(gallery.error) }} />;
+  if (gallery.isError) return <Banner message={{ type: 'error', text: errorMessage(gallery.error) }} onRetry={() => gallery.refetch()} />;
   const images = gallery.data ?? [];
   if (!images.length) {
     return (

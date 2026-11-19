@@ -76,6 +76,8 @@ export const shared = defineMessages({
 
   "error.generic": { en: "Something went wrong. Please try again.", hi: "कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।", mr: "काहीतरी चुकले. कृपया पुन्हा प्रयत्न करा." },
   "error.offline": { en: "Can't reach the server. Check your connection and try again.", hi: "सर्वर से कनेक्ट नहीं हो पा रहा। अपना इंटरनेट देखें और फिर से कोशिश करें।", mr: "सर्व्हरशी जोडता येत नाही. तुमचे इंटरनेट तपासा आणि पुन्हा प्रयत्न करा." },
+  "auth.sessionEnded": { en: "Your session ended. Please log in again.", hi: "आपका सत्र खत्म हो गया। कृपया फिर से लॉगिन करें।", mr: "तुमचे सत्र संपले. कृपया पुन्हा लॉगिन करा." },
+  "account.deleted": { en: "Your account has been deleted.", hi: "आपका खाता हटा दिया गया है।", mr: "तुमचे खाते हटवले आहे." },
   "error.shopsOnly": { en: "Only shops can sign in here. Places aren't supported on the web yet.", hi: "यहाँ सिर्फ़ दुकानें साइन इन कर सकती हैं। जगहें अभी वेब पर नहीं हैं।", mr: "इथे फक्त दुकाने साइन इन करू शकतात. ठिकाणे अजून वेबवर नाहीत." },
   "error.noStore": { en: "This store doesn't exist or is no longer taking bookings.", hi: "यह स्टोर मौजूद नहीं है या अब बुकिंग नहीं ले रहा।", mr: "हे स्टोअर अस्तित्वात नाही किंवा आता बुकिंग घेत नाही." },
   "home.otherStores": { en: "Other stores", hi: "अन्य स्टोर", mr: "इतर स्टोअर" },

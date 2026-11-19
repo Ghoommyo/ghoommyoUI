@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/api';
 import { useSession } from '@/auth/session';
@@ -173,6 +173,8 @@ export function useSearchStores(query: string) {
     queryFn: ({ pageParam }) => api.searchStores(query, pageParam),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
+    // While a new search loads, the last results stay on screen instead of a blank list.
+    placeholderData: keepPreviousData,
   });
 }
 

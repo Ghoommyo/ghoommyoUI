@@ -25,13 +25,13 @@ export default function ProfileScreen() {
 function StoreProfile({ storeId }: { storeId: string }) {
   const store = useStore(storeId);
   if (store.isLoading) return <ActivityIndicator />;
-  if (!store.data) return <Banner message={{ type: 'error', text: errorMessage(store.error) }} />;
+  if (!store.data) return <Banner message={{ type: 'error', text: errorMessage(store.error) }} onRetry={() => store.refetch()} />;
   return <StoreProfileForm store={store.data} />;
 }
 
 function UserProfile() {
   const profile = useMyProfile();
   if (profile.isLoading) return <ActivityIndicator />;
-  if (!profile.data) return <Banner message={{ type: 'error', text: errorMessage(profile.error) }} />;
+  if (!profile.data) return <Banner message={{ type: 'error', text: errorMessage(profile.error) }} onRetry={() => profile.refetch()} />;
   return <UserProfileForm profile={profile.data} />;
 }

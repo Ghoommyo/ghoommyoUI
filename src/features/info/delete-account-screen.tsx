@@ -191,7 +191,8 @@ export function DeleteAccountScreen() {
           remove.mutate(password, {
             onSuccess: async () => {
               await signOut();
-              router.replace('/login');
+              // Home says the account is gone.
+              router.replace({ pathname: '/home', params: { deleted: '1' } });
             },
             onError: (e) => setError(errorMessage(e)),
           });
