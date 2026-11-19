@@ -16,6 +16,7 @@ import {
   settingsToStore,
   slotKey,
   slotsFromCalendar,
+  slotsFromCounts,
   galleryToImage,
   publicStoreToPage,
 } from '@/api/ghoomo/mappers';
@@ -34,6 +35,7 @@ import type {
   GhoomoService,
   GhoomoSettings,
   GhoomoUserClaims,
+  GhoomoSlotCounts,
 } from '@/api/ghoomo/types';
 import { adoptServerTime, CLIENT_NOT_ALLOWED, signatureHeaders } from '@/api/ghoomo/signature';
 import { isLanguage } from '@/i18n/languages';
@@ -110,7 +112,7 @@ export function createRequest(baseUrl: string): GhoomoRequest {
  */
 function apiError(data: { error?: string; message?: string; code?: string } | null, status: number, fallback: string) {
   const message = data?.error ?? data?.message ?? fallback;
-  return new ApiError(message, status === 401 && data?.code === CLIENT_NOT_ALLOWED ? 403 : status);
+  return new ApiError(message, status === 401 && data?.code === CLIENT_NOT_ALLOWED ? 403 : status, data?.code);
 }
 
 /** POST /uploads: multipart, so it skips the JSON request helper. */
@@ -314,12 +316,15 @@ export function createGhoomoApi(baseUrl: string): Api {
     getStore: findShop,
 
     async getStoreSlots(storeId, date) {
-      const { year, month } = parseDateKey(date);
-      const [store, dayDetails] = await Promise.all([
+      // Servers from phase 34 count slots from the bookings themselves and say which are blocked;
+      // older ones (no route: 404) fall back to the month calendar.
+      const [store, counted] = await Promise.all([
         findShop(storeId),
-        getCalendar(storeId, year, month),
+        request<GhoomoSlotCounts>(`/stores/${encodeURIComponent(storeId)}/slots?date=${date}`, { emptyOn: [404] }).catch(() => null),
       ]);
-      return slotsFromCalendar(dayDetails, date, store);
+      if (counted?.slots) return slotsFromCounts(counted, date, store);
+      const { year, month } = parseDateKey(date);
+      return slotsFromCalendar(await getCalendar(storeId, year, month), date, store);
     },
 
     async getStoreMonthSummary(storeId, year, month) {
@@ -496,6 +501,7 @@ export function createGhoomoApi(baseUrl: string): Api {
 
       return {
         ...input,
+        delivery: null,
         id: appointmentId,
         storeName: store.name,
         userId,
@@ -514,6 +520,14 @@ export function createGhoomoApi(baseUrl: string): Api {
         method: 'PUT',
         body: { apntmnt_id: bookingId, status: fromStatus(status) },
       });
+      return appointmentToBooking(res!.appointment);
+    },
+
+    async startDelivery(bookingId, trackingUrl) {
+      const res = await request<{ appointment: GhoomoAppointment }>(
+        `/appointment/${encodeURIComponent(bookingId)}/delivery`,
+        { method: 'POST', body: { trackingUrl: trackingUrl.trim() || null } },
+      );
       return appointmentToBooking(res!.appointment);
     },
 

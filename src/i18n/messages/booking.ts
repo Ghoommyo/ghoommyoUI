@@ -60,4 +60,19 @@ export const booking = defineMessages({
   "book.address": { en: "Address", hi: "पता", mr: "पत्ता" },
   "book.addressPlaceholder": { en: "House or flat, street, area, city, PIN code", hi: "घर या फ़्लैट, गली, इलाका, शहर, पिन कोड", mr: "घर किंवा फ्लॅट, रस्ता, परिसर, शहर, पिन कोड" },
   "book.saveAddress": { en: "Save this address", hi: "यह पता सेव करें", mr: "हा पत्ता सेव्ह करा" },
+  // Orders for the store's items (Pickup, Porter, home visit) need at least one.
+  "book.itemsRequired": { en: "Choose at least one of the store's {items} for this order type.", hi: "इस ऑर्डर टाइप के लिए स्टोर के {items} में से कम से कम एक चुनें।", mr: "या ऑर्डर प्रकारासाठी स्टोअरच्या {items} पैकी किमान एक निवडा." },
+  "book.noItemsToOrder": { en: "This store hasn't added any {items} yet, so it can't take this order type.", hi: "इस स्टोर ने अभी कोई {items} नहीं जोड़े हैं, इसलिए यह ऑर्डर टाइप नहीं ले सकता।", mr: "या स्टोअरने अजून कोणतेही {items} जोडलेले नाहीत, त्यामुळे हा ऑर्डर प्रकार घेता येत नाही." },
+  // Porter deliveries: the store sends the order out, optionally with a tracking link.
+  "delivery.start": { en: "🚚 Delivery started", hi: "🚚 डिलीवरी शुरू", mr: "🚚 डिलिव्हरी सुरू" },
+  "delivery.updateLink": { en: "Update tracking link", hi: "ट्रैकिंग लिंक बदलें", mr: "ट्रॅकिंग लिंक बदला" },
+  "delivery.trackingLink": { en: "Tracking link (optional)", hi: "ट्रैकिंग लिंक (वैकल्पिक)", mr: "ट्रॅकिंग लिंक (ऐच्छिक)" },
+  "delivery.trackingHint": { en: "Paste the link from the delivery service. The customer is notified and can follow the delivery.", hi: "डिलीवरी सर्विस का लिंक यहाँ डालें। ग्राहक को सूचना मिलेगी और वह डिलीवरी ट्रैक कर सकेगा।", mr: "डिलिव्हरी सेवेची लिंक इथे टाका. ग्राहकाला सूचना मिळेल आणि तो डिलिव्हरी ट्रॅक करू शकेल." },
+  "delivery.linkInvalid": { en: "Enter a link that starts with https://", hi: "https:// से शुरू होने वाला लिंक डालें", mr: "https:// ने सुरू होणारी लिंक टाका" },
+  "delivery.submit": { en: "Submit", hi: "भेजें", mr: "पाठवा" },
+  "delivery.label": { en: "Delivery", hi: "डिलीवरी", mr: "डिलिव्हरी" },
+  "delivery.startedAt": { en: "Started {time}", hi: "{time} को शुरू हुई", mr: "{time} ला सुरू झाली" },
+  "delivery.onTheWay": { en: "Delivery started", hi: "डिलीवरी शुरू", mr: "डिलिव्हरी सुरू" },
+  "delivery.track": { en: "Track delivery ↗", hi: "डिलीवरी ट्रैक करें ↗", mr: "डिलिव्हरी ट्रॅक करा ↗" },
+  "book.chooseAnotherTime": { en: "Choose another time", hi: "दूसरा समय चुनें", mr: "दुसरी वेळ निवडा" },
 });

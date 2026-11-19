@@ -10,6 +10,7 @@ import type {
   GhoomoSettings,
   GhoomoSlotCount,
   GhoomoStatus,
+  GhoomoSlotCounts,
 } from '@/api/ghoomo/types';
 import { makeDateKey, MONTHS, parseDateKey, toDateKey, toMinutes } from '@/lib/date';
 import { orderTypeFromApi } from '@/lib/order-types';
@@ -134,6 +135,22 @@ export function slotsFromCalendar(
   });
 }
 
+/** The server's slot counts (phase 34) on the slots the app draws; `blocked` slots can't be chosen. */
+export function slotsFromCounts(
+  counted: GhoomoSlotCounts,
+  date: DateKey,
+  store: Pick<StoreSettings, 'openAt' | 'closeAt' | 'limitUnit' | 'maxPerSlot'>,
+): Slot[] {
+  const byStart = new Map(counted.slots.map((slot) => [slot.start, slot]));
+  const max = Number(counted.maxPerSlot) || store.maxPerSlot;
+  return buildSlotStarts(date, store.openAt, store.closeAt, store.limitUnit).map((start) => {
+    const found = byStart.get(start);
+    const count = Number(found?.count ?? 0);
+    const full = found?.full ?? count >= max;
+    return { start, count, left: Math.max(0, max - count), blocked: Boolean(counted.blockWhenFull) && full };
+  });
+}
+
 /** Per-day totals for a month (month is 0-based). */
 export function daySummaryFromCalendar(
   dayDetails: GhoomoDayDetails | null,
@@ -146,7 +163,7 @@ export function daySummaryFromCalendar(
   }));
 }
 
-type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'open_days' | 'store_inactive' | 'uploads_on' | 'links_on' | 'gallery_on' | 'auto_approve'>;
+type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'open_days' | 'block_when_full' | 'store_inactive' | 'uploads_on' | 'links_on' | 'gallery_on' | 'auto_approve'>;
 /** Settings columns, which are null on browse rows for locations that never opened settings. */
 type SettingsInput = { [K in keyof SettingsFields]?: SettingsFields[K] | null };
 
@@ -179,6 +196,7 @@ export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'>
     serviceType: row.svc_type || null,
     storeCategory: row.store_cat || null,
     openDays: toOpenDays(row.open_days),
+    blockWhenFull: Number(row.block_when_full ?? 0) === 1,
     inactive: Number(row.store_inactive ?? 0) === 1,
     uploadsEnabled: Number(row.uploads_on ?? 0) === 1,
     linksEnabled: Number(row.links_on ?? 0) === 1,
@@ -199,6 +217,7 @@ export function settingsToRequest(settings: StoreSettings) {
     serviceType: settings.serviceType,
     storeCategory: settings.storeCategory,
     openDays: settings.openDays,
+    blockWhenFull: Boolean(settings.blockWhenFull),
   };
 }
 
@@ -282,6 +301,9 @@ export function appointmentToBooking(row: GhoomoAppointment): Booking {
     })),
     orderType: orderTypeFromApi(row.order_type),
     deliveryAddress: row.dlvry_addr || null,
+    delivery: row.dlvry_start_on
+      ? { startedAt: row.dlvry_start_on, trackingUrl: row.dlvry_track_url || null }
+      : null,
   };
 }
 

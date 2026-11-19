@@ -8,11 +8,12 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Stars } from '@/components/ui/stars';
+import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { DescriptionHistory } from '@/features/bookings/description-history';
-import { useSetBookingStatus, useStores } from '@/hooks/queries';
+import { useSetBookingStatus, useStartDelivery, useStores } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { formatSlotStart } from '@/lib/date';
+import { formatSlotStart, toDateKey } from '@/lib/date';
 import { catalogLabels, hasStoreAddress, orderTypeLabel, showsPeople, visitsStore } from '@/lib/order-types';
 import { formatPrice } from '@/lib/services';
 import type { Booking, BookingStatus, CatalogType } from '@/types/domain';
@@ -54,6 +55,33 @@ export function BookingDetailsModal({
   const busy = setStatus.isPending ? setStatus.variables?.status : undefined;
   const change = (status: BookingStatus) => setStatus.mutate({ bookingId: booking.id, status }, { onSuccess: setBooking });
 
+  // Porter: once accepted, the store starts the delivery with an optional tracking link.
+  const startDelivery = useStartDelivery();
+  const canDeliver = viewer === 'store' && booking.orderType === 'porter' && booking.status === 'accepted';
+  const [deliveryForm, setDeliveryForm] = useState(false);
+  const [trackingUrl, setTrackingUrl] = useState('');
+  const [linkError, setLinkError] = useState<string | undefined>();
+  const openDeliveryForm = () => {
+    setTrackingUrl(booking.delivery?.trackingUrl ?? '');
+    setLinkError(undefined);
+    startDelivery.reset();
+    setDeliveryForm(true);
+  };
+  const submitDelivery = () => {
+    const url = trackingUrl.trim();
+    if (url && !/^https?:\/\/\S+$/i.test(url)) return setLinkError(t('delivery.linkInvalid'));
+    setLinkError(undefined);
+    startDelivery.mutate(
+      { bookingId: booking.id, trackingUrl: url },
+      {
+        onSuccess: (updated) => {
+          setBooking(updated);
+          setDeliveryForm(false);
+        },
+      },
+    );
+  };
+
   const rows: [string, ReactNode][] = [
     viewer === 'store' ? [t('booking.customer'), booking.name] : [t('booking.store'), booking.storeName],
   ];
@@ -80,6 +108,22 @@ export function BookingDetailsModal({
   if (booking.deliveryAddress) {
     rows.push([booking.orderType === 'homeVisit' ? t('booking.visitAt') : t('booking.deliverTo'), booking.deliveryAddress]);
   }
+  if (booking.delivery) {
+    const { startedAt, trackingUrl: link } = booking.delivery;
+    rows.push([
+      t('delivery.label'),
+      <View key="delivery" style={styles.deliveryValue}>
+        <ThemedText type="smallBold">{t('delivery.startedAt', { time: formatSlotStart(localSlotStart(startedAt), language) })}</ThemedText>
+        {link ? (
+          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(link)}>
+            <ThemedText type="smallBold" style={{ color: theme.primary }}>
+              {t('delivery.track')}
+            </ThemedText>
+          </Pressable>
+        ) : null}
+      </View>,
+    ]);
+  }
   const store =
     viewer === 'user' && visitsStore(booking.orderType)
       ? stores.data?.find((s) => s.id === booking.storeId)
@@ -90,8 +134,21 @@ export function BookingDetailsModal({
   }
 
   const footer =
-    viewer === 'store' ? (
+    viewer === 'store' && deliveryForm ? (
       <View style={styles.actions}>
+        <Button label={t('common.cancel')} variant="secondary" disabled={startDelivery.isPending} onPress={() => setDeliveryForm(false)} />
+        <Button label={t('delivery.submit')} variant="success" loading={startDelivery.isPending} onPress={submitDelivery} />
+      </View>
+    ) : viewer === 'store' ? (
+      <View style={styles.actions}>
+        {canDeliver ? (
+          <Button
+            label={booking.delivery ? t('delivery.updateLink') : t('delivery.start')}
+            variant={booking.delivery ? 'secondary' : 'primary'}
+            disabled={setStatus.isPending}
+            onPress={openDeliveryForm}
+          />
+        ) : null}
         {booking.status !== 'rejected' ? (
           <Button label={t('booking.reject')} variant="danger" loading={busy === 'rejected'} disabled={setStatus.isPending} onPress={() => change('rejected')} />
         ) : null}
@@ -116,7 +173,36 @@ export function BookingDetailsModal({
           #{booking.id.slice(0, 8)}
         </ThemedText>
       </View>
-      <Banner message={setStatus.isError ? { type: 'error', text: errorMessage(setStatus.error) } : null} />
+      <Banner
+        message={
+          setStatus.isError
+            ? { type: 'error', text: errorMessage(setStatus.error) }
+            : startDelivery.isError
+              ? { type: 'error', text: errorMessage(startDelivery.error) }
+              : null
+        }
+      />
+
+      {deliveryForm ? (
+        <View style={[styles.box, { backgroundColor: theme.backgroundSelected }]}>
+          <ThemedText type="smallBold">{t('delivery.onTheWay')}</ThemedText>
+          <TextField
+            label={t('delivery.trackingLink')}
+            value={trackingUrl}
+            onChangeText={(text) => {
+              setTrackingUrl(text);
+              setLinkError(undefined);
+            }}
+            placeholder="https://"
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={1000}
+            hint={t('delivery.trackingHint')}
+            error={linkError}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.rows}>
         {rows.map(([label, value]) => (
@@ -174,7 +260,17 @@ export function BookingDetailsModal({
   );
 }
 
+/** ISO → the local `YYYY-MM-DDTHH:mm` that formatSlotStart takes. */
+function localSlotStart(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${toDateKey(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 const styles = StyleSheet.create({
+  deliveryValue: {
+    gap: Spacing.half,
+  },
   statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

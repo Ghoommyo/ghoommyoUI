@@ -52,6 +52,7 @@ export function EventCard({ booking, title, actions, subtitle, showPeople = true
   const meta = [
     booking.orderType ? orderTypeLabel(t, booking.orderType) : '',
     showPeople ? t('common.people', { count: booking.people }) : '',
+    booking.delivery ? `🚚 ${t('delivery.onTheWay')}` : '',
   ]
     .filter(Boolean)
     .join(' · ');

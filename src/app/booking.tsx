@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { errorMessage } from '@/api';
+import { ApiError, errorMessage } from '@/api';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Banner } from '@/components/ui/banner';
@@ -27,6 +27,7 @@ import { formatSlotStart } from '@/lib/date';
 import {
   asksPeople as asksPeopleFor,
   needsDeliveryAddress,
+  needsItems,
   visitsStore,
   catalogLabels,
   catalogWords,
@@ -53,6 +54,8 @@ type FieldErrors = {
   people?: string;
   description?: string;
   address?: string;
+  /** Pickup, Porter and home visits need at least one item. */
+  items?: string;
 };
 
 const MAX_ADDRESS_LENGTH = 500;
@@ -167,10 +170,15 @@ function BookingForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [confirmCancel, setConfirmCancel] = useState(false);
   const createBooking = useCreateBooking();
+  const slotFull = createBooking.error instanceof ApiError && createBooking.error.code === 'SLOT_FULL';
 
   const confirm = () => {
     const cleanMobile = mobile.replace(/[\s-]/g, '');
     const next: FieldErrors = {
+      items:
+        !needsItems(orderType) || picked.length
+          ? undefined
+          : t(services.length ? 'book.itemsRequired' : 'book.noItemsToOrder', { items: words.items }),
       name: name.trim() ? undefined : t('book.nameRequired'),
       mobile: MOBILE_PATTERN.test(cleanMobile) ? undefined : t('booking.invalidMobile'),
       people: !asksPeople || people ? undefined : t('book.choosePeople'),
@@ -229,7 +237,7 @@ function BookingForm({
         servicesDescription(nextPicked, heading),
       ),
     );
-    setErrors((e) => ({ ...e, description: undefined }));
+    setErrors((e) => ({ ...e, description: undefined, items: undefined }));
     setPicks(next);
     setServicesOpen(false);
   };
@@ -245,7 +253,7 @@ function BookingForm({
 
       <Banner
         message={
-          createBooking.isError
+          createBooking.isError && !slotFull
             ? { type: 'error', text: errorMessage(createBooking.error) }
             : inactive
               ? { type: 'error', text: t('hint.inactiveUser') }
@@ -255,7 +263,7 @@ function BookingForm({
         }
       />
 
-      {services.length || picked.length ? (
+      {services.length || picked.length || errors.items ? (
         <View style={[styles.services, { backgroundColor: theme.backgroundElement }]}>
           <View style={styles.servicesHeader}>
             <View style={styles.flex}>
@@ -271,13 +279,20 @@ function BookingForm({
                 {t('book.selectHint', { items: words.items })}
               </ThemedText>
             </View>
-            <Button
-              label={picked.length ? `${words.Items} (${countServices(picks)})` : words.Items}
-              variant="secondary"
-              size="sm"
-              onPress={() => setServicesOpen(true)}
-            />
+            {services.length ? (
+              <Button
+                label={picked.length ? `${words.Items} (${countServices(picks)})` : words.Items}
+                variant="secondary"
+                size="sm"
+                onPress={() => setServicesOpen(true)}
+              />
+            ) : null}
           </View>
+          {errors.items ? (
+            <ThemedText type="small" accessibilityRole="alert" style={{ color: theme.danger }}>
+              {errors.items}
+            </ThemedText>
+          ) : null}
           {picked.map((s, i) => (
             <View
               key={s.serviceId}
@@ -330,7 +345,7 @@ function BookingForm({
         onChange={(next) => {
           setOrderType(next);
           // The people or address field may have just gone away.
-          setErrors((e) => ({ ...e, people: undefined, address: undefined }));
+          setErrors((e) => ({ ...e, people: undefined, address: undefined, items: undefined }));
         }}
       />
       {visitsStore(orderType) ? <StoreAddressCard storeName={store.name} profile={store.profile} /> : null}
@@ -383,6 +398,16 @@ function BookingForm({
         multiline
       />
 
+      {slotFull ? (
+        // The slot filled up while the form was open: say so next to Confirm, with a way back.
+        <View accessibilityRole="alert" style={[styles.slotFull, { borderColor: theme.danger }]}>
+          <ThemedText type="smallBold" style={{ color: theme.danger }}>
+            {errorMessage(createBooking.error)}
+          </ThemedText>
+          <Button label={t('book.chooseAnotherTime')} variant="secondary" onPress={() => router.back()} />
+        </View>
+      ) : null}
+
       <View style={styles.actions}>
         <Button label={t('common.cancel')} variant="secondary" onPress={() => setConfirmCancel(true)} />
         <Button
@@ -423,6 +448,12 @@ function BookingForm({
 }
 
 const styles = StyleSheet.create({
+  slotFull: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+    borderWidth: 1,
+    borderRadius: Spacing.three,
+  },
   center: {
     flex: 1,
     alignItems: 'center',

@@ -94,6 +94,8 @@ export interface StoreSettings {
   storeCategory: string | null;
   /** Weekdays the store is open, 0 = Sunday … 6 = Saturday (`Date.getDay()`); customers only book these. */
   openDays: number[];
+  /** Full slots stop bookings and show greyed out (server phase 34; false on older servers). */
+  blockWhenFull?: boolean;
   /** The admin made the store inactive (only known for the signed-in store's own record). */
   inactive?: boolean;
   /** The app admin lets the store upload pictures; off by default (only known for the store's own record). */
@@ -257,6 +259,15 @@ export interface Booking {
   orderType: OrderType | null;
   /** Where the store goes for Porter / home-visit bookings; null otherwise. */
   deliveryAddress: string | null;
+  /** Set once the store started a Porter order's delivery; null before (and for other types). */
+  delivery: BookingDelivery | null;
+}
+
+export interface BookingDelivery {
+  /** ISO timestamp of when the store started the delivery. */
+  startedAt: string;
+  /** The delivery service's tracking link, when the store added one. */
+  trackingUrl: string | null;
 }
 
 export interface BookingRating {
@@ -290,7 +301,7 @@ export interface ReviewsPage {
   summary?: RatingSummary;
 }
 
-export type NotificationKind = 'NEW_REQUEST' | 'AUTO_ACCEPTED' | 'ACCEPTED' | 'REJECTED' | 'UPDATED' | 'RATED';
+export type NotificationKind = 'NEW_REQUEST' | 'AUTO_ACCEPTED' | 'ACCEPTED' | 'REJECTED' | 'UPDATED' | 'RATED' | 'DELIVERY_STARTED';
 
 export interface AppNotification {
   id: string;
@@ -340,6 +351,10 @@ export interface Slot {
   start: SlotStart;
   /** Visitors booked into this slot (rejected bookings excluded). */
   count: number;
+  /** Places left before the store's limit (older servers: worked out from `count`). */
+  left?: number;
+  /** Full, and the store stops bookings in full slots: it can't be chosen. */
+  blocked?: boolean;
 }
 
 export interface DaySummary {

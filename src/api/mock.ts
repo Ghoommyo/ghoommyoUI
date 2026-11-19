@@ -1,6 +1,6 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
 import { addDays, makeDateKey, todayKey } from '@/lib/date';
-import { needsDeliveryAddress, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
+import { needsDeliveryAddress, needsItems, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
 import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
 import { STANDARD_STORE_CATEGORIES } from '@/lib/store-categories';
 import { ALL_DAYS, buildSlotStarts, daysInMonth, visitorCount, weekDays } from '@/lib/slots';
@@ -23,6 +23,9 @@ import type {
   Store,
   StoreService,
   UserProfile,
+  DateKey,
+  Slot,
+  SlotStart,
 } from '@/types/domain';
 
 // The mock answers like the server, which speaks English.
@@ -210,10 +213,25 @@ function seedBookings(): Booking[] {
     // The oldest one predates order types.
     orderType: i === 0 ? null : 'appointment',
     deliveryAddress: null,
+    delivery: null,
   }));
 }
 
 const bookings: Booking[] = seedBookings();
+
+/** Slots of a day with their counts; `blocked` when full and the store stops bookings in full slots. */
+function mockSlots(store: StoreRecord, date: DateKey, dayBookings: Booking[]): Slot[] {
+  const starts = buildSlotStarts(date, store.openAt, store.closeAt, store.limitUnit);
+  const counted = (start: SlotStart, inSlot: Booking[]): Slot => {
+    const count = visitorCount(inSlot);
+    return { start, count, left: Math.max(0, store.maxPerSlot - count), blocked: Boolean(store.blockWhenFull) && count >= store.maxPerSlot };
+  };
+  if (store.limitUnit === 'day') return [counted(starts[0], dayBookings)];
+  return starts.map((start, i) => {
+    const end = starts[i + 1] ?? `${date}T${store.closeAt}`;
+    return counted(start, dayBookings.filter((b) => b.slotStart >= start && b.slotStart < end));
+  });
+}
 
 /** Customers' saved delivery addresses, newest first. */
 const addresses: (SavedAddress & { accountId: string })[] = [
@@ -595,13 +613,7 @@ export const mockApi: Api = {
     const dayBookings = bookings.filter(
       (b) => b.storeId === storeId && b.slotStart.startsWith(date),
     );
-    const starts = buildSlotStarts(date, store.openAt, store.closeAt, store.limitUnit);
-    if (store.limitUnit === 'day') return [{ start: starts[0], count: visitorCount(dayBookings) }];
-    return starts.map((start, i) => {
-      const end = starts[i + 1] ?? `${date}T${store.closeAt}`;
-      const inSlot = dayBookings.filter((b) => b.slotStart >= start && b.slotStart < end);
-      return { start, count: visitorCount(inSlot) };
-    });
+    return mockSlots(store, date, dayBookings);
   },
 
   async getStoreMonthSummary(storeId, year, month) {
@@ -810,6 +822,17 @@ export const mockApi: Api = {
       }
       return { serviceId, name: stored.name, price: stored.price, qty };
     });
+    // Stores that stop bookings in full slots (phase 34).
+    if (store.blockWhenFull) {
+      const sameDay = bookings.filter((b) => b.storeId === store.id && b.slotStart.startsWith(input.slotStart.slice(0, 10)));
+      const slot = mockSlots(store, input.slotStart.slice(0, 10), sameDay).findLast((s) => s.start <= input.slotStart);
+      if (slot && slot.count + people > store.maxPerSlot) {
+        throw new ApiError('This time slot is full. Please choose another time.', 409, 'SLOT_FULL');
+      }
+    }
+    if (needsItems(input.orderType) && booked.length === 0) {
+      throw new ApiError('Choose at least one product or service for PICKUP, PORTER and HOME_VISIT bookings', 400);
+    }
     // Porter and home visits go to the customer, so they need an address; store visits don't keep one.
     const deliveryAddress = needsDeliveryAddress(input.orderType) ? (input.deliveryAddress ?? '').trim() : null;
     if (deliveryAddress !== null && (!deliveryAddress || deliveryAddress.length > 500)) {
@@ -818,6 +841,7 @@ export const mockApi: Api = {
     const booking: Booking = {
       ...input,
       deliveryAddress,
+      delivery: null,
       people,
       services: booked,
       id: newId('b'),
@@ -846,6 +870,30 @@ export const mockApi: Api = {
     if (status !== 'pending') {
       notify(booking.userId, booking.id, status === 'accepted' ? 'ACCEPTED' : 'REJECTED', `${booking.storeName} ${status} your booking`);
     }
+    return clone(booking);
+  },
+
+  async startDelivery(bookingId, trackingUrl) {
+    await delay();
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (!booking) throw new ApiError('Appointment not found', 404);
+    requireStoreOwner(booking.storeId);
+    if (booking.orderType !== 'porter') throw new ApiError('Only Porter orders have a delivery', 409);
+    if (booking.status !== 'accepted') throw new ApiError('Accept the order before starting its delivery', 409);
+    const link = trackingUrl.trim();
+    if (link && !/^https?:\/\/\S+$/i.test(link)) {
+      throw new ApiError('trackingUrl must be an http(s) link of at most 1000 characters', 400);
+    }
+    const again = booking.delivery !== null;
+    booking.delivery = { startedAt: booking.delivery?.startedAt ?? new Date().toISOString(), trackingUrl: link || null };
+    notify(
+      booking.userId,
+      booking.id,
+      'DELIVERY_STARTED',
+      again
+        ? `${booking.storeName} updated the tracking link for your delivery`
+        : `${booking.storeName} started your delivery${link ? ' — open the booking to track it' : ''}`,
+    );
     return clone(booking);
   },
 

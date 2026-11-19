@@ -246,6 +246,8 @@ export function useCreateBooking() {
       queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.myBookings(session?.accountId ?? '') });
     },
+    // The slot filled up meanwhile: refresh the grid so it shows as full.
+    onError: (_error, booking) => queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) }),
   });
 }
 
@@ -254,6 +256,18 @@ export function useSetBookingStatus() {
   return useMutation({
     mutationFn: ({ bookingId, status }: { bookingId: string; status: BookingStatus }) =>
       api.setBookingStatus(bookingId, status),
+    onSuccess: (booking) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useStartDelivery() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, trackingUrl }: { bookingId: string; trackingUrl: string }) =>
+      api.startDelivery(bookingId, trackingUrl),
     onSuccess: (booking) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.store(booking.storeId) });
       queryClient.invalidateQueries({ queryKey: ['me'] });
