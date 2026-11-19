@@ -49,7 +49,7 @@ export default function StoreScreen() {
       <ThemedView style={styles.fill}>
         <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
           <View style={styles.content}>
-            <AppHeader title={t('storePage.title')} />
+            <AppHeader back title={t('storePage.title')} />
             {store.isError ? (
               <Banner
                 message={{
@@ -79,7 +79,7 @@ export default function StoreScreen() {
   const shown: Tab = tab === 'gallery' && !page.galleryOn ? 'reviews' : tab;
   const header = (
     <View style={styles.header}>
-      <AppHeader title={page.name} />
+      <AppHeader back title={page.name} />
       <StoreHeader store={page} />
       <SegmentedTabs tabs={tabs} value={shown} onChange={setTab} />
     </View>

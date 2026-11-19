@@ -1,5 +1,5 @@
 import { ApiError, getAuthToken, type Api } from '@/api/client';
-import { addDays, makeDateKey, todayKey } from '@/lib/date';
+import { addDays, makeDateKey, slotStartToDate, todayKey } from '@/lib/date';
 import { needsDeliveryAddress, needsItems, orderTypeChoices, orderTypeToApi } from '@/lib/order-types';
 import { cleanServiceType, MAX_SERVICE_TYPE_LENGTH, STANDARD_SERVICE_TYPES } from '@/lib/service-types';
 import { STANDARD_STORE_CATEGORIES } from '@/lib/store-categories';
@@ -861,15 +861,41 @@ export const mockApi: Api = {
     return clone(booking);
   },
 
-  async setBookingStatus(bookingId, status) {
+  async setBookingStatus(bookingId, status, reason) {
     await delay();
     const booking = bookings.find((b) => b.id === bookingId);
     if (!booking) throw new ApiError('Booking not found.', 404);
     requireStoreOwner(booking.storeId);
+    if (booking.status === 'cancelled') throw new ApiError('The customer cancelled this booking', 409);
+    const why = reason?.trim() ?? '';
+    if (why.length > 200) throw new ApiError('updt_reason must be at most 200 characters', 400);
     booking.status = status;
+    booking.statusReason = status === 'rejected' && why ? why : null;
     if (status !== 'pending') {
-      notify(booking.userId, booking.id, status === 'accepted' ? 'ACCEPTED' : 'REJECTED', `${booking.storeName} ${status} your booking`);
+      notify(
+        booking.userId,
+        booking.id,
+        status === 'accepted' ? 'ACCEPTED' : 'REJECTED',
+        `${booking.storeName} ${status} your booking${status === 'rejected' && why ? `: ${why}` : ''}`,
+      );
     }
+    return clone(booking);
+  },
+
+  async cancelBooking(bookingId) {
+    await delay();
+    const account = currentAccount();
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (!booking || booking.userId !== account.id) throw new ApiError('Appointment not found', 404);
+    if (booking.status === 'cancelled') throw new ApiError('This booking is already cancelled', 409);
+    if (booking.status !== 'pending' && booking.status !== 'accepted') {
+      throw new ApiError('Only pending or accepted bookings can be cancelled', 409);
+    }
+    if (slotStartToDate(booking.slotStart) <= new Date()) {
+      throw new ApiError("This booking has already started, so it can't be cancelled", 409);
+    }
+    booking.status = 'cancelled';
+    notify(booking.storeId, booking.id, 'UPDATED', `${booking.name || 'A customer'} cancelled their booking`);
     return clone(booking);
   },
 
@@ -908,7 +934,9 @@ export const mockApi: Api = {
     const account = currentAccount();
     const booking = bookings.find((b) => b.id === bookingId);
     if (!booking || booking.userId !== account.id) throw new ApiError('Appointment not found', 404);
-    if (booking.status === 'rejected') throw new ApiError('Only pending or accepted bookings can be changed', 409);
+    if (booking.status === 'rejected' || booking.status === 'cancelled') {
+      throw new ApiError('Only pending or accepted bookings can be changed', 409);
+    }
     const store = findStore(booking.storeId);
     const message = changes.message?.trim() ?? '';
     const people = changes.people ?? booking.people;

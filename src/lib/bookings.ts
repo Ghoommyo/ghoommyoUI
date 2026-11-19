@@ -1,3 +1,4 @@
+import { slotStartToDate } from '@/lib/date';
 import type { Booking, DateKey } from '@/types/domain';
 
 /** Line the server puts between a booking's description and each message the customer adds. */
@@ -14,6 +15,11 @@ export function descriptionParts(description: string): string[] {
 /** Customers can change pending/accepted bookings for today or later. */
 export function canEditBooking(booking: Booking, today: DateKey): boolean {
   return (booking.status === 'pending' || booking.status === 'accepted') && booking.slotStart.slice(0, 10) >= today;
+}
+
+/** Customers can cancel pending/accepted bookings that haven't started yet. */
+export function canCancelBooking(booking: Booking, now: Date): boolean {
+  return (booking.status === 'pending' || booking.status === 'accepted') && slotStartToDate(booking.slotStart) > now;
 }
 
 /** Customers can rate any accepted booking, past or upcoming. */

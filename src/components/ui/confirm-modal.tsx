@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -16,6 +17,10 @@ type ConfirmModalProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
+  /** Extra content under the message, e.g. a reason field. */
+  children?: ReactNode;
+  /** Shows a spinner on the confirm button. */
+  loading?: boolean;
   onConfirm(): void;
   onCancel(): void;
 };
@@ -28,6 +33,8 @@ export function ConfirmModal({
   confirmLabel,
   cancelLabel,
   destructive = false,
+  children,
+  loading,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -51,11 +58,13 @@ export function ConfirmModal({
           <ThemedText type="small" themeColor="textSecondary">
             {message}
           </ThemedText>
+          {children}
           <View style={styles.actions}>
             <Button label={cancelLabel} variant="secondary" onPress={onCancel} />
             <Button
               label={confirmLabel}
               variant={destructive ? 'danger' : 'primary'}
+              loading={loading}
               onPress={onConfirm}
             />
           </View>

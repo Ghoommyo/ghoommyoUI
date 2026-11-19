@@ -1,5 +1,6 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { ApiError, errorMessage } from '@/api';
@@ -170,6 +171,27 @@ function BookingForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [confirmCancel, setConfirmCancel] = useState(false);
   const createBooking = useCreateBooking();
+
+  // Leaving with something typed (Cancel, Android back, swiping the sheet down) asks first.
+  const navigation = useNavigation();
+  const [initialDescription] = useState(description);
+  const [initialOrderType] = useState(orderType);
+  const dirty =
+    name !== initialName ||
+    mobile !== initialMobile ||
+    people !== undefined ||
+    orderType !== initialOrderType ||
+    description !== initialDescription ||
+    otherAddress.trim() !== '' ||
+    picks !== initialPicks;
+  // Set once the booking is made or the user chose to discard, so leaving no longer asks.
+  const leaving = useRef(false);
+  const pendingLeave = useRef<Parameters<typeof navigation.dispatch>[0] | null>(null);
+  usePreventRemove(dirty, ({ data }) => {
+    if (leaving.current) return navigation.dispatch(data.action);
+    pendingLeave.current = data.action;
+    setConfirmCancel(true);
+  });
   const slotFull = createBooking.error instanceof ApiError && createBooking.error.code === 'SLOT_FULL';
 
   const confirm = () => {
@@ -218,6 +240,7 @@ function BookingForm({
           if (needsAddress && choice === OTHER_ADDRESS && saveNewAddress) {
             saveAddress.mutate({ input: { label: '', address: deliveryAddress } });
           }
+          leaving.current = true;
           router.dismissTo({
             pathname: '/dashboard',
             params: { booked: booking.slotStart, status: booking.status },
@@ -404,12 +427,19 @@ function BookingForm({
           <ThemedText type="smallBold" style={{ color: theme.danger }}>
             {errorMessage(createBooking.error)}
           </ThemedText>
-          <Button label={t('book.chooseAnotherTime')} variant="secondary" onPress={() => router.back()} />
+          <Button
+            label={t('book.chooseAnotherTime')}
+            variant="secondary"
+            onPress={() => {
+              leaving.current = true;
+              router.back();
+            }}
+          />
         </View>
       ) : null}
 
       <View style={styles.actions}>
-        <Button label={t('common.cancel')} variant="secondary" onPress={() => setConfirmCancel(true)} />
+        <Button label={t('common.cancel')} variant="secondary" onPress={() => (dirty ? setConfirmCancel(true) : router.back())} />
         <Button
           label={t('book.confirm')}
           variant="success"
@@ -437,10 +467,17 @@ function BookingForm({
         confirmLabel={t('book.discard')}
         cancelLabel={t('book.keepEditing')}
         destructive
-        onCancel={() => setConfirmCancel(false)}
+        onCancel={() => {
+          pendingLeave.current = null;
+          setConfirmCancel(false);
+        }}
         onConfirm={() => {
           setConfirmCancel(false);
-          router.back();
+          leaving.current = true;
+          const action = pendingLeave.current;
+          pendingLeave.current = null;
+          if (action) navigation.dispatch(action);
+          else router.back();
         }}
       />
     </Screen>

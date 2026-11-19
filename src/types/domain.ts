@@ -4,7 +4,8 @@ export type Role = 'user' | 'store';
 
 export type LimitUnit = 'day' | 'hour' | 'halfHour';
 
-export type BookingStatus = 'pending' | 'accepted' | 'rejected';
+/** `cancelled`: the customer cancelled (the server keeps it REJECTED with `cncl_on`). */
+export type BookingStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled';
 
 /** How the customer gets what they booked. Which ones a store offers: `src/lib/order-types.ts`. */
 export type OrderType = 'table' | 'pickup' | 'porter' | 'appointment' | 'homeVisit';
@@ -261,6 +262,8 @@ export interface Booking {
   deliveryAddress: string | null;
   /** Set once the store started a Porter order's delivery; null before (and for other types). */
   delivery: BookingDelivery | null;
+  /** Why the store rejected the booking, if it said; null otherwise. */
+  statusReason?: string | null;
 }
 
 export interface BookingDelivery {

@@ -515,11 +515,19 @@ export function createGhoomoApi(baseUrl: string): Api {
       };
     },
 
-    async setBookingStatus(bookingId, status) {
+    async setBookingStatus(bookingId, status, reason) {
       const res = await request<{ appointment: GhoomoAppointment }>('/appointment', {
         method: 'PUT',
-        body: { apntmnt_id: bookingId, status: fromStatus(status) },
+        body: { apntmnt_id: bookingId, status: fromStatus(status), ...(reason ? { updt_reason: reason } : {}) },
       });
+      return appointmentToBooking(res!.appointment);
+    },
+
+    async cancelBooking(bookingId) {
+      const res = await request<{ appointment: GhoomoAppointment }>(
+        `/appointment/${encodeURIComponent(bookingId)}/cancel`,
+        { method: 'POST', body: {} },
+      );
       return appointmentToBooking(res!.appointment);
     },
 

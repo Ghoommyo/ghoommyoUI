@@ -49,7 +49,7 @@ export function dayCapacity(store: StoreSettings): number {
 
 /** Visitors counted against capacity: rejected bookings don't count. */
 export function visitorCount(bookings: Booking[]): number {
-  return bookings.reduce((sum, b) => (b.status === 'rejected' ? sum : sum + b.people), 0);
+  return bookings.reduce((sum, b) => (b.status === 'rejected' || b.status === 'cancelled' ? sum : sum + b.people), 0);
 }
 
 export function daysInMonth(year: number, month: number): number {
