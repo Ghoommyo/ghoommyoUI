@@ -1,13 +1,14 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ApiError, errorMessage } from '@/api';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
+import { ChoiceChips } from '@/components/ui/choice-chips';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Screen } from '@/components/ui/screen';
 import { Select } from '@/components/ui/select';
@@ -53,7 +54,6 @@ type FieldErrors = {
   name?: string;
   mobile?: string;
   people?: string;
-  description?: string;
   address?: string;
   /** Pickup, Porter and home visits need at least one item. */
   items?: string;
@@ -193,6 +193,11 @@ function BookingForm({
     setConfirmCancel(true);
   });
   const slotFull = createBooking.error instanceof ApiError && createBooking.error.code === 'SLOT_FULL';
+  const hasErrors = Object.values(errors).some(Boolean);
+
+  // Where each checked field sits in the page, so Confirm can scroll to the first problem.
+  const scrollRef = useRef<ScrollView>(null);
+  const positions = useRef<Partial<Record<keyof FieldErrors, number>>>({});
 
   const confirm = () => {
     const cleanMobile = mobile.replace(/[\s-]/g, '');
@@ -204,8 +209,6 @@ function BookingForm({
       name: name.trim() ? undefined : t('book.nameRequired'),
       mobile: MOBILE_PATTERN.test(cleanMobile) ? undefined : t('booking.invalidMobile'),
       people: !asksPeople || people ? undefined : t('book.choosePeople'),
-      // The server rejects bookings without a description.
-      description: description.trim() ? undefined : t('book.descriptionRequired'),
       address: !needsAddress
         ? undefined
         : !deliveryAddress
@@ -215,7 +218,13 @@ function BookingForm({
             : undefined,
     };
     setErrors(next);
-    if (Object.values(next).some(Boolean)) return;
+    const wrong = (Object.keys(next) as (keyof FieldErrors)[]).filter((field) => next[field]);
+    if (wrong.length) {
+      const y = Math.min(...wrong.map((field) => positions.current[field] ?? Infinity));
+      if (Number.isFinite(y)) scrollRef.current?.scrollTo({ y: Math.max(0, y - Spacing.three), animated: true });
+      AccessibilityInfo.announceForAccessibility(t('book.fixErrors'));
+      return;
+    }
 
     createBooking.mutate(
       {
@@ -260,13 +269,13 @@ function BookingForm({
         servicesDescription(nextPicked, heading),
       ),
     );
-    setErrors((e) => ({ ...e, description: undefined, items: undefined }));
+    setErrors((e) => ({ ...e, items: undefined }));
     setPicks(next);
     setServicesOpen(false);
   };
 
   return (
-    <Screen>
+    <Screen scrollRef={scrollRef}>
       <View style={styles.summary}>
         <ThemedText type="smallBold" themeColor="textSecondary">
           {store.name}
@@ -276,9 +285,7 @@ function BookingForm({
 
       <Banner
         message={
-          createBooking.isError && !slotFull
-            ? { type: 'error', text: errorMessage(createBooking.error) }
-            : inactive
+          inactive
               ? { type: 'error', text: t('hint.inactiveUser') }
               : servicesError
               ? { type: 'error', text: t('app.itemsFailed', { items: words.items, error: servicesError }) }
@@ -286,8 +293,27 @@ function BookingForm({
         }
       />
 
+      <ChoiceChips
+        label={t('book.howToGet')}
+        value={orderType}
+        options={orderTypeOptions(store, t)}
+        onChange={(next) => {
+          setOrderType(next);
+          // The people, address or items check may have just gone away.
+          setErrors((e) => ({ ...e, people: undefined, address: undefined, items: undefined }));
+        }}
+      />
+
       {services.length || picked.length || errors.items ? (
-        <View style={[styles.services, { backgroundColor: theme.backgroundElement }]}>
+        <View
+          onLayout={(e) => {
+            positions.current.items = e.nativeEvent.layout.y;
+          }}
+          style={[
+            styles.services,
+            { backgroundColor: theme.backgroundElement },
+            errors.items ? { borderWidth: 2, borderColor: theme.danger } : null,
+          ]}>
           <View style={styles.servicesHeader}>
             <View style={styles.flex}>
               <ThemedText type="smallBold" accessibilityRole="header">
@@ -344,6 +370,9 @@ function BookingForm({
         </View>
       ) : null}
 
+      <View onLayout={(e) => {
+            positions.current.name = e.nativeEvent.layout.y;
+          }}>
       <TextField
         label={t('book.name')}
         value={name}
@@ -352,6 +381,10 @@ function BookingForm({
         autoComplete="name"
         textContentType="name"
       />
+      </View>
+      <View onLayout={(e) => {
+            positions.current.mobile = e.nativeEvent.layout.y;
+          }}>
       <TextField
         label={t('booking.contactMobile')}
         value={mobile}
@@ -361,18 +394,12 @@ function BookingForm({
         autoComplete="tel"
         textContentType="telephoneNumber"
       />
-      <Select
-        label={t('booking.orderType')}
-        value={orderType}
-        options={orderTypeOptions(store, t)}
-        onChange={(next) => {
-          setOrderType(next);
-          // The people or address field may have just gone away.
-          setErrors((e) => ({ ...e, people: undefined, address: undefined, items: undefined }));
-        }}
-      />
+      </View>
       {visitsStore(orderType) ? <StoreAddressCard storeName={store.name} profile={store.profile} /> : null}
       {needsAddress ? (
+        <View onLayout={(e) => {
+            positions.current.address = e.nativeEvent.layout.y;
+          }}>
         <DeliveryAddressField
           isHomeVisit={orderType === 'homeVisit'}
           saved={savedAddresses}
@@ -391,8 +418,12 @@ function BookingForm({
           onSave={setSaveNewAddress}
           error={errors.address}
         />
+        </View>
       ) : null}
       {asksPeople ? (
+        <View onLayout={(e) => {
+            positions.current.people = e.nativeEvent.layout.y;
+          }}>
         <Select
           label={t('booking.howManyPeople')}
           placeholder={t('book.peopleRange', { max: store.maxPerBooking })}
@@ -407,19 +438,26 @@ function BookingForm({
           }}
           error={errors.people}
         />
+        </View>
       ) : null}
       <TextField
-        label={t('booking.description')}
+        label={t('book.note')}
         value={description}
-        onChangeText={(value) => {
-          setDescription(value);
-          setErrors((e) => ({ ...e, description: undefined }));
-        }}
+        onChangeText={setDescription}
         placeholder={t('book.descriptionPlaceholder')}
         hint={t('book.descriptionHint')}
-        error={errors.description}
         multiline
       />
+
+      {/* Problems are shown next to Confirm, where the customer is looking. */}
+      {hasErrors ? (
+        <ThemedText type="smallBold" accessibilityRole="alert" style={{ color: theme.danger }}>
+          {t('book.fixErrors')}
+        </ThemedText>
+      ) : null}
+      {createBooking.isError && !slotFull ? (
+        <Banner message={{ type: 'error', text: errorMessage(createBooking.error) }} />
+      ) : null}
 
       {slotFull ? (
         // The slot filled up while the form was open: say so next to Confirm, with a way back.

@@ -75,27 +75,35 @@ export function isOpenDay(openDays: number[] | undefined, year: number, month: n
   return !openDays || openDays.includes(weekday(year, month, day));
 }
 
-/** The days of a month the store is open, as Day picker options ("Mon 3"). */
-export function openDayOptions(
+/**
+ * `day` when the store is open then, else its next open day in the month, else its first one
+ * from `fromDay` (today in the current month, so a past day is never chosen). With no open day
+ * left, `day` stays and the schedule says the store is closed.
+ */
+export function nextOpenDay(
   openDays: number[] | undefined,
   year: number,
   month: number,
-  t: Translate,
-) {
-  const options: { label: string; value: number }[] = [];
-  for (let d = 1; d <= daysInMonth(year, month); d++) {
-    if (isOpenDay(openDays, year, month, d)) {
-      options.push({ label: openDays ? `${shortDay(t, weekday(year, month, d))} ${d}` : String(d), value: d });
-    }
-  }
-  return options;
+  day: number,
+  fromDay = 1,
+): number {
+  const open: number[] = [];
+  for (let d = fromDay; d <= daysInMonth(year, month); d++) if (isOpenDay(openDays, year, month, d)) open.push(d);
+  return open.find((d) => d >= day) ?? open[0] ?? day;
 }
 
-/** `day` when the store is open then, else its next open day in the month, else its first one. */
-export function nextOpenDay(openDays: number[] | undefined, year: number, month: number, day: number): number {
-  const open: number[] = [];
-  for (let d = 1; d <= daysInMonth(year, month); d++) if (isOpenDay(openDays, year, month, d)) open.push(d);
-  return open.find((d) => d >= day) ?? open[0] ?? day;
+/** The first bookable day of a month: today in the current month, else the 1st. */
+export function firstDay(today: Date, year: number, month: number): number {
+  return year === today.getFullYear() && month === today.getMonth() ? today.getDate() : 1;
+}
+
+/** The day strip of a month from `fromDay` (today in the current month): every day, closed ones marked. */
+export function monthDays(openDays: number[] | undefined, year: number, month: number, fromDay: number, t: Translate) {
+  const days: { day: number; weekday: string; open: boolean }[] = [];
+  for (let d = Math.max(1, fromDay); d <= daysInMonth(year, month); d++) {
+    days.push({ day: d, weekday: shortDay(t, weekday(year, month, d)), open: isOpenDay(openDays, year, month, d) });
+  }
+  return days;
 }
 
 /** "Every day", "Mon–Fri", "Mon, Wed, Sat" (Monday first). */

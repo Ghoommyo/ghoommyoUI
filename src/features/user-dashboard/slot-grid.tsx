@@ -38,7 +38,11 @@ export function SlotGrid({
 }: SlotGridProps) {
   const { t, language } = useT();
   const [width, setWidth] = useState(0);
-  const columns = limitUnit === 'day' ? 1 : width >= 520 ? 4 : 3;
+  const allDay = limitUnit === 'day';
+  const columns = allDay ? 1 : width >= 520 ? 4 : 3;
+  // An all-day slot stays bookable for the rest of its day (as on the website).
+  const isPast = (start: SlotStart) => (allDay ? start.slice(0, 10) < now.slice(0, 10) : start < now);
+  const theme = useTheme();
   const itemWidth = width ? (width - GAP * (columns - 1)) / columns : 0;
 
   return (
@@ -54,11 +58,16 @@ export function SlotGrid({
               isDarkStore={isDarkStore}
               width={itemWidth}
               selected={slot.start === selected}
-              past={slot.start < now}
+              past={isPast(slot.start)}
               onPress={() => onSelect(slot.start)}
             />
           ))}
       </View>
+      {!allDay && slots.length > 0 && slots.every((slot) => isPast(slot.start)) ? (
+        <ThemedText type="smallBold" style={[styles.noTimes, { color: theme.cardTextSecondary }]}>
+          {t('schedule.noTimesLeft')}
+        </ThemedText>
+      ) : null}
       <Legend blocked={Boolean(blockWhenFull) || slots.some((slot) => slot.blocked)} />
     </View>
   );
@@ -190,6 +199,10 @@ const styles = StyleSheet.create({
   },
   dimmed: {
     opacity: 0.5,
+  },
+  noTimes: {
+    marginTop: Spacing.three,
+    textAlign: 'center',
   },
   legend: {
     flexDirection: 'row',

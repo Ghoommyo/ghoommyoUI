@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { Link, router, useLocalSearchParams } from 'expo-router';
+import { type Href, Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 
@@ -18,7 +18,14 @@ export default function LoginScreen() {
   const { t } = useT();
   const { signIn } = useSession();
   // Set by signup (and forgot password): show a confirmation and, for stores, prefill the store name.
-  const params = useLocalSearchParams<{ registered?: string; passwordReset?: string; role?: Role; store?: string }>();
+  // `next`: where a guest was before logging in (their booking selection on the dashboard).
+  const params = useLocalSearchParams<{
+    registered?: string;
+    passwordReset?: string;
+    role?: Role;
+    store?: string;
+    next?: string;
+  }>();
   const [role, setRole] = useState<Role>(params.role === 'store' ? 'store' : 'user');
   const [identifier, setIdentifier] = useState(params.store ?? '');
   const [password, setPassword] = useState('');
@@ -29,7 +36,9 @@ export default function LoginScreen() {
     mutationFn: (credentials: Credentials) => api.login(credentials),
     onSuccess: async (session) => {
       await signIn(session);
-      router.replace('/dashboard');
+      // Only back to the dashboard (never a link from elsewhere); stores always start there fresh.
+      const next = session.role === 'user' && params.next?.startsWith('/dashboard?') ? params.next : '/dashboard';
+      router.replace(next as Href);
     },
   });
 
