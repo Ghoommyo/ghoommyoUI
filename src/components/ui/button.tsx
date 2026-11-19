@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-type Variant = 'primary' | 'success' | 'danger' | 'secondary';
+type Variant = 'primary' | 'success' | 'danger' | 'secondary' | 'text';
 
 type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   label: string;
@@ -29,8 +29,10 @@ export function Button({
     success: theme.success,
     danger: theme.danger,
     secondary: theme.backgroundSelected,
+    // A quiet action next to the main one (Reset): no fill, still 44 tall.
+    text: 'transparent',
   }[variant];
-  const color = variant === 'secondary' ? theme.text : theme.onPrimary;
+  const color = variant === 'secondary' ? theme.text : variant === 'text' ? theme.primary : theme.onPrimary;
   const isDisabled = disabled || loading;
 
   return (
