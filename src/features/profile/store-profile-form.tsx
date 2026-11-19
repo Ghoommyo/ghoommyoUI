@@ -96,7 +96,8 @@ export function StoreProfileForm({ store }: { store: Store }) {
         {...storePictureRules(store, t, 'app.storePhotoHint')}
         linkError={errors.photoUrl}
       />
-      {FIELDS.map((field) => (
+      {/* Fields the server can't change yet (State) only show while they hold a value. */}
+      {FIELDS.filter((field) => !(USE_REAL_API && field.localOnly && !draft[field.key])).map((field) => (
         <TextField
           key={field.key}
           label={t(field.label)}
@@ -111,13 +112,7 @@ export function StoreProfileForm({ store }: { store: Store }) {
           autoCapitalize={field.url ? 'none' : undefined}
           placeholder={field.url ? 'https://maps.google.com/…' : undefined}
           editable={!(USE_REAL_API && field.localOnly)}
-          hint={
-            USE_REAL_API && field.localOnly
-              ? t('hint.readOnly')
-              : field.key === 'bio'
-                ? t('profile.bioHint', { count: MAX_BIO_LENGTH })
-                : undefined
-          }
+          hint={field.key === 'bio' ? t('profile.bioHint', { count: MAX_BIO_LENGTH }) : undefined}
         />
       ))}
       <TextField

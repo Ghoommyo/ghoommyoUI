@@ -4,8 +4,9 @@ import { StyleSheet, Switch, View } from 'react-native';
 import { errorMessage } from '@/api';
 import { USE_REAL_API } from '@/api/config';
 import { ThemedText } from '@/components/themed-text';
-import { Banner, type BannerMessage } from '@/components/ui/banner';
+import { type BannerMessage } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { DayPicker } from '@/components/ui/day-picker';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
@@ -105,12 +106,21 @@ export function StoreSettingsForm({ store }: { store: Store }) {
   const offered = orderTypeChoices({ ...draft, profile: store.profile });
   const needAddress = orderTypeChoices(draft).filter((type) => !offered.includes(type));
 
+  const theme = useTheme();
+  const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(store));
+  // New hours or open days don't move bookings already made: say so before saving.
+  const [confirmHours, setConfirmHours] = useState(false);
+  const hoursChanged =
+    draft.openAt !== store.openAt ||
+    draft.closeAt !== store.closeAt ||
+    [...draft.openDays].sort().join() !== [...store.openDays].sort().join();
+
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
     setMessage(null);
   };
 
-  const save = () => {
+  const save = (hoursConfirmed = false) => {
     const maxPerSlot = positiveInt(draft.maxPerSlot);
     const maxPerBooking = positiveInt(draft.maxPerBooking);
     const maxServiceQty = positiveInt(draft.maxServiceQty);
@@ -131,7 +141,14 @@ export function StoreSettingsForm({ store }: { store: Store }) {
       otherCategory: isService ? undefined : otherError(draft.storeCategory, draft.otherCategory, t('storeSettings.nounCategory'), t),
     };
     setErrors(next);
-    if (!maxPerSlot || !maxPerBooking || !maxServiceQty || Object.values(next).some(Boolean)) return;
+    if (!maxPerSlot || !maxPerBooking || !maxServiceQty || Object.values(next).some(Boolean)) {
+      setMessage({ type: 'error', text: t('book.fixErrors') });
+      return;
+    }
+    if (hoursChanged && !hoursConfirmed) {
+      setConfirmHours(true);
+      return;
+    }
 
     const { otherType, otherCategory, ...settings } = draft;
     // Only the field for the store's type changes; the other keeps whatever was saved before.
@@ -172,48 +189,16 @@ export function StoreSettingsForm({ store }: { store: Store }) {
 
   return (
     <View style={styles.form}>
-      <Banner message={message} />
-      <TextField
-        label={t('storeSettings.storeName')}
-        value={draft.name}
-        onChangeText={(v) => set('name', v)}
-        error={errors.name}
-        editable={!USE_REAL_API}
-        hint={USE_REAL_API ? t('hint.readOnly') : undefined}
-      />
-      <View style={styles.row}>
-        <View style={styles.flex}>
-          <TextField
-            label={draft.isDarkStore ? t('storeSettings.maxOrdersPerUnit') : t('storeSettings.maxPerUnit')}
-            value={draft.maxPerSlot}
-            onChangeText={(v) => set('maxPerSlot', v)}
-            error={errors.maxPerSlot}
-            keyboardType="number-pad"
-          />
-        </View>
-        <Select
-          label={t('storeSettings.limitUnit')}
-          value={draft.limitUnit}
-          options={limitUnits(t)}
-          onChange={(v) => set('limitUnit', v)}
-          style={styles.flex}
+      {/* The name and per-booking limit can only change with the test backend (no server route yet). */}
+      {!USE_REAL_API ? (
+        <TextField
+          label={t('storeSettings.storeName')}
+          value={draft.name}
+          onChangeText={(v) => set('name', v)}
+          error={errors.name}
         />
-      </View>
-      <SwitchRow
-        label={t('storeSettings.blockWhenFull')}
-        description={t(draft.blockWhenFull ? 'storeSettings.blockWhenFullOn' : 'storeSettings.blockWhenFullOff')}
-        value={Boolean(draft.blockWhenFull)}
-        onChange={(v) => set('blockWhenFull', v)}
-      />
-      <TextField
-        label={t('storeSettings.maxPerBooking')}
-        value={draft.maxPerBooking}
-        onChangeText={(v) => set('maxPerBooking', v)}
-        error={errors.maxPerBooking}
-        keyboardType="number-pad"
-        editable={!USE_REAL_API}
-        hint={USE_REAL_API ? t('hint.readOnly') : undefined}
-      />
+      ) : null}
+      <Section title={t('storeSettings.sectionHours')}>
       <View style={styles.row}>
         <Select
           label={t('storeSettings.openAt')}
@@ -241,6 +226,54 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         error={errors.openDays}
         hint={t('storeSettings.openDaysHint')}
       />
+      </Section>
+      <Section title={t('storeSettings.sectionLimits')}>
+      <View style={styles.row}>
+        <View style={styles.flex}>
+          <TextField
+            label={draft.isDarkStore ? t('storeSettings.maxOrdersPerUnit') : t('storeSettings.maxPerUnit')}
+            value={draft.maxPerSlot}
+            onChangeText={(v) => set('maxPerSlot', v)}
+            error={errors.maxPerSlot}
+            keyboardType="number-pad"
+          />
+        </View>
+        <Select
+          label={t('storeSettings.limitUnit')}
+          value={draft.limitUnit}
+          options={limitUnits(t)}
+          onChange={(v) => set('limitUnit', v)}
+          style={styles.flex}
+        />
+      </View>
+      <SwitchRow
+        label={t('storeSettings.blockWhenFull')}
+        description={t(draft.blockWhenFull ? 'storeSettings.blockWhenFullOn' : 'storeSettings.blockWhenFullOff')}
+        value={Boolean(draft.blockWhenFull)}
+        onChange={(v) => set('blockWhenFull', v)}
+      />
+      {!USE_REAL_API ? (
+        <TextField
+          label={t('storeSettings.maxPerBooking')}
+          value={draft.maxPerBooking}
+          onChangeText={(v) => set('maxPerBooking', v)}
+          error={errors.maxPerBooking}
+          keyboardType="number-pad"
+        />
+      ) : null}
+      </Section>
+      <Section title={t('storeSettings.sectionApprovals')} hint={t('storeSettings.autoApproveHint')}>
+        {offered.map((type) => (
+          <SwitchRow
+            key={type}
+            label={orderTypeLabel(t, type)}
+            description={t(draft.autoApprove[type] ? 'storeSettings.autoApproveOn' : 'storeSettings.autoApproveOff')}
+            value={draft.autoApprove[type]}
+            onChange={(on) => set('autoApprove', { ...draft.autoApprove, [type]: on })}
+          />
+        ))}
+      </Section>
+      <Section title={t('storeSettings.sectionStore')}>
       <View style={styles.field}>
         <Select
           label={t('storeSettings.storeType')}
@@ -306,21 +339,6 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         keyboardType="number-pad"
         hint={t('storeSettings.maxEachHint', { item: words.item, items: words.items })}
       />
-      <View style={styles.group}>
-        <ThemedText type="smallBold">{t('storeSettings.autoApprove')}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {t('storeSettings.autoApproveHint')}
-        </ThemedText>
-        {offered.map((type) => (
-          <SwitchRow
-            key={type}
-            label={orderTypeLabel(t, type)}
-            description={t(draft.autoApprove[type] ? 'storeSettings.autoApproveOn' : 'storeSettings.autoApproveOff')}
-            value={draft.autoApprove[type]}
-            onChange={(on) => set('autoApprove', { ...draft.autoApprove, [type]: on })}
-          />
-        ))}
-      </View>
       <SwitchRow
         label={t('storeSettings.darkStore')}
         description={t(
@@ -329,10 +347,53 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         value={draft.isDarkStore}
         onChange={(v) => set('isDarkStore', v)}
       />
-      <View style={styles.actions}>
-        <Button label={t('common.cancel')} variant="secondary" onPress={cancel} />
-        <Button label={t('common.save')} variant="success" onPress={save} loading={update.isPending} />
+      </Section>
+      {/* What happened, next to the buttons. */}
+      <View style={[styles.actions, { borderTopColor: theme.border }]}>
+        <ThemedText
+          type="smallBold"
+          accessibilityLiveRegion="polite"
+          style={[
+            styles.flex,
+            { color: message?.type === 'error' ? theme.danger : message ? theme.success : theme.textSecondary },
+          ]}>
+          {message ? message.text : dirty ? t('storeSettings.unsaved') : t('storeSettings.allSaved')}
+        </ThemedText>
+        <Button label={t('common.cancel')} variant="secondary" onPress={cancel} disabled={!dirty} />
+        <Button label={t('common.save')} variant="success" onPress={() => save()} loading={update.isPending} disabled={!dirty} />
       </View>
+      <ConfirmModal
+        visible={confirmHours}
+        title={t('storeSettings.hoursTitle')}
+        message={t('storeSettings.hoursMessage')}
+        confirmLabel={t('storeSettings.hoursConfirm')}
+        cancelLabel={t('storeSettings.hoursBack')}
+        onCancel={() => setConfirmHours(false)}
+        onConfirm={() => {
+          setConfirmHours(false);
+          save(true);
+        }}
+      />
+    </View>
+  );
+}
+
+/** A titled group of settings. */
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.section, { backgroundColor: theme.backgroundElement }]}>
+      <View>
+        <ThemedText type="subtitle" accessibilityRole="header" style={styles.sectionTitle}>
+          {title}
+        </ThemedText>
+        {hint ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {hint}
+          </ThemedText>
+        ) : null}
+      </View>
+      {children}
     </View>
   );
 }
@@ -443,12 +504,20 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     padding: Spacing.three,
   },
-  group: {
-    gap: Spacing.two,
+  section: {
+    gap: Spacing.three,
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    lineHeight: 24,
   },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: Spacing.three,
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: Spacing.three,
   },
 });

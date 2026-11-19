@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 
 import { errorMessage } from '@/api';
 import { EventCard, StatusChip } from '@/components/event-card';
@@ -10,6 +10,7 @@ import { SegmentedTabs, type Tab } from '@/components/ui/segmented-tabs';
 import { BookingDetailsModal } from '@/features/bookings/booking-details-modal';
 import { RejectBookingModal } from '@/features/bookings/reject-booking-modal';
 import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useSetBookingStatus, useStoreBookings } from '@/hooks/queries';
 import { showsPeople } from '@/lib/order-types';
 import type { Booking, BookingStatus, CatalogType, DateKey } from '@/types/domain';
@@ -24,6 +25,8 @@ const tabs = (t: Translate): Tab<TabKey>[] => [
   { key: 'rejected', label: t('store.tabRejected') },
   { key: 'all', label: t('store.tabAll') },
 ];
+
+const UNDO_MS = 5000;
 
 const TAB_STATUS: Record<Exclude<TabKey, 'all'>, BookingStatus> = {
   open: 'pending',
@@ -51,13 +54,62 @@ export function StoreBookings({ storeId, dates, searchedDays, isDarkStore, catal
   // Rejecting asks first (with an optional reason for the customer).
   const [rejecting, setRejecting] = useState<Booking | null>(null);
 
-  // Bookings the customer cancelled sit with the rejected ones.
+  const theme = useTheme();
+
+  // Accept waits a few seconds with an Undo on the card, so a wrong tap never reaches the customer.
+  // Leaving the screen, the app going to the background, or accepting another booking sends it at once.
+  const [held, setHeld] = useState<Booking | null>(null);
+  const heldRef = useRef<{ booking: Booking; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const mutateRef = useRef(setStatus.mutate);
+  useEffect(() => {
+    mutateRef.current = setStatus.mutate;
+  });
+  const sendHeld = () => {
+    const current = heldRef.current;
+    if (!current) return;
+    clearTimeout(current.timer);
+    heldRef.current = null;
+    setHeld(null);
+    mutateRef.current({ bookingId: current.booking.id, status: 'accepted' });
+  };
+  const accept = (booking: Booking) => {
+    sendHeld();
+    heldRef.current = { booking, timer: setTimeout(sendHeld, UNDO_MS) };
+    setHeld(booking);
+  };
+  const undo = () => {
+    if (heldRef.current) clearTimeout(heldRef.current.timer);
+    heldRef.current = null;
+    setHeld(null);
+  };
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') sendHeld();
+    });
+    return () => {
+      sub.remove();
+      sendHeld();
+    };
+    // sendHeld only reads refs.
+  }, []);
+
+  // Bookings the customer cancelled sit with the rejected ones; a held one stays where it was, with Undo.
   const visible = (bookings.data ?? []).filter(
     (b) => tab === 'all' || b.status === TAB_STATUS[tab] || (tab === 'rejected' && b.status === 'cancelled'),
   );
 
   const renderActions = (booking: Booking) => {
     const busy = setStatus.isPending && setStatus.variables?.bookingId === booking.id;
+    if (held?.id === booking.id) {
+      return (
+        <>
+          <ThemedText type="smallBold" accessibilityRole="alert" style={{ color: theme.onPrimary }}>
+            {t('store.acceptedToast', { name: booking.name })}
+          </ThemedText>
+          <Button label={t('store.undo')} variant="secondary" onPress={undo} />
+        </>
+      );
+    }
     return (
       <>
         {tab === 'all' || booking.status === 'cancelled' ? <StatusChip status={booking.status} /> : null}
@@ -67,7 +119,7 @@ export function StoreBookings({ storeId, dates, searchedDays, isDarkStore, catal
             variant="success"
             loading={busy && setStatus.variables?.status === 'accepted'}
             disabled={busy}
-            onPress={() => setStatus.mutate({ bookingId: booking.id, status: 'accepted' })}
+            onPress={() => accept(booking)}
           />
         ) : null}
         {booking.status !== 'rejected' && booking.status !== 'cancelled' ? (

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
@@ -5,7 +6,7 @@ import { errorMessage } from '@/api';
 import { useSession } from '@/auth/session';
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
-import { Banner, type BannerMessage } from '@/components/ui/banner';
+import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Spacing } from '@/constants/theme';
@@ -26,12 +27,21 @@ export function StoreDashboard() {
   const [today] = useState(() => new Date());
   const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selected, setSelected] = useState<Set<DateKey>>(new Set());
-  const [searchDates, setSearchDates] = useState<DateKey[] | null>(null);
-  // Until the store searches, the bookings list shows today.
+  // Tapping days shows their bookings straight away; with none picked the list shows today.
   const [todayDates] = useState(() => [todayKey()]);
-  const [message, setMessage] = useState<BannerMessage | null>(null);
+  const picked = [...selected].sort();
 
   const store = useStore(storeId);
+  // Pull down: the store, its calendar and bookings, and the bell.
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = () => {
+    setRefreshing(true);
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['stores', storeId] }),
+      queryClient.invalidateQueries({ queryKey: ['me'] }),
+    ]).finally(() => setRefreshing(false));
+  };
   const summary = useStoreMonthSummary(storeId, view.year, view.month);
   const counts = new Map((summary.data ?? []).map((d) => [d.date, d.count]));
 
@@ -42,21 +52,12 @@ export function StoreDashboard() {
     });
 
   const toggleDay = (date: DateKey) => {
-    setMessage(null);
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(date)) next.delete(date);
       else next.add(date);
       return next;
     });
-  };
-
-  const search = () => {
-    if (selected.size === 0) {
-      setMessage({ type: 'error', text: t('store.selectDaysFirst') });
-      return;
-    }
-    setSearchDates([...selected].sort());
   };
 
   if (!storeId || store.isLoading) {
@@ -69,7 +70,7 @@ export function StoreDashboard() {
   }
 
   return (
-    <Screen ads>
+    <Screen ads onRefresh={refresh} refreshing={refreshing}>
       <AppHeader />
       {store.data?.inactive ? <Banner message={{ type: 'error', text: t('hint.inactiveStore') }} /> : null}
       {store.data ? (
@@ -91,6 +92,7 @@ export function StoreDashboard() {
         today={todayKey()}
         counts={counts}
         capacity={store.data ? dayCapacity(store.data) : Infinity}
+        openDays={store.data?.openDays}
         isDarkStore={store.data?.isDarkStore}
         selected={selected}
         onToggle={toggleDay}
@@ -98,28 +100,19 @@ export function StoreDashboard() {
         onNext={() => shiftMonth(1)}
       />
 
-      <Banner message={message} />
       <View style={styles.searchRow}>
         <ThemedText type="small" themeColor="textSecondary" style={styles.flex}>
           {selected.size === 0 ? t('store.tapDays') : t('store.daysSelected', { count: selected.size })}
         </ThemedText>
         {selected.size > 0 ? (
-          <Button
-            label={t('store.clear')}
-            variant="secondary"
-            onPress={() => {
-              setSelected(new Set());
-              setSearchDates(null);
-            }}
-          />
+          <Button label={t('store.showToday')} variant="secondary" onPress={() => setSelected(new Set())} />
         ) : null}
-        <Button label={t('store.search')} variant="success" onPress={search} />
       </View>
 
       <StoreBookings
         storeId={storeId}
-        dates={searchDates ?? todayDates}
-        searchedDays={searchDates ? searchDates.map((date) => formatDayLong(date, language)).join(', ') : null}
+        dates={picked.length ? picked : todayDates}
+        searchedDays={picked.length ? picked.map((date) => formatDayLong(date, language)).join(', ') : null}
         isDarkStore={store.data?.isDarkStore}
         catalogType={store.data?.catalogType}
       />
