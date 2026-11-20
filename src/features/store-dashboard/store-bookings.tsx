@@ -115,6 +115,7 @@ export function StoreBookings({ storeId, dates, searchedDays, isDarkStore, catal
         {tab === 'all' || booking.status === 'cancelled' ? <StatusChip status={booking.status} /> : null}
         {booking.status !== 'accepted' && booking.status !== 'cancelled' ? (
           <Button
+            icon="✓"
             label={t('booking.accept')}
             variant="success"
             loading={busy && setStatus.variables?.status === 'accepted'}
@@ -124,6 +125,7 @@ export function StoreBookings({ storeId, dates, searchedDays, isDarkStore, catal
         ) : null}
         {booking.status !== 'rejected' && booking.status !== 'cancelled' ? (
           <Button
+            icon="✕"
             label={t('booking.reject')}
             variant="danger"
             loading={busy && setStatus.variables?.status === 'rejected'}
@@ -142,7 +144,8 @@ export function StoreBookings({ storeId, dates, searchedDays, isDarkStore, catal
           {searchedDays ? t('store.bookingsFor', { days: searchedDays }) : t('store.todaysBookings')}
         </ThemedText>
         <Button
-          label={`↻ ${t('common.refresh')}`}
+          icon="↻"
+          label={t('common.refresh')}
           variant="secondary"
           size="sm"
           accessibilityLabel={t('events.refresh')}

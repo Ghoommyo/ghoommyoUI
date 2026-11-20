@@ -8,6 +8,8 @@ type Variant = 'primary' | 'success' | 'danger' | 'secondary' | 'text';
 
 type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   label: string;
+  /** A mark shown before the label (✓, ✕, ↻); screen readers read only the label. */
+  icon?: string;
   variant?: Variant;
   size?: 'sm' | 'md';
   loading?: boolean;
@@ -16,6 +18,7 @@ type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
 
 export function Button({
   label,
+  icon,
   variant = 'primary',
   size = 'md',
   loading = false,
@@ -38,7 +41,10 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
+      // Small buttons look 32 tall; the touch area reaches 44.
+      hitSlop={size === 'sm' ? { top: 6, bottom: 6 } : undefined}
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
@@ -54,7 +60,7 @@ export function Button({
         // One line: Android sometimes lays out a Hindi/Marathi label narrower than it measured it, and
         // the wrapped last word was hidden.
         <ThemedText type={size === 'sm' ? 'smallBold' : 'default'} style={{ color }} numberOfLines={1}>
-          {label}
+          {icon ? `${icon} ${label}` : label}
         </ThemedText>
       )}
     </Pressable>

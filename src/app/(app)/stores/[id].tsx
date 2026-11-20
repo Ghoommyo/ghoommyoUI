@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactElement } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo, useState, type ReactElement } from 'react';
+import { ActivityIndicator, Linking, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, errorMessage } from '@/api';
@@ -251,6 +251,20 @@ function GalleryTab({ storeId }: { storeId: string }) {
   const theme = useTheme();
   const gallery = useGallery(storeId);
   const [open, setOpen] = useState<number | null>(null);
+  const count = gallery.data?.length ?? 0;
+  // Wraps around at either end.
+  const step = (by: number) => setOpen((i) => (i === null || count < 2 ? i : (i + by + count) % count));
+  // A sideways swipe of more than 50 points pages; vertical moves are left alone.
+  const swipe = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 20 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+        onPanResponderRelease: (_, g) => {
+          if (Math.abs(g.dx) > 50 && count > 1) setOpen((i) => (i === null ? i : (i + (g.dx < 0 ? 1 : -1) + count) % count));
+        },
+      }),
+    [count],
+  );
   if (gallery.isLoading) return <ActivityIndicator style={styles.empty} color={theme.primary} />;
   if (gallery.isError) return <Banner message={{ type: 'error', text: errorMessage(gallery.error) }} onRetry={() => gallery.refetch()} />;
   const images = gallery.data ?? [];
@@ -289,12 +303,25 @@ function GalleryTab({ storeId }: { storeId: string }) {
       </View>
       <Sheet visible={shown !== null} title={open === null ? '' : pictureName(open)} onClose={() => setOpen(null)}>
         {shown ? (
-          <Image
-            source={{ uri: shown.imageUrl }}
-            contentFit="contain"
-            accessibilityLabel={shown.caption || undefined}
-            style={styles.full}
-          />
+          <View style={styles.viewer}>
+            <View {...swipe.panHandlers}>
+              <Image
+                source={{ uri: shown.imageUrl }}
+                contentFit="contain"
+                accessibilityLabel={shown.caption || undefined}
+                style={styles.full}
+              />
+            </View>
+            {images.length > 1 ? (
+              <View style={styles.pager}>
+                <Button label={t('gallery.previous')} variant="secondary" onPress={() => step(-1)} />
+                <ThemedText themeColor="textSecondary" accessibilityLiveRegion="polite">
+                  {`${(open ?? 0) + 1} / ${images.length}`}
+                </ThemedText>
+                <Button label={t('gallery.next')} variant="secondary" onPress={() => step(1)} />
+              </View>
+            ) : null}
+          </View>
         ) : null}
       </Sheet>
     </>
@@ -399,6 +426,15 @@ const styles = StyleSheet.create({
   full: {
     width: '100%',
     aspectRatio: 3 / 4,
+  },
+  viewer: {
+    gap: Spacing.two,
+  },
+  pager: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
   },
   empty: {
     textAlign: 'center',

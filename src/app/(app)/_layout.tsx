@@ -15,7 +15,7 @@ export default function AppLayout() {
       drawerContent={(props) => <SideMenu {...props} />}
       screenOptions={{ headerShown: false, drawerPosition: 'left', drawerType: 'front' }}>
       <Drawer.Screen name="home" options={{ title: t('menu.home') }} />
-      <Drawer.Screen name="dashboard" options={{ title: t('menu.dashboard') }} />
+      <Drawer.Screen name="dashboard" options={{ title: t(session?.role === 'store' ? 'menu.dashboard' : 'menu.book') }} />
       <Drawer.Screen name="reviews" options={{ title: t('menu.reviews') }} />
       <Drawer.Screen name="stores/index" options={{ title: t('menu.explore') }} />
       <Drawer.Screen name="stores/[id]" options={{ title: t('storePage.title') }} />

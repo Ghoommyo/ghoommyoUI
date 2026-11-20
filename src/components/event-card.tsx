@@ -16,6 +16,8 @@ const STATUS_LABEL: Record<BookingStatus, MessageKey> = {
   rejected: 'status.rejected',
   cancelled: 'status.cancelled',
 };
+// Shown before the word; screen readers read only the word.
+const STATUS_MARK: Record<BookingStatus, string> = { accepted: '✓', pending: '◦', rejected: '✕', cancelled: '–' };
 
 export function StatusChip({ status }: { status: BookingStatus }) {
   const { t } = useT();
@@ -23,9 +25,9 @@ export function StatusChip({ status }: { status: BookingStatus }) {
   const color = { accepted: theme.success, pending: theme.warning, rejected: theme.danger, cancelled: theme.textSecondary }[status];
 
   return (
-    <View style={[styles.chip, { backgroundColor: color }]}>
+    <View accessible accessibilityLabel={t(STATUS_LABEL[status])} style={[styles.chip, { backgroundColor: color }]}>
       <ThemedText type="smallBold" style={{ color: theme.onPrimary, fontSize: 13 }}>
-        {t(STATUS_LABEL[status])}
+        {STATUS_MARK[status]} {t(STATUS_LABEL[status])}
       </ThemedText>
     </View>
   );

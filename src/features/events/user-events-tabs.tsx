@@ -21,21 +21,23 @@ import { useT } from '@/i18n/language-provider';
 import type { MessageKey } from '@/i18n/messages';
 import type { Translate } from '@/i18n/translate';
 
-type TabKey = 'coming' | 'inProgress' | 'completed';
+type TabKey = 'coming' | 'inProgress' | 'completed' | 'closed';
 
 const tabs = (t: Translate): Tab<TabKey>[] => [
   { key: 'coming', label: t('events.coming') },
   { key: 'inProgress', label: t('events.inProgress') },
   { key: 'completed', label: t('events.completed') },
+  { key: 'closed', label: t('events.closed') },
 ];
 
 const EMPTY: Record<TabKey, MessageKey> = {
   coming: 'events.comingEmpty',
   inProgress: 'events.inProgressEmpty',
   completed: 'events.completedEmpty',
+  closed: 'events.closedEmpty',
 };
 
-/** The signed-in user's bookings: from tomorrow, today, and before today. */
+/** The signed-in user's bookings: from tomorrow, today, before today, and rejected or cancelled. */
 export function UserEventsTabs() {
   const { t } = useT();
   const [tab, setTab] = useState<TabKey>('coming');
@@ -68,7 +70,8 @@ export function UserEventsTabs() {
           {t('events.yourBookings')}
         </ThemedText>
         <Button
-          label={`↻ ${t('common.refresh')}`}
+          icon="↻"
+          label={t('common.refresh')}
           variant="secondary"
           size="sm"
           accessibilityLabel={t('events.refresh')}
@@ -98,7 +101,7 @@ export function UserEventsTabs() {
               <>
                 <StatusChip status={b.status} />
                 {canEditBooking(b, today) ? (
-                  <Button label={t('events.edit')} variant="secondary" size="sm" onPress={() => startEdit(b)} />
+                  <Button icon="✎" label={t('events.edit')} variant="secondary" size="sm" onPress={() => startEdit(b)} />
                 ) : null}
               </>
             }

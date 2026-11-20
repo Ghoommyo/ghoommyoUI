@@ -72,7 +72,7 @@ export function EmailVerifyField({
   });
 
   const verify = useMutation({
-    mutationFn: () => api.verifyEmailCode({ email: email.trim(), purpose, role: role!, code }),
+    mutationFn: (value: string) => api.verifyEmailCode({ email: email.trim(), purpose, role: role!, code: value }),
     onSuccess: (verificationToken) => {
       setSent(null);
       setCode('');
@@ -92,7 +92,7 @@ export function EmailVerifyField({
       setCodeError(t('email.enterCode'));
       return;
     }
-    verify.mutate();
+    verify.mutate(code.trim());
   };
 
   const change = () => {
@@ -147,8 +147,11 @@ export function EmailVerifyField({
           label={t('email.code')}
           value={code}
           onChangeText={(value) => {
-            setCode(value.replace(/\D/g, '').slice(0, 6));
+            const digits = value.replace(/\D/g, '').slice(0, 6);
+            setCode(digits);
             setCodeError(undefined);
+            // The sixth digit (typed or filled in from the SMS/email) checks the code at once.
+            if (digits.length === 6 && digits !== code && !verify.isPending) verify.mutate(digits);
           }}
           error={codeError}
           hint={

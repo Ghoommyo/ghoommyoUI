@@ -3,9 +3,10 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 
 import { api, errorMessage } from '@/api';
+import { useSession } from '@/auth/session';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import { ChoiceChips } from '@/components/ui/choice-chips';
 import { TextField } from '@/components/ui/text-field';
 import { EmailVerifyField } from '@/features/auth/email-verify-field';
 import {
@@ -16,11 +17,10 @@ import {
   validateUsername,
 } from '@/features/auth/auth-form';
 import { normalizeStoreName, storeKey, validateStoreName } from '@/lib/store-name';
-import type { Role, SignupInput } from '@/types/domain';
+import type { Credentials, Role, SignupInput } from '@/types/domain';
 import { useT } from '@/i18n/language-provider';
 
 type FieldErrors = {
-  role?: string;
   username?: string;
   locationName?: string;
   email?: string;
@@ -30,7 +30,9 @@ type FieldErrors = {
 
 export default function SignupScreen() {
   const { t } = useT();
-  const [role, setRole] = useState<Role>();
+  const { signIn } = useSession();
+  // Most people sign up to book, so a customer account is chosen to start with.
+  const [role, setRole] = useState<Role>('user');
   const [username, setUsername] = useState('');
   const [locationName, setLocationName] = useState('');
   const [email, setEmail] = useState('');
@@ -40,9 +42,24 @@ export default function SignupScreen() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const isStore = role === 'store';
 
+  // A new account is signed in straight away with the same email or store name and password.
+  // If that sign-in fails, the account still exists, so the login screen takes over.
   const signup = useMutation({
-    mutationFn: (input: SignupInput) => api.signup(input),
-    onSuccess: (result, input) =>
+    mutationFn: async (input: SignupInput) => {
+      await api.signup(input);
+      const credentials: Credentials =
+        input.role === 'store'
+          ? { role: 'store', login: input.locationName, password: input.password }
+          : { role: 'user', email: input.email, password: input.password };
+      return api.login(credentials).catch(() => null);
+    },
+    onSuccess: async (session, input) => {
+      if (session) {
+        await signIn(session);
+        // New stores start in Settings to set their hours and order types.
+        router.replace(input.role === 'store' ? '/settings' : '/dashboard');
+        return;
+      }
       router.replace({
         pathname: '/login',
         params: {
@@ -50,12 +67,12 @@ export default function SignupScreen() {
           role: input.role,
           ...(input.role === 'store' ? { store: input.locationName } : {}),
         },
-      }),
+      });
+    },
   });
 
   const submit = () => {
     const next: FieldErrors = {
-      role: role ? undefined : t('auth.chooseType'),
       username: role === 'user' ? validateUsername(username, t) : undefined,
       locationName: isStore ? validateStoreName(locationName, t) : undefined,
       email: validateEmail(email, t) ?? (verificationToken ? undefined : t('auth.verifyFirst')),
@@ -66,7 +83,7 @@ export default function SignupScreen() {
       confirm: confirm !== password ? t('auth.passwordsDiffer') : undefined,
     };
     setErrors(next);
-    if (!role || !verificationToken || Object.values(next).some(Boolean)) return;
+    if (!verificationToken || Object.values(next).some(Boolean)) return;
     signup.mutate(
       role === 'store'
         ? { role: 'store', locationName: normalizeStoreName(locationName), email: email.trim(), password, verificationToken }
@@ -83,18 +100,15 @@ export default function SignupScreen() {
       <Banner
         message={signup.isError ? { type: 'error', text: errorMessage(signup.error) } : null}
       />
-      <Select
+      <ChoiceChips
         label={t('auth.type')}
-        placeholder={t('auth.typePlaceholder')}
         value={role}
         options={roleOptions(t)}
         onChange={(value) => {
-          // A verified email is tied to the account type.
+          // A verified email is tied to the account type; the typed names and email stay.
           if (value !== role) setVerificationToken(null);
           setRole(value);
-          setErrors((e) => ({ ...e, role: undefined }));
         }}
-        error={errors.role}
       />
       {isStore ? (
         <TextField
@@ -115,7 +129,7 @@ export default function SignupScreen() {
           }
           autoComplete="organization"
         />
-      ) : role === 'user' ? (
+      ) : (
         <TextField
           label={t('auth.username')}
           value={username}
@@ -125,9 +139,9 @@ export default function SignupScreen() {
           autoComplete="username"
           textContentType="username"
         />
-      ) : null}
+      )}
       <EmailVerifyField
-        key={role ?? 'none'}
+        key={role}
         role={role}
         purpose="signup"
         email={email}

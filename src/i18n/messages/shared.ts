@@ -31,7 +31,7 @@ export const shared = defineMessages({
 
   "orderType.table": { en: "Book table", hi: "टेबल बुक करें", mr: "टेबल बुक करा" },
   "orderType.pickup": { en: "Pickup", hi: "पिकअप", mr: "पिकअप" },
-  "orderType.porter": { en: "Porter", hi: "पोर्टर", mr: "पोर्टर" },
+  "orderType.porter": { en: "Delivery (Porter)", hi: "डिलीवरी (पोर्टर)", mr: "डिलिव्हरी (पोर्टर)" },
   "orderType.appointment": { en: "Book appointment", hi: "अपॉइंटमेंट बुक करें", mr: "अपॉइंटमेंट बुक करा" },
   "orderType.homeVisit": { en: "Book home visit", hi: "घर पर बुलाएँ", mr: "घरी बोलवा" },
 
@@ -49,10 +49,13 @@ export const shared = defineMessages({
   "catalog.Service": { en: "Service", hi: "सेवा", mr: "सेवा" },
   "catalog.service": { en: "service", hi: "सेवा", mr: "सेवा" },
 
-  "status.accepted": { en: "✓ Accepted", hi: "✓ स्वीकार", mr: "✓ स्वीकारले" },
-  "status.pending": { en: "◦ Pending", hi: "◦ बाकी", mr: "◦ प्रलंबित" },
+  "common.show": { en: "Show", hi: "दिखाएँ", mr: "दाखवा" },
+  "common.hide": { en: "Hide", hi: "छिपाएँ", mr: "लपवा" },
+  "common.showPassword": { en: "Show password", hi: "पासवर्ड दिखाएँ", mr: "पासवर्ड दाखवा" },
+  "status.accepted": { en: "Accepted", hi: "स्वीकार", mr: "स्वीकारले" },
+  "status.pending": { en: "Pending", hi: "बाकी", mr: "प्रलंबित" },
   "status.cancelled": { en: "Cancelled", hi: "रद्द", mr: "रद्द" },
-  "status.rejected": { en: "✕ Rejected", hi: "✕ अस्वीकार", mr: "✕ नाकारले" },
+  "status.rejected": { en: "Rejected", hi: "अस्वीकार", mr: "नाकारले" },
 
   "hint.readOnly": { en: "Can't be changed yet — the server doesn't support it.", hi: "अभी बदला नहीं जा सकता — सर्वर इसे सपोर्ट नहीं करता।", mr: "अजून बदलता येत नाही — सर्व्हर याला सपोर्ट करत नाही." },
   "hint.inactiveStore": {

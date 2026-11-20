@@ -73,7 +73,8 @@ export function Select<T extends string | number>({
       ) : null}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label ?? placeholder ?? t('common.select')}
+        // "Order type, Book table": screen readers hear the chosen value too.
+        accessibilityLabel={[label, selected?.label ?? placeholder ?? t('common.select')].filter(Boolean).join(', ')}
         accessibilityHint={t('app.opensList')}
         disabled={disabled}
         onPress={() => setOpen(true)}

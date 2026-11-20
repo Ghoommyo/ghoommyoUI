@@ -209,7 +209,7 @@ export function UserDashboard() {
   };
 
   return (
-    <Screen ads>
+    <Screen>
       <AppHeader />
       {/* The booking just made: at the top, where the customer lands, with a way to see it. */}
       {bookedMessage && !message && !inactive ? (

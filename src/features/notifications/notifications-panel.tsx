@@ -195,6 +195,7 @@ function NotificationRow({
       {isStore && booking?.status === 'pending' ? (
         <View style={styles.decide}>
           <Button
+            icon="✕"
             label={t('booking.reject')}
             variant="danger"
             loading={busy === 'rejected'}
@@ -202,6 +203,7 @@ function NotificationRow({
             onPress={() => setRejecting(true)}
           />
           <Button
+            icon="✓"
             label={t('booking.accept')}
             variant="success"
             loading={busy === 'accepted'}

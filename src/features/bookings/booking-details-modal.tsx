@@ -163,10 +163,10 @@ export function BookingDetailsModal({
           />
         ) : null}
         {booking.status !== 'rejected' ? (
-          <Button label={t('booking.reject')} variant="danger" loading={busy === 'rejected'} disabled={setStatus.isPending} onPress={() => setRejecting(true)} />
+          <Button icon="✕" label={t('booking.reject')} variant="danger" loading={busy === 'rejected'} disabled={setStatus.isPending} onPress={() => setRejecting(true)} />
         ) : null}
         {booking.status !== 'accepted' ? (
-          <Button label={t('booking.accept')} variant="success" loading={busy === 'accepted'} disabled={setStatus.isPending} onPress={() => change('accepted')} />
+          <Button icon="✓" label={t('booking.accept')} variant="success" loading={busy === 'accepted'} disabled={setStatus.isPending} onPress={() => change('accepted')} />
         ) : null}
       </View>
     ) : viewer === 'user' && (edit || rate || canCancel) ? (

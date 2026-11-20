@@ -10,7 +10,7 @@ export const screens = defineMessages({
   "home.seeAll": { en: "See all {count}", hi: "सभी {count} देखें", mr: "सर्व {count} पाहा" },
   "home.book": { en: "Book", hi: "बुक करें", mr: "बुक करा" },
 
-  "eventsPage.title": { en: "Events", hi: "मेरी बुकिंग", mr: "माझी बुकिंग" },
+  "eventsPage.title": { en: "My bookings", hi: "मेरी बुकिंग", mr: "माझी बुकिंग" },
   "reviewsPage.title": { en: "Reviews", hi: "रिव्यू", mr: "रिव्ह्यू" },
   "reviewsPage.store": { en: "Store", hi: "स्टोर", mr: "स्टोअर" },
   "reviewsPage.back": { en: "← Back to dashboard", hi: "← डैशबोर्ड पर वापस", mr: "← डॅशबोर्डवर परत" },

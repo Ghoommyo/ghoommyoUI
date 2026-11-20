@@ -1,9 +1,12 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n/language-provider';
+
+import { Button } from './button';
 
 type TextFieldProps = TextInputProps & {
   label: string;
@@ -14,8 +17,22 @@ type TextFieldProps = TextInputProps & {
   accessory?: ReactNode;
 };
 
-export function TextField({ label, error, hint, accessory, style, multiline, editable, ...rest }: TextFieldProps) {
+export function TextField({ label, error, hint, accessory, style, multiline, editable, secureTextEntry, ...rest }: TextFieldProps) {
   const theme = useTheme();
+  const { t } = useT();
+  // Password fields get a Show / Hide button, unless they bring their own accessory.
+  const [revealed, setRevealed] = useState(false);
+  const side =
+    accessory ??
+    (secureTextEntry ? (
+      <Button
+        label={t(revealed ? 'common.hide' : 'common.show')}
+        variant="secondary"
+        accessibilityLabel={t('common.showPassword')}
+        accessibilityState={{ checked: revealed }}
+        onPress={() => setRevealed((r) => !r)}
+      />
+    ) : null);
 
   return (
     <View style={styles.container}>
@@ -38,8 +55,9 @@ export function TextField({ label, error, hint, accessory, style, multiline, edi
             style,
           ]}
           {...rest}
+          secureTextEntry={secureTextEntry && !revealed}
         />
-        {accessory}
+        {side}
       </View>
       {error ? (
         <ThemedText type="small" style={{ color: theme.danger }}>

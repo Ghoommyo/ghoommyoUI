@@ -125,14 +125,16 @@ export function monthGrid(year: number, month: number): (DateKey | null)[] {
   return cells;
 }
 
-/** Splits bookings into upcoming (from tomorrow), today, and past. */
+/** Splits bookings into upcoming (from tomorrow), today, past, and rejected or cancelled. */
 export function bucketEvents(bookings: Booking[], today: DateKey) {
   const coming: Booking[] = [];
   const inProgress: Booking[] = [];
   const completed: Booking[] = [];
+  const closed: Booking[] = [];
   for (const b of bookings) {
     const day = b.slotStart.slice(0, 10);
-    if (day > today) coming.push(b);
+    if (b.status === 'rejected' || b.status === 'cancelled') closed.push(b);
+    else if (day > today) coming.push(b);
     else if (day === today) inProgress.push(b);
     else completed.push(b);
   }
@@ -140,5 +142,6 @@ export function bucketEvents(bookings: Booking[], today: DateKey) {
   coming.sort(asc);
   inProgress.sort(asc);
   completed.sort((a, b) => asc(b, a));
-  return { coming, inProgress, completed };
+  closed.sort((a, b) => asc(b, a));
+  return { coming, inProgress, completed, closed };
 }
