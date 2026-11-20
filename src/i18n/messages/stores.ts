@@ -10,6 +10,7 @@ export const stores = defineMessages({
 
   "explore.title": { en: "Explore stores", hi: "स्टोर खोजें", mr: "स्टोअर शोधा" },
   "explore.search": { en: "Search stores by name", hi: "नाम से स्टोर खोजें", mr: "नावाने स्टोअर शोधा" },
+  "explore.clear": { en: "Clear search", hi: "खोज हटाएँ", mr: "शोध साफ करा" },
   "explore.searchPlaceholder": { en: "e.g. bakery", hi: "जैसे बेकरी", mr: "उदा. बेकरी" },
   "explore.results": { en: "Stores", hi: "स्टोर", mr: "स्टोअर" },
   "explore.none": { en: "No stores match \"{query}\".", hi: "\"{query}\" से मिलता कोई स्टोर नहीं।", mr: "\"{query}\" शी जुळणारे स्टोअर नाही." },
@@ -36,6 +37,8 @@ export const stores = defineMessages({
   "storePage.noPictures": { en: "No pictures yet.", hi: "अभी कोई फ़ोटो नहीं।", mr: "अजून फोटो नाहीत." },
   "storePage.pictureOf": { en: "Picture {count} of {total}", hi: "फ़ोटो {count} / {total}", mr: "फोटो {count} / {total}" },
 
+  "gallery.previous": { en: "Previous", hi: "पिछली", mr: "मागील" },
+  "gallery.next": { en: "Next", hi: "अगली", mr: "पुढील" },
   "gallery.title": { en: "Gallery", hi: "गैलरी", mr: "गॅलरी" },
   "gallery.hint": { en: "Pictures of your store, shown on your store page ({count} of {max}).", hi: "आपके स्टोर की फ़ोटो, जो आपके स्टोर पेज पर दिखती हैं ({max} में से {count})।", mr: "तुमच्या स्टोअरचे फोटो, जे तुमच्या स्टोअर पेजवर दिसतात ({max} पैकी {count})." },
   "gallery.add": { en: "Add picture", hi: "फ़ोटो जोड़ें", mr: "फोटो जोडा" },

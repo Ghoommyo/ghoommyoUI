@@ -53,7 +53,7 @@ export function StoreGallery({ store }: { store: Store }) {
       {gallery.isLoading ? (
         <ActivityIndicator />
       ) : gallery.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(gallery.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(gallery.error) }} onRetry={() => gallery.refetch()} />
       ) : !count ? (
         <ThemedText themeColor="textSecondary" style={styles.empty}>
           {t('gallery.empty')}

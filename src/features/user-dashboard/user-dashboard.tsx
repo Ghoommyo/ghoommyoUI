@@ -209,7 +209,7 @@ export function UserDashboard() {
   };
 
   return (
-    <Screen ads>
+    <Screen>
       <AppHeader />
       {/* The booking just made: at the top, where the customer lands, with a way to see it. */}
       {bookedMessage && !message && !inactive ? (
@@ -269,7 +269,7 @@ export function UserDashboard() {
         </View>
       ) : null}
       {stores.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(stores.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(stores.error) }} onRetry={() => stores.refetch()} />
       ) : null}
 
       <View style={[styles.card, { backgroundColor: theme.card }]}>

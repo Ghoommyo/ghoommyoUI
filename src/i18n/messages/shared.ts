@@ -31,7 +31,7 @@ export const shared = defineMessages({
 
   "orderType.table": { en: "Book table", hi: "टेबल बुक करें", mr: "टेबल बुक करा" },
   "orderType.pickup": { en: "Pickup", hi: "पिकअप", mr: "पिकअप" },
-  "orderType.porter": { en: "Porter", hi: "पोर्टर", mr: "पोर्टर" },
+  "orderType.porter": { en: "Delivery (Porter)", hi: "डिलीवरी (पोर्टर)", mr: "डिलिव्हरी (पोर्टर)" },
   "orderType.appointment": { en: "Book appointment", hi: "अपॉइंटमेंट बुक करें", mr: "अपॉइंटमेंट बुक करा" },
   "orderType.homeVisit": { en: "Book home visit", hi: "घर पर बुलाएँ", mr: "घरी बोलवा" },
 
@@ -49,10 +49,13 @@ export const shared = defineMessages({
   "catalog.Service": { en: "Service", hi: "सेवा", mr: "सेवा" },
   "catalog.service": { en: "service", hi: "सेवा", mr: "सेवा" },
 
-  "status.accepted": { en: "✓ Accepted", hi: "✓ स्वीकार", mr: "✓ स्वीकारले" },
-  "status.pending": { en: "◦ Pending", hi: "◦ बाकी", mr: "◦ प्रलंबित" },
+  "common.show": { en: "Show", hi: "दिखाएँ", mr: "दाखवा" },
+  "common.hide": { en: "Hide", hi: "छिपाएँ", mr: "लपवा" },
+  "common.showPassword": { en: "Show password", hi: "पासवर्ड दिखाएँ", mr: "पासवर्ड दाखवा" },
+  "status.accepted": { en: "Accepted", hi: "स्वीकार", mr: "स्वीकारले" },
+  "status.pending": { en: "Pending", hi: "बाकी", mr: "प्रलंबित" },
   "status.cancelled": { en: "Cancelled", hi: "रद्द", mr: "रद्द" },
-  "status.rejected": { en: "✕ Rejected", hi: "✕ अस्वीकार", mr: "✕ नाकारले" },
+  "status.rejected": { en: "Rejected", hi: "अस्वीकार", mr: "नाकारले" },
 
   "hint.readOnly": { en: "Can't be changed yet — the server doesn't support it.", hi: "अभी बदला नहीं जा सकता — सर्वर इसे सपोर्ट नहीं करता।", mr: "अजून बदलता येत नाही — सर्व्हर याला सपोर्ट करत नाही." },
   "hint.inactiveStore": {
@@ -76,6 +79,8 @@ export const shared = defineMessages({
 
   "error.generic": { en: "Something went wrong. Please try again.", hi: "कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।", mr: "काहीतरी चुकले. कृपया पुन्हा प्रयत्न करा." },
   "error.offline": { en: "Can't reach the server. Check your connection and try again.", hi: "सर्वर से कनेक्ट नहीं हो पा रहा। अपना इंटरनेट देखें और फिर से कोशिश करें।", mr: "सर्व्हरशी जोडता येत नाही. तुमचे इंटरनेट तपासा आणि पुन्हा प्रयत्न करा." },
+  "auth.sessionEnded": { en: "Your session ended. Please log in again.", hi: "आपका सत्र खत्म हो गया। कृपया फिर से लॉगिन करें।", mr: "तुमचे सत्र संपले. कृपया पुन्हा लॉगिन करा." },
+  "account.deleted": { en: "Your account has been deleted.", hi: "आपका खाता हटा दिया गया है।", mr: "तुमचे खाते हटवले आहे." },
   "error.shopsOnly": { en: "Only shops can sign in here. Places aren't supported on the web yet.", hi: "यहाँ सिर्फ़ दुकानें साइन इन कर सकती हैं। जगहें अभी वेब पर नहीं हैं।", mr: "इथे फक्त दुकाने साइन इन करू शकतात. ठिकाणे अजून वेबवर नाहीत." },
   "error.noStore": { en: "This store doesn't exist or is no longer taking bookings.", hi: "यह स्टोर मौजूद नहीं है या अब बुकिंग नहीं ले रहा।", mr: "हे स्टोअर अस्तित्वात नाही किंवा आता बुकिंग घेत नाही." },
   "home.otherStores": { en: "Other stores", hi: "अन्य स्टोर", mr: "इतर स्टोअर" },

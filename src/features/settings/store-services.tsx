@@ -59,7 +59,7 @@ export function StoreServices({ store }: { store: Store }) {
       {services.isLoading ? (
         <ActivityIndicator />
       ) : services.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(services.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(services.error) }} onRetry={() => services.refetch()} />
       ) : !services.data?.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
           {t('items.empty', { items: words.items })}

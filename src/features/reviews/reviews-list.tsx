@@ -34,7 +34,7 @@ export function ReviewsList({ storeId, header }: { storeId: string; header: Reac
       ListHeaderComponent={
         <View style={styles.headerArea}>
           {header}
-          {reviews.isError ? <Banner message={{ type: 'error', text: errorMessage(reviews.error) }} /> : null}
+          {reviews.isError ? <Banner message={{ type: 'error', text: errorMessage(reviews.error) }} onRetry={() => reviews.refetch()} /> : null}
           {summary && summary.count > 0 && summary.average !== null ? (
             <View style={[styles.summary, { backgroundColor: theme.backgroundElement }]}>
               <ThemedText style={styles.average}>{summary.average.toFixed(1)}</ThemedText>

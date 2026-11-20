@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
@@ -26,21 +26,28 @@ export function StoreCard({ id, name, photoUrl, bio, rating, line }: StoreCardPr
   const theme = useTheme();
   return (
     <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
-      <StorePhoto uri={photoUrl} name={name} style={styles.photo} />
-      <View style={styles.top}>
-        <ThemedText type="smallBold" style={styles.name}>
-          {name}
+      {/* The whole card above the buttons opens the store page; the buttons are siblings, not nested. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('home.profileNamed', { name })}
+        onPress={() => router.push({ pathname: '/stores/[id]', params: { id } })}
+        style={({ pressed }) => [styles.open, pressed && styles.pressed]}>
+        <StorePhoto uri={photoUrl} name={name} style={styles.photo} />
+        <View style={styles.top}>
+          <ThemedText type="smallBold" style={styles.name}>
+            {name}
+          </ThemedText>
+          <RatingBadge rating={rating} />
+        </View>
+        <ThemedText type="small" themeColor="textSecondary">
+          {line}
         </ThemedText>
-        <RatingBadge rating={rating} />
-      </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        {line}
-      </ThemedText>
-      {bio ? (
-        <ThemedText type="small" numberOfLines={2}>
-          {bio}
-        </ThemedText>
-      ) : null}
+        {bio ? (
+          <ThemedText type="small" numberOfLines={2}>
+            {bio}
+          </ThemedText>
+        ) : null}
+      </Pressable>
       <View style={styles.actions}>
         <Button
           label={t('home.book')}
@@ -66,6 +73,12 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     padding: Spacing.three,
     gap: Spacing.one,
+  },
+  open: {
+    gap: Spacing.one,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   photo: {
     width: '100%',

@@ -1,4 +1,4 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, type Href } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { useSession } from '@/auth/session';
@@ -25,10 +25,11 @@ export default function IntroScreen() {
 
   if (hasSeenIntro) return <Redirect href="/dashboard" />;
 
-  const start = async () => {
+  const go = async (to: Href) => {
     await markIntroSeen();
-    router.replace('/dashboard');
+    router.replace(to);
   };
+  const start = () => go('/dashboard');
 
   return (
     <Screen>
@@ -51,6 +52,10 @@ export default function IntroScreen() {
       ))}
 
       <Button label={t('intro.start')} onPress={start} fullWidth />
+      <View style={styles.links}>
+        <Button label={t('auth.toLogin')} variant="text" onPress={() => go('/login')} />
+        <Button label={t('auth.toSignup')} variant="text" onPress={() => go('/signup')} />
+      </View>
       <LanguagePicker />
     </Screen>
   );
@@ -61,6 +66,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingVertical: Spacing.six,
+  },
+  links: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.three,
   },
   tagline: {
     textAlign: 'center',

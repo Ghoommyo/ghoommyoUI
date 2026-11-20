@@ -11,7 +11,8 @@ import { useT } from '@/i18n/language-provider';
 
 /**
  * A Google banner pinned under the screen's content, while the admin has ads switched on.
- * It takes no space until an ad has loaded, and none if it fails (offline, nothing to show).
+ * While it loads it already holds a banner's height, so the screen doesn't jump when the ad
+ * appears; if it fails (offline, nothing to show) the space goes away.
  */
 export function AdBanner() {
   const { t } = useT();
@@ -22,6 +23,7 @@ export function AdBanner() {
   const enabled = config.data?.adsEnabled === true && !!BANNER_ID;
   const [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -44,15 +46,24 @@ export function AdBanner() {
   return (
     <View
       accessibilityLabel={t('common.advertisement')}
-      // The hidden banner covers the bottom of the screen: let taps through until an ad shows.
       pointerEvents={loaded ? 'auto' : 'none'}
-      style={loaded ? [styles.shown, { paddingBottom: insets.bottom, backgroundColor: theme.background }] : styles.loading}>
+      style={[
+        failed ? styles.failed : styles.shown,
+        !loaded && !failed && styles.loading,
+        { paddingBottom: failed ? 0 : insets.bottom, backgroundColor: theme.background },
+      ]}>
       <BannerAd
         unitId={BANNER_ID}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
         requestOptions={AD_REQUEST}
-        onAdLoaded={() => setLoaded(true)}
-        onAdFailedToLoad={() => setLoaded(false)}
+        onAdLoaded={() => {
+          setLoaded(true);
+          setFailed(false);
+        }}
+        onAdFailedToLoad={() => {
+          setLoaded(false);
+          setFailed(true);
+        }}
       />
     </View>
   );
@@ -62,8 +73,12 @@ const styles = StyleSheet.create({
   shown: {
     alignItems: 'center',
   },
-  // Laid out off to the side so the ad can load without taking space yet.
+  // A phone banner is 50–60 tall: hold that much while it loads.
   loading: {
+    minHeight: 56,
+  },
+  // Laid out off to the side, so a later retry can still load without taking space.
+  failed: {
     position: 'absolute',
     left: 0,
     right: 0,

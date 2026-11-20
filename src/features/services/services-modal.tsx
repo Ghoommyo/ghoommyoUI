@@ -79,7 +79,7 @@ export function ServicesModal({
       {services.isLoading ? (
         <ActivityIndicator style={styles.empty} />
       ) : services.isError ? (
-        <Banner message={{ type: 'error', text: errorMessage(services.error) }} />
+        <Banner message={{ type: 'error', text: errorMessage(services.error) }} onRetry={() => services.refetch()} />
       ) : !services.data?.length ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
           {t('items.none', { items: words.items })}

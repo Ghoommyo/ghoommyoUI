@@ -56,7 +56,7 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
     ? [
         { label: 'menu.home', href: '/home', route: 'home' },
         { label: 'menu.explore', href: '/stores', route: 'stores/index' },
-        { label: 'menu.dashboard', href: '/dashboard', route: 'dashboard' },
+        { label: session.role === 'store' ? 'menu.dashboard' : 'menu.book', href: '/dashboard', route: 'dashboard' },
         ...(session.role === 'user'
           ? [
               { label: 'menu.events' as const, href: '/events' as const, route: 'events' },
@@ -75,7 +75,7 @@ export function SideMenu({ state, navigation }: DrawerContentComponentProps) {
     : [
         { label: 'menu.home', href: '/home', route: 'home' },
         { label: 'menu.explore', href: '/stores', route: 'stores/index' },
-        { label: 'menu.dashboard', href: '/dashboard', route: 'dashboard' },
+        { label: 'menu.book', href: '/dashboard', route: 'dashboard' },
         { label: 'menu.login', href: '/login' },
         { label: 'menu.signup', href: '/signup' },
       ];

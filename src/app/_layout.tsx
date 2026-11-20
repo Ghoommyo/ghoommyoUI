@@ -1,13 +1,17 @@
-import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import NetInfo from '@react-native-community/netinfo';
+import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState, type PropsWithChildren } from 'react';
-import { AppState, Platform } from 'react-native';
+import { useEffect, useRef, useState, useSyncExternalStore, type PropsWithChildren } from 'react';
+import { AppState, Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiError } from '@/api';
 import { SessionProvider, useSession } from '@/auth/session';
-import { Colors } from '@/constants/theme';
+import { ThemedText } from '@/components/themed-text';
+import { Colors, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { ReminderSync } from '@/features/reminders/reminder-sync';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { LanguageProvider, useT } from '@/i18n/language-provider';
@@ -18,6 +22,10 @@ SplashScreen.preventAutoHideAsync();
 // the one-minute refresh pauses while the app is in the background.
 if (Platform.OS !== 'web') {
   AppState.addEventListener('change', (state) => focusManager.setFocused(state === 'active'));
+  // Offline: loads wait instead of failing, and run again once the phone is back online.
+  onlineManager.setEventListener((setOnline) =>
+    NetInfo.addEventListener((state) => setOnline(state.isConnected !== false)),
+  );
 }
 
 export default function RootLayout() {
@@ -53,7 +61,12 @@ export default function RootLayout() {
 }
 
 function QueryProvider({ children }: PropsWithChildren) {
-  const { signOut } = useSession();
+  const { session, signOut } = useSession();
+  // One "session ended" per sign-in, however many requests were refused.
+  const ended = useRef(false);
+  useEffect(() => {
+    if (session) ended.current = false;
+  }, [session]);
   const [client] = useState(
     () =>
       new QueryClient({
@@ -71,7 +84,10 @@ function QueryProvider({ children }: PropsWithChildren) {
       client.getQueryCache().subscribe((event) => {
         if (event.type !== 'updated' || event.action.type !== 'error') return;
         const { error } = event.action;
-        if (error instanceof ApiError && error.status === 401) signOut();
+        if (!(error instanceof ApiError && error.status === 401) || ended.current) return;
+        ended.current = true;
+        // Say why: the login screen shows "Your session ended".
+        signOut().then(() => router.push({ pathname: '/login', params: { ended: '1' } }));
       }),
     [client, signOut],
   );
@@ -91,6 +107,7 @@ function RootNavigator() {
   if (isLoading) return null;
 
   return (
+    <>
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(app)" />
@@ -104,5 +121,38 @@ function RootNavigator() {
         />
       </Stack.Protected>
     </Stack>
+    <OfflineNotice />
+    </>
   );
 }
+
+const subscribeOnline = (onChange: () => void) => onlineManager.subscribe(onChange);
+const isOnline = () => onlineManager.isOnline();
+
+/** While the phone is offline, a bar says so (loads wait and run again once it's back). */
+function OfflineNotice() {
+  const online = useSyncExternalStore(subscribeOnline, isOnline);
+  const { t } = useT();
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  if (online) return null;
+  return (
+    // At the top, clear of the ad banner at the bottom.
+    <View pointerEvents="none" style={[styles.offline, { top: insets.top + Spacing.two, backgroundColor: theme.text }]}>
+      <ThemedText type="smallBold" accessibilityRole="alert" style={{ color: theme.background, textAlign: 'center' }}>
+        {t('app.youreOffline')}
+      </ThemedText>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  offline: {
+    position: 'absolute',
+    left: Spacing.three,
+    right: Spacing.three,
+    borderRadius: Spacing.two,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+  },
+});

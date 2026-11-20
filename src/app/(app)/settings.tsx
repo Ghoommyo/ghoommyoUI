@@ -37,7 +37,7 @@ function StoreSettings({ storeId }: { storeId: string }) {
   const { t } = useT();
   const store = useStore(storeId);
   if (store.isLoading) return <ActivityIndicator />;
-  if (!store.data) return <Banner message={{ type: 'error', text: errorMessage(store.error) }} />;
+  if (!store.data) return <Banner message={{ type: 'error', text: errorMessage(store.error) }} onRetry={() => store.refetch()} />;
   return (
     <>
       {store.data.inactive ? <Banner message={{ type: 'error', text: t('hint.inactiveStore') }} /> : null}

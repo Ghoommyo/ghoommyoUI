@@ -6,6 +6,7 @@
     "@expo-google-fonts/noto-sans-devanagari": "^0.4.2",
     "@expo/ui": "~57.0.21",
     "@noble/hashes": "^1.8.0",
+    "@react-native-community/netinfo": "12.0.1",
     "@tanstack/react-query": "^5.104.1",
     "expo": "~57.0.26",
     "expo-constants": "~57.0.20",

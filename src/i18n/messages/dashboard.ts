@@ -75,5 +75,5 @@ export const dashboard = defineMessages({
   "user.resetKeep": { en: "Keep", hi: "रहने दें", mr: "राहू द्या" },
   "user.seeMyBookings": { en: "See my bookings", hi: "मेरी बुकिंग देखें", mr: "माझी बुकिंग पाहा" },
   "user.submit": { en: "Submit request", hi: "अनुरोध भेजें", mr: "विनंती पाठवा" },
-  "user.loginToBook": { en: "Login to book", hi: "बुक करने के लिए लॉगिन करें", mr: "बुक करण्यासाठी लॉगिन करा" },
+  "user.loginToBook": { en: "Log in to book", hi: "बुक करने के लिए लॉग इन करें", mr: "बुक करण्यासाठी लॉग इन करा" },
 });
