@@ -40,6 +40,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/optional-features",
       [
         "expo-splash-screen",
         {
