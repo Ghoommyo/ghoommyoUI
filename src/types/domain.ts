@@ -97,6 +97,8 @@ export interface StoreSettings {
   openDays: number[];
   /** Full slots stop bookings and show greyed out (server phase 34; false on older servers). */
   blockWhenFull?: boolean;
+  /** A day can be booked only from 12:00 am (India time) the day before (server phase 36; false on older servers). */
+  bookDayBefore?: boolean;
   /** The admin made the store inactive (only known for the signed-in store's own record). */
   inactive?: boolean;
   /** The app admin lets the store upload pictures; off by default (only known for the store's own record). */

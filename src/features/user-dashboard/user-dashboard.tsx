@@ -20,7 +20,7 @@ import { DayStrip } from '@/features/user-dashboard/day-strip';
 import { SlotGrid } from '@/features/user-dashboard/slot-grid';
 import { useMyProfile, useStores, useStoreSlots } from '@/hooks/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDayLong, formatMonthYear, formatSlotStart, makeDateKey, toDateKey } from '@/lib/date';
+import { addDays, formatDayLong, formatMonthYear, formatSlotStart, makeDateKey, toDateKey } from '@/lib/date';
 import { catalogLabels, storeTypeLabel } from '@/lib/order-types';
 import { countServices, encodeServices, parseServices } from '@/lib/services';
 import { daysInMonth, firstDay, isOpenDay, limitUnitLabel, nextOpenDay, openDaysLabel } from '@/lib/slots';
@@ -138,6 +138,9 @@ export function UserDashboard() {
     }
   }
   const closedDay = Boolean(store && !isOpenDay(store.openDays, year, month, day));
+  // Stores whose bookings open the day before (12:00 am): only today and tomorrow can be booked.
+  const lastDay = store?.bookDayBefore ? addDays(toDateKey(today), 1) : null;
+  const tooEarly = lastDay !== null && dateKey > lastDay;
   // Products or Services, by the store type; "Products" until a store is picked.
   const words = catalogLabels(t, store?.catalogType);
   const slots = useStoreSlots(storeId, dateKey);
@@ -306,11 +309,17 @@ export function UserDashboard() {
           year={year}
           month={month}
           day={day}
+          lastDay={lastDay}
           onChange={(d) => {
             setDay(d);
             setSelectedSlot(null);
           }}
         />
+        {store?.bookDayBefore ? (
+          <ThemedText type="small" style={{ color: theme.cardTextSecondary }}>
+            {t('schedule.dayBeforeNote')}
+          </ThemedText>
+        ) : null}
 
         {!store ? (
           <ThemedText type="small" style={[styles.empty, { color: theme.cardTextSecondary }]}>
@@ -321,6 +330,10 @@ export function UserDashboard() {
         ) : slots.isError ? (
           <ThemedText type="small" style={[styles.empty, { color: theme.danger }]}>
             {errorMessage(slots.error)}
+          </ThemedText>
+        ) : tooEarly ? (
+          <ThemedText type="smallBold" style={[styles.empty, { color: theme.cardTextSecondary }]}>
+            {t('schedule.opensOn', { day: formatDayLong(dateKey, language), before: formatDayLong(addDays(dateKey, -1), language) })}
           </ThemedText>
         ) : closedDay ? (
           <ThemedText type="smallBold" style={[styles.empty, { color: theme.cardTextSecondary }]}>

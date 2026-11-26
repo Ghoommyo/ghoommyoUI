@@ -30,6 +30,7 @@ export interface GhoomoLocation {
   open_days?: number[] | null;
   /** 1 = full slots stop bookings (phase 34). */
   block_when_full?: number | null;
+  book_day_before?: number | null;
   /** From the location's profile, so customers know where to go; null when not filled in. */
   loc_address?: string | null;
   loc_city?: string | null;
@@ -72,6 +73,7 @@ export interface GhoomoSettings {
   open_days?: number[];
   /** 1 = full slots stop bookings (phase 34). */
   block_when_full?: number;
+  book_day_before?: number;
   /** 1 when the admin made the location inactive (GET settings only). */
   store_inactive?: number;
   /** 1 when the app admin lets the location upload pictures (GET settings only). */

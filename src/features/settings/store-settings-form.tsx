@@ -82,6 +82,7 @@ const toDraft = (store: Store): Draft => ({
   openDays: store.openDays,
   isDarkStore: store.isDarkStore,
   blockWhenFull: Boolean(store.blockWhenFull),
+  bookDayBefore: Boolean(store.bookDayBefore),
   catalogType: store.catalogType,
   serviceType: store.serviceType,
   otherType: '',
@@ -251,6 +252,12 @@ export function StoreSettingsForm({ store }: { store: Store }) {
         description={t(draft.blockWhenFull ? 'storeSettings.blockWhenFullOn' : 'storeSettings.blockWhenFullOff')}
         value={Boolean(draft.blockWhenFull)}
         onChange={(v) => set('blockWhenFull', v)}
+      />
+      <SwitchRow
+        label={t('storeSettings.bookDayBefore')}
+        description={t(draft.bookDayBefore ? 'storeSettings.bookDayBeforeOn' : 'storeSettings.bookDayBeforeOff')}
+        value={Boolean(draft.bookDayBefore)}
+        onChange={(v) => set('bookDayBefore', v)}
       />
       {!USE_REAL_API ? (
         <TextField
