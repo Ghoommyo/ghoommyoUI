@@ -5,6 +5,8 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n/language-provider';
+import { makeDateKey } from '@/lib/date';
+import type { DateKey } from '@/types/domain';
 import { firstDay, monthDays } from '@/lib/slots';
 
 type DayStripProps = {
@@ -14,6 +16,8 @@ type DayStripProps = {
   year: number;
   month: number;
   day: number;
+  /** The last day that can be booked now (stores whose bookings open the day before); later days show "Not yet". */
+  lastDay?: DateKey | null;
   onChange(day: number): void;
 };
 
@@ -21,7 +25,7 @@ const CHIP_WIDTH = 56;
 const GAP = Spacing.two;
 
 /** The days of the month from today, side by side; closed days can't be picked. */
-export function DayStrip({ today, openDays, year, month, day, onChange }: DayStripProps) {
+export function DayStrip({ today, openDays, year, month, day, lastDay, onChange }: DayStripProps) {
   const { t } = useT();
   const theme = useTheme();
   const days = monthDays(openDays, year, month, firstDay(today, year, month), t);
@@ -49,14 +53,16 @@ export function DayStrip({ today, openDays, year, month, day, onChange }: DayStr
         contentContainerStyle={styles.row}>
         {days.map((d) => {
           const selected = d.day === day;
+          const later = Boolean(lastDay) && makeDateKey(year, month, d.day) > lastDay!;
+          const off = !d.open || later;
           const color = selected ? theme.onPrimary : theme.cardText;
           return (
             <Pressable
               key={d.day}
               accessibilityRole="button"
-              accessibilityLabel={`${d.weekday} ${d.day}${d.open ? '' : `, ${t('schedule.closed')}`}`}
-              accessibilityState={{ selected, disabled: !d.open }}
-              disabled={!d.open}
+              accessibilityLabel={`${d.weekday} ${d.day}${!d.open ? `, ${t('schedule.closed')}` : later ? `, ${t('schedule.notYet')}` : ''}`}
+              accessibilityState={{ selected, disabled: off }}
+              disabled={off}
               onPress={() => onChange(d.day)}
               style={[
                 styles.chip,
@@ -64,7 +70,7 @@ export function DayStrip({ today, openDays, year, month, day, onChange }: DayStr
                   backgroundColor: selected ? theme.primary : theme.card,
                   borderColor: selected ? theme.primary : theme.border,
                 },
-                !d.open && styles.closed,
+                off && styles.closed,
               ]}>
               <ThemedText type="smallBold" style={{ color }}>
                 {d.weekday}
@@ -72,6 +78,8 @@ export function DayStrip({ today, openDays, year, month, day, onChange }: DayStr
               <ThemedText style={[styles.date, { color }]}>{d.day}</ThemedText>
               {!d.open ? (
                 <ThemedText style={[styles.closedText, { color }]}>{t('schedule.closed')}</ThemedText>
+              ) : later ? (
+                <ThemedText style={[styles.closedText, { color }]}>{t('schedule.notYet')}</ThemedText>
               ) : null}
             </Pressable>
           );

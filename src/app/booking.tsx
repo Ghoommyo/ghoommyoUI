@@ -192,7 +192,10 @@ function BookingForm({
     pendingLeave.current = data.action;
     setConfirmCancel(true);
   });
-  const slotFull = createBooking.error instanceof ApiError && createBooking.error.code === 'SLOT_FULL';
+  // The slot filled up, has started, or isn't open for booking yet: offer another time.
+  const slotFull =
+    createBooking.error instanceof ApiError &&
+    ['SLOT_FULL', 'SLOT_PASSED', 'BOOKING_NOT_OPEN'].includes(createBooking.error.code ?? '');
   const hasErrors = Object.values(errors).some(Boolean);
 
   // Where each checked field sits in the page, so Confirm can scroll to the first problem.

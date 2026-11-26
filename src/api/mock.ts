@@ -822,6 +822,16 @@ export const mockApi: Api = {
       }
       return { serviceId, name: stored.name, price: stored.price, qty };
     });
+    // Stores whose bookings open the day before (phase 36): today and tomorrow only, not past times.
+    if (store.bookDayBefore) {
+      const date = input.slotStart.slice(0, 10);
+      if (date > addDays(todayKey(), 1)) {
+        throw new ApiError(`Bookings for ${date} open at 12:00 am on ${addDays(date, -1)}.`, 409, 'BOOKING_NOT_OPEN');
+      }
+      if (store.limitUnit === 'day' ? date < todayKey() : slotStartToDate(input.slotStart) < new Date()) {
+        throw new ApiError('This time has already passed. Please choose another time.', 409, 'SLOT_PASSED');
+      }
+    }
     // Stores that stop bookings in full slots (phase 34).
     if (store.blockWhenFull) {
       const sameDay = bookings.filter((b) => b.storeId === store.id && b.slotStart.startsWith(input.slotStart.slice(0, 10)));

@@ -163,7 +163,7 @@ export function daySummaryFromCalendar(
   }));
 }
 
-type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'open_days' | 'block_when_full' | 'store_inactive' | 'uploads_on' | 'links_on' | 'gallery_on' | 'auto_approve'>;
+type SettingsFields = Pick<GhoomoSettings, 'max_limit' | 'unit' | 'is_auto_approval' | 'open_at' | 'close_at' | 'is_dark_store' | 'max_svc_qty' | 'catalog_type' | 'svc_type' | 'store_cat' | 'open_days' | 'block_when_full' | 'book_day_before' | 'store_inactive' | 'uploads_on' | 'links_on' | 'gallery_on' | 'auto_approve'>;
 /** Settings columns, which are null on browse rows for locations that never opened settings. */
 type SettingsInput = { [K in keyof SettingsFields]?: SettingsFields[K] | null };
 
@@ -197,6 +197,7 @@ export function settingsToStore(row: SettingsInput): Omit<StoreSettings, 'name'>
     storeCategory: row.store_cat || null,
     openDays: toOpenDays(row.open_days),
     blockWhenFull: Number(row.block_when_full ?? 0) === 1,
+    bookDayBefore: Number(row.book_day_before ?? 0) === 1,
     inactive: Number(row.store_inactive ?? 0) === 1,
     uploadsEnabled: Number(row.uploads_on ?? 0) === 1,
     linksEnabled: Number(row.links_on ?? 0) === 1,
@@ -218,6 +219,7 @@ export function settingsToRequest(settings: StoreSettings) {
     storeCategory: settings.storeCategory,
     openDays: settings.openDays,
     blockWhenFull: Boolean(settings.blockWhenFull),
+    bookDayBefore: Boolean(settings.bookDayBefore),
   };
 }
 
